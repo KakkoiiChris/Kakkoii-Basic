@@ -1,0 +1,3 @@
+rem File Test
+
+write("writeTest.txt", {"Hello", "World", "How", "Are", "You", "Today"})

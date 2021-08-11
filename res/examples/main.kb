@@ -1,0 +1,13 @@
+data Vector
+    var x as double,
+    var y as double
+end data
+
+sub add(a as Vector, b as Vector) as Vector
+    yield Vector {a.x + b.x, a.y + b.y}
+end sub
+
+let a = Vector{}
+let b = Vector{}
+
+yield a:add(b)

@@ -1,0 +1,9 @@
+let nameCount = input("How many names? ") as int
+
+let names as string[nameCount]
+
+for i = 0 to nameCount
+	names[i] = input("Name #", i + 1, ": ")
+end for
+
+print(names)

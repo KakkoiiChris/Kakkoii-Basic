@@ -1,0 +1,9 @@
+sub x(a as char, b as char, c as char*) as void
+    print("A: " + a + "\n")
+    print("B: " + b + "\n")
+    for d in c
+        print(d + ' ')
+    end for
+end sub
+
+x('a', 'b', 'c', 'd', 'e')

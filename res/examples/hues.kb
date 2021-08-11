@@ -1,0 +1,25 @@
+var hue = 0.0
+
+createWindow(640, 480, "KBasic")
+
+openWindow()
+
+setFont("Fira Code", 0, 32)
+
+while windowIsOpen()
+	setColor(0)
+	clear()
+	
+	setColor(hsbToColor(hue, 1.0, 1.0))
+	rem drawString(concat(mouseX(), ", ", mouseY(), ", ", wheel()), 16, 16)
+	fillOval(100, 100, 200, 200)
+    
+	flip()
+	rem poll()
+	sleep(1 / 60.0)
+	
+	hue += 0.001
+end while
+
+closeWindow()
+

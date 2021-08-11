@@ -1,0 +1,29 @@
+rem Pig Latin Translator
+
+print("Welcome!\n")
+
+var again as string
+
+while again:toLower <> "no"
+	let word = input("Translate: "):toLower
+	
+	var iv = 0
+	
+	while "aeiou":indexOf(word[iv]) == -1
+		iv += 1
+	end while
+	
+	var translation as string
+	
+	if iv == 0 then
+		translation = concat(word, "way")
+	else
+		translation = concat(word:substring(iv), word:substring(0, iv), "ay")
+	end if
+	
+	print(translation, "\n\n")
+	
+	again = input("Go again? (yes/no): "):toLower
+end while
+
+print("Farewell!\n")

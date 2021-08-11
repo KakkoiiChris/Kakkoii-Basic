@@ -1,0 +1,21 @@
+let width  = 400
+let height = 400
+let img    = loadImage("logo.png")
+
+window(width, height, 1, "Image Test")
+
+var angle = 0
+
+while shown()
+	color(0)
+	clear()
+	pushMatrix()
+	move(mouseX(), mouseY())
+	turn(angle)
+	angle += wheel() * 2.5
+	image(img, -width/2, -height/2, width, height)
+	popMatrix()
+	flip()
+	poll()
+	pause(1000 / 60)
+end while

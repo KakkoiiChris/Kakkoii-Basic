@@ -1,0 +1,49 @@
+let fps = 60.0
+let wait = 1 / fps
+
+let width = 640
+let height = 480
+
+let sphereCount = 100
+
+let x as double[sphereCount]
+let y as double[sphereCount]
+
+let dx as double[sphereCount]
+let dy as double[sphereCount]
+
+let radius = 16
+
+for i = 0 to sphereCount
+	x[i] = (width / 2) - radius + (random() * 100) - 50
+	y[i] = (height / 2) - radius + (random() * 100) - 50
+	dx[i] = (random() * 2.0) - 1.0
+	dy[i] = (random() * 2.0) - 1.0
+end for
+
+createWindow(width, height, "Zen Rainbow Energy Spheres")
+
+openWindow()
+
+while windowIsOpen()
+	setColor(0)
+	clear()
+	
+	for i = 0 to sphereCount
+		setColor(random(), random(), random())
+		fillOval(x[i] as int, y[i] as int, (radius * 2) as int, (radius * 2) as int)
+	end for
+	
+	flip()
+	
+	for i = 0 to sphereCount
+		x[i] += dx[i]
+		y[i] += dy[i]
+		if x[i] < 0 or x[i] >= width - radius * 2 dx[i] *= -1 end if
+		if y[i] < 0 or y[i] >= height - radius * 2 dy[i] *= -1 end if
+	end for
+	
+	sleep(wait)
+end while
+
+closeWindow()

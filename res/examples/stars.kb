@@ -1,0 +1,10 @@
+let stars = input("How many stars? ") as int
+
+print('\n')
+
+for row = 0 to stars
+	for col = 0 to stars - row
+		print('*')
+	end for
+	print('\n')
+end for

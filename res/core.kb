@@ -1,0 +1,681 @@
+; general
+
+sub print(args as any*) end sub
+
+sub input(args as any*) as string end sub
+
+sub concat(args as any*) as string end sub
+
+sub sleep(milliseconds as long) end sub
+
+sub sleep(seconds as double)
+    sleep((seconds * 1000) as long)
+end sub
+
+sub getMilliseconds() as long end sub
+
+sub getNanoseconds() as long end sub
+
+sub getSeconds() as double
+    yield getNanoseconds() / 1E9
+end sub
+
+sub typeOf(x as any) as string end sub
+
+sub invoke(name as string, args as any*) as any end sub
+
+sub exit(code as int) end sub
+
+sub exit()
+    exit(0)
+end sub
+
+; char
+
+sub isAlpha(c as char) as bool end sub
+
+sub isAlnum(c as char) as bool end sub
+
+sub isDigit(c as char) as bool end sub
+
+sub isSpace(c as char) as bool end sub
+
+sub isVowel(c as char) as bool end sub
+
+sub isLower(c as char) as bool end sub
+
+sub isUpper(c as char) as bool end sub
+
+sub toLower(c as char) as char end sub
+
+sub toUpper(c as char) as char end sub
+
+; string
+
+sub isBlank(s as string) as bool end sub
+
+sub isEmpty(s as string) as bool end sub
+
+sub toLower(s as string) as string end sub
+
+sub toUpper(s as string) as string end sub
+
+sub startsWith(s as string, prefix as string, ignoreCase as bool) as bool end sub
+
+sub startsWith(s as string, prefix as string) as bool
+    yield startsWith(s, prefix, false)
+end sub
+
+sub endsWith(s as string, suffix as string, ignoreCase as bool) as bool end sub
+
+sub endsWith(s as string, suffix as string) as bool
+    yield endsWith(s, suffix, false)
+end sub
+
+sub trim(s as string) as string end sub
+
+sub trimStart(s as string) as string end sub
+
+sub trimEnd(s as string) as string end sub
+
+sub substring(s as string, startIndex as int, endIndex as int) as string end sub
+
+sub substring(s as string, startIndex as int) as string
+    yield substring(s, startIndex, #s)
+end sub
+
+sub indexOf(s as string, c as char) as int end sub
+
+sub indexOf(s as string, sequence as string) as int end sub
+
+sub lastIndexOf(s as string, c as char) as int end sub
+
+sub lastIndexOf(s as string, sequence as string) as int end sub
+
+sub padstart(s as string, length as int, c as char) as string end sub
+
+sub padstart(s as string, length as int) as string
+    yield padStart(s, length, ' ')
+end sub
+
+sub padEnd(s as string, length as int, c as char) as string end sub
+
+sub padEnd(s as string, length as int) as string
+    yield padEnd(s, length, ' ')
+end sub
+
+sub replace(s as string, old as char, new as char) as string end sub
+
+sub replace(s as string, old as string, new as string) as string end sub
+
+; arrays
+
+sub forEach(x as any[], action as string)
+    for y in x
+        invoke(action, y)
+    end for
+end sub
+
+sub map(x as any[], transform as string) as any[]
+    let new as any[#x]
+    
+    for i = 0 to #x
+        new[i] = invoke(transform, x[i])
+    end for
+    
+    yield new
+end sub
+
+; math
+
+let E =  2.718281828459045
+
+let PI = 3.141592653589793
+
+sub abs(n as double) as double end sub
+
+sub abs(n as float) as float end sub
+
+sub abs(n as int) as int end sub
+
+sub abs(n as long) as long end sub
+
+sub acos(n as double) as double end sub
+
+sub acos(n as float) as float end sub
+
+sub acosh(n as double) as double end sub
+
+sub acosh(n as float) as float end sub
+
+sub asin(n as double) as double end sub
+
+sub asin(n as float) as float end sub
+
+sub asinh(n as double) as double end sub
+
+sub asinh(n as float) as float end sub
+
+sub atan(n as double) as double end sub
+
+sub atan(n as float) as float end sub
+
+sub atan2(y as double, x as double) as double end sub
+
+sub atan2(y as float, x as float) as float end sub
+
+sub atanh(n as double) as double end sub
+
+sub atanh(n as float) as float end sub
+
+sub ceil(n as double) as double end sub
+
+sub ceil(n as float) as float end sub
+
+sub cos(n as double) as double end sub
+
+sub cos(n as float) as float end sub
+
+sub cosh(n as double) as double end sub
+
+sub cosh(n as float) as float end sub
+
+sub exp(n as double) as double end sub
+
+sub exp(n as float) as float end sub
+
+sub expm1(n as double) as double end sub
+
+sub expm1(n as float) as float end sub
+
+sub floor(n as double) as double end sub
+
+sub floor(n as float) as float end sub
+
+sub hypot(x as double, y as double) as double end sub
+
+sub hypot(x as float, y as double) as float end sub
+
+; sub (double) remIEEE(divisor as double) as double end sub
+
+; sub (float) remIEEE(divisor as float) as float end sub
+
+sub ln(n as double) as double end sub
+
+sub ln(n as float) as float end sub
+
+sub ln1p(n as double) as double end sub
+
+sub ln1p(n as float) as float end sub
+
+sub log(n as double, base as double) as double end sub
+
+sub log(n as float, base as double) as float end sub
+
+sub log10(n as double) as double end sub
+
+sub log10(n as float) as float end sub
+
+sub log2(n as double) as double end sub
+
+sub log2(n as float) as float end sub
+
+sub max(a as double, b as double) as double end sub
+
+sub max(a as float, b as float) as float end sub
+
+sub max(a as int, b as int) as int end sub
+
+sub max(a as long, b as long) as long end sub
+
+sub min(a as double, b as double) as double end sub
+
+sub min(a as float, b as float) as float end sub
+
+sub min(a as int, b as int) as int end sub
+
+sub min(a as long, b as long) as long end sub
+
+sub nextDown(n as double) as double end sub
+
+sub nextDown(n as float) as float end sub
+
+sub nextTowards(a as double, b as double) as double end sub
+
+sub nextTowards(a as float, b as double) as float end sub
+
+sub nextUp(n as double) as double end sub
+
+sub nextUp(n as float) as float end sub
+
+sub pow(b as double, e as double) as double end sub
+
+sub pow(b as float, e as float) as float end sub
+
+sub pow(b as double, e as int) as double end sub
+
+sub pow(b as float, e as int) as float end sub
+
+sub random() as double end sub
+
+sub round(n as double) as double end sub
+
+sub round(n as float) as float end sub
+
+sub roundToInt(n as double) as int end sub
+
+sub roundToInt(n as float) as int end sub
+
+sub roundToLong(n as double) as long end sub
+
+sub roundToLong(n as float) as long end sub
+
+sub sign(n as double) as double end sub
+
+sub sign(n as float) as float end sub
+
+sub sign(n as int) as int end sub
+
+sub sign(n as long) as int end sub
+
+sub sin(n as double) as double end sub
+
+sub sin(n as float) as float end sub
+
+sub sinh(n as double) as double end sub
+
+sub sinh(n as float) as float end sub
+
+sub tan(n as double) as double end sub
+
+sub tan(n as float) as float end sub
+
+sub tanh(n as double) as double end sub
+
+sub tanh(n as float) as float end sub
+
+sub truncate(n as double) as double end sub
+
+sub truncate(n as float) as float end sub
+
+sub ulp(n as double) as double end sub
+
+sub ulp(n as float) as float end sub
+
+sub map(n as double, fromMin as double, fromMax as double, toMin as double, toMax as double) as double end sub
+
+sub map(n as float, fromMin as float, fromMax as float, toMin as float, toMax as float) as float end sub
+
+sub map(n as int, fromMin as int, fromMax as int, toMin as int, toMax as int) as int end sub
+
+sub map(n as long, fromMin as long, fromMax as long, toMin as long, toMax as long) as long end sub
+
+; graphics
+
+let VK_ENTER                     = '\n' as int
+let VK_BACK_SPACE                = '\b' as int
+let VK_TAB                       = '\t' as int
+let VK_CANCEL                    = 0x03
+let VK_CLEAR                     = 0x0C
+let VK_SHIFT                     = 0x10
+let VK_CONTROL                   = 0x11
+let VK_ALT                       = 0x12
+let VK_PAUSE                     = 0x13
+let VK_CAPS_LOCK                 = 0x14
+let VK_ESCAPE                    = 0x1B
+let VK_SPACE                     = 0x20
+let VK_PAGE_UP                   = 0x21
+let VK_PAGE_DOWN                 = 0x22
+let VK_END                       = 0x23
+let VK_HOME                      = 0x24
+let VK_LEFT                      = 0x25
+let VK_UP                        = 0x26
+let VK_RIGHT                     = 0x27
+let VK_DOWN                      = 0x28
+let VK_COMMA                     = 0x2C
+let VK_MINUS                     = 0x2D
+let VK_PERIOD                    = 0x2E
+let VK_SLASH                     = 0x2F
+let VK_0                         = 0x30
+let VK_1                         = 0x31
+let VK_2                         = 0x32
+let VK_3                         = 0x33
+let VK_4                         = 0x34
+let VK_5                         = 0x35
+let VK_6                         = 0x36
+let VK_7                         = 0x37
+let VK_8                         = 0x38
+let VK_9                         = 0x39
+let VK_SEMICOLON                 = 0x3B
+let VK_EQUALS                    = 0x3D
+let VK_A                         = 0x41
+let VK_B                         = 0x42
+let VK_C                         = 0x43
+let VK_D                         = 0x44
+let VK_E                         = 0x45
+let VK_F                         = 0x46
+let VK_G                         = 0x47
+let VK_H                         = 0x48
+let VK_I                         = 0x49
+let VK_J                         = 0x4A
+let VK_K                         = 0x4B
+let VK_L                         = 0x4C
+let VK_M                         = 0x4D
+let VK_N                         = 0x4E
+let VK_O                         = 0x4F
+let VK_P                         = 0x50
+let VK_Q                         = 0x51
+let VK_R                         = 0x52
+let VK_S                         = 0x53
+let VK_T                         = 0x54
+let VK_U                         = 0x55
+let VK_V                         = 0x56
+let VK_W                         = 0x57
+let VK_X                         = 0x58
+let VK_Y                         = 0x59
+let VK_Z                         = 0x5A
+let VK_OPEN_BRACKET              = 0x5B
+let VK_BACK_SLASH                = 0x5C
+let VK_CLOSE_BRACKET             = 0x5D
+let VK_NUMPAD0                   = 0x60
+let VK_NUMPAD1                   = 0x61
+let VK_NUMPAD2                   = 0x62
+let VK_NUMPAD3                   = 0x63
+let VK_NUMPAD4                   = 0x64
+let VK_NUMPAD5                   = 0x65
+let VK_NUMPAD6                   = 0x66
+let VK_NUMPAD7                   = 0x67
+let VK_NUMPAD8                   = 0x68
+let VK_NUMPAD9                   = 0x69
+let VK_MULTIPLY                  = 0x6A
+let VK_ADD                       = 0x6B
+let VK_SEPARATER                 = 0x6C
+let VK_SEPARATOR                 = VK_SEPARATER
+let VK_SUBTRACT                  = 0x6D
+let VK_DECIMAL                   = 0x6E
+let VK_DIVIDE                    = 0x6F
+let VK_DELETE                    = 0x7F
+let VK_NUM_LOCK                  = 0x90
+let VK_SCROLL_LOCK               = 0x91
+let VK_F1                        = 0x70
+let VK_F2                        = 0x71
+let VK_F3                        = 0x72
+let VK_F4                        = 0x73
+let VK_F5                        = 0x74
+let VK_F6                        = 0x75
+let VK_F7                        = 0x76
+let VK_F8                        = 0x77
+let VK_F9                        = 0x78
+let VK_F10                       = 0x79
+let VK_F11                       = 0x7A
+let VK_F12                       = 0x7B
+let VK_F13                       = 0xF000
+let VK_F14                       = 0xF001
+let VK_F15                       = 0xF002
+let VK_F16                       = 0xF003
+let VK_F17                       = 0xF004
+let VK_F18                       = 0xF005
+let VK_F19                       = 0xF006
+let VK_F20                       = 0xF007
+let VK_F21                       = 0xF008
+let VK_F22                       = 0xF009
+let VK_F23                       = 0xF00A
+let VK_F24                       = 0xF00B
+let VK_PRINTSCREEN               = 0x9A
+let VK_INSERT                    = 0x9B
+let VK_HELP                      = 0x9C
+let VK_META                      = 0x9D
+let VK_BACK_QUOTE                = 0xC0
+let VK_QUOTE                     = 0xDE
+let VK_KP_UP                     = 0xE0
+let VK_KP_DOWN                   = 0xE1
+let VK_KP_LEFT                   = 0xE2
+let VK_KP_RIGHT                  = 0xE3
+let VK_DEAD_GRAVE                = 0x80
+let VK_DEAD_ACUTE                = 0x81
+let VK_DEAD_CIRCUMFLEX           = 0x82
+let VK_DEAD_TILDE                = 0x83
+let VK_DEAD_MACRON               = 0x84
+let VK_DEAD_BREVE                = 0x85
+let VK_DEAD_ABOVEDOT             = 0x86
+let VK_DEAD_DIAERESIS            = 0x87
+let VK_DEAD_ABOVERING            = 0x88
+let VK_DEAD_DOUBLEACUTE          = 0x89
+let VK_DEAD_CARON                = 0x8a
+let VK_DEAD_CEDILLA              = 0x8b
+let VK_DEAD_OGONEK               = 0x8c
+let VK_DEAD_IOTA                 = 0x8d
+let VK_DEAD_VOICED_SOUND         = 0x8e
+let VK_DEAD_SEMIVOICED_SOUND     = 0x8f
+let VK_AMPERSAND                 = 0x96
+let VK_ASTERISK                  = 0x97
+let VK_QUOTEDBL                  = 0x98
+let VK_LESS                      = 0x99
+let VK_GREATER                   = 0xa0
+let VK_BRACELEFT                 = 0xa1
+let VK_BRACERIGHT                = 0xa2
+let VK_AT                        = 0x0200
+let VK_COLON                     = 0x0201
+let VK_CIRCUMFLEX                = 0x0202
+let VK_DOLLAR                    = 0x0203
+let VK_EURO_SIGN                 = 0x0204
+let VK_EXCLAMATION_MARK          = 0x0205
+let VK_INVERTED_EXCLAMATION_MARK = 0x0206
+let VK_LEFT_PARENTHESIS          = 0x0207
+let VK_NUMBER_SIGN               = 0x0208
+let VK_PLUS                      = 0x0209
+let VK_RIGHT_PARENTHESIS         = 0x020A
+let VK_UNDERSCORE                = 0x020B
+let VK_WINDOWS                   = 0x020C
+let VK_CONTEXT_MENU              = 0x020D
+let VK_FINAL                     = 0x0018
+let VK_CONVERT                   = 0x001C
+let VK_NONCONVERT                = 0x001D
+let VK_ACCEPT                    = 0x001E
+let VK_MODECHANGE                = 0x001F
+let VK_KANA                      = 0x0015
+let VK_KANJI                     = 0x0019
+let VK_ALPHANUMERIC              = 0x00F0
+let VK_KATAKANA                  = 0x00F1
+let VK_HIRAGANA                  = 0x00F2
+let VK_FULL_WIDTH                = 0x00F3
+let VK_HALF_WIDTH                = 0x00F4
+let VK_ROMAN_CHARACTERS          = 0x00F5
+let VK_ALL_CANDIDATES            = 0x0100
+let VK_PREVIOUS_CANDIDATE        = 0x0101
+let VK_CODE_INPUT                = 0x0102
+let VK_JAPANESE_KATAKANA         = 0x0103
+let VK_JAPANESE_HIRAGANA         = 0x0104
+let VK_JAPANESE_ROMAN            = 0x0105
+let VK_KANA_LOCK                 = 0x0106
+let VK_INPUT_METHOD_ON_OFF       = 0x0107
+let VK_CUT                       = 0xFFD1
+let VK_COPY                      = 0xFFCD
+let VK_PASTE                     = 0xFFCF
+let VK_UNDO                      = 0xFFCB
+let VK_AGAIN                     = 0xFFC9
+let VK_FIND                      = 0xFFD0
+let VK_PROPS                     = 0xFFCA
+let VK_STOP                      = 0xFFC8
+let VK_COMPOSE                   = 0xFF20
+let VK_ALT_GRAPH                 = 0xFF7E
+let VK_BEGIN                     = 0xFF58
+let VK_UNDEFINED                 = 0x0
+
+sub createWindow(width as int, height as int, title as string) end sub
+
+sub openWindow() end sub
+
+sub closeWindow() end sub
+
+sub windowIsOpen() as bool end sub
+
+data Color
+    var red   as int,
+    var green as int,
+    var blue  as int,
+    var alpha as int = 255
+end data
+
+sub getColor() as Color end sub
+
+sub setColor(red as int, green as int, blue as int, alpha as int) end sub
+
+sub setColor(red as int, green as int, blue as int)
+    setColor(red, green, blue, 255)
+end sub
+
+sub setColor(value as int, alpha as int)
+    setColor(value, value, value, alpha)
+end sub
+
+sub setColor(value as int)
+    setColor(value, 255)
+end sub
+
+sub setColor(red as double, green as double, blue as double, alpha as double)
+    setColor((red * 255) as int, (green * 255) as int, (blue * 255) as int, (alpha * 255) as int)
+end sub
+
+sub setColor(red as double, green as double, blue as double)
+    setColor(red, green, blue, 1.0)
+end sub
+
+sub setColor(value as double, alpha as double)
+    setColor(value, value, value, alpha)
+end sub
+
+sub setColor(value as double)
+    setColor(value, 1.0)
+end sub
+
+sub setColor(color as Color)
+    setColor(color.red, color.green, color.blue, color.alpha)
+end sub
+
+sub hsbToColor(h as double, s as double, b as double) as Color end sub
+
+data Font
+    var name  as string,
+    var style as int,
+    var size  as int
+end data
+
+sub getFont() as Font end sub
+
+sub setFont(name as string, style as int, size  as int) end sub
+
+sub setFont(font as Font)
+    setFont(font.name, font.style, font.size)
+end sub
+
+data Stroke
+    var width      as float,
+    var cap        as int,
+    var join       as int,
+    var miterLimit as float,
+    var dash       as float[],
+    var dashPhase  as float
+end data
+
+sub getStroke() as Stroke end sub
+
+sub setStroke(width as float, cap as int, join as int, miterLimit as float, dash as float[], dashPhase as float) end sub
+
+sub setStroke(stroke as Stroke)
+    setStroke(stroke.width, stroke.cap, stroke.join, stroke.miterLimit, stroke.dash, stroke.dashPhase)
+end sub
+
+sub translate(x as int, y as int) end sub
+
+sub translate(x as double, y as double) end sub
+
+sub rotate(theta as double) end sub
+
+sub rotate(theta as double, x as double, y as double) end sub
+
+sub scale(x as double, y as double) end sub
+
+sub shear(x as double, y as double) end sub
+
+sub pushMatrix() end sub
+
+sub popMatrix() end sub
+
+sub clear() end sub
+
+sub drawLine(xa as int, ya as int, xb as int, yb as int) end sub
+
+sub drawRect(x as int, y as int, width as int, height as int) end sub
+
+sub fillRect(x as int, y as int, width as int, height as int) end sub
+
+sub drawOval(x as int, y as int, width as int, height as int) end sub
+
+sub fillOval(x as int, y as int, width as int, height as int) end sub
+
+sub drawRoundRect(x as int, y as int, width as int, height as int, arcWidth as int, arcHeight as int) end sub
+
+sub fillRoundRect(x as int, y as int, width as int, height as int, arcWidth as int, arcHeight as int) end sub
+
+sub draw3DRect(x as int, y as int, width as int, height as int, raised as bool) end sub
+
+sub fill3DRect(x as int, y as int, width as int, height as int, raised as bool) end sub
+
+sub drawArc(x as int, y as int, width as int, height as int, startAngle as int, arcAngle as int) end sub
+
+sub fillArc(x as int, y as int, width as int, height as int, startAngle as int, arcAngle as int) end sub
+
+sub drawPolyline(xPoints as int[], yPoints as int[], nPoints as int) end sub
+
+sub drawPolyline(xPoints as int[], yPoints as int[])
+    drawPolyline(xPoints, yPoints, #xPoints)
+end sub
+
+sub drawPolygon(xPoints as int[], yPoints as int[], nPoints as int) end sub
+
+sub drawPolygon(xPoints as int[], yPoints as int[])
+    drawPolygon(xPoints, yPoints, #xPoints)
+end sub
+
+sub fillPolygon(xPoints as int[], yPoints as int[], nPoints as int) end sub
+
+sub fillPolygon(xPoints as int[], yPoints as int[])
+    fillPolygon(xPoints, yPoints, #xPoints)
+end sub
+
+sub drawString(s as string, x as int, y as int) end sub
+
+data Image
+    let id     as int,
+    let width  as int,
+    let height as int
+end data
+
+sub loadImage(path as string) as Image end sub
+
+sub drawImage(image as Image, x as int, y as int) end sub
+
+sub drawImage(image as Image, x as int, y as int, width as int, height as int) end sub
+
+sub drawImage(image as Image, dxa as int, dya as int, dxb as int, dyb as int, sxa as int, sya as int, sxb as int, syb as int) end sub
+
+sub flip() end sub
+
+sub keyIsDown(keyCode as int) as bool end sub
+
+sub keyIsHeld(keyCode as int) as bool end sub
+
+sub keyIsUp(keyCode as int) as bool end sub
+
+sub buttonIsDown(buttonCode as int) as bool end sub
+
+sub buttonIsHeld(buttonCode as int) as bool end sub
+
+sub buttonIsUp(buttonCode as int) as bool end sub
+
+sub mouseX() as int end sub
+
+sub mouseY() as int end sub
+
+sub poll() end sub

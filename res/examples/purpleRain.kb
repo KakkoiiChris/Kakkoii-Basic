@@ -1,0 +1,45 @@
+let dropCount = 500
+
+let drops as double[dropCount * 4]
+
+for i = 0 to dropCount step 4
+	drops[i] = random() * 640
+	drops[i + 1] = (random() * 450) - 500
+	drops[i + 2] = (random() * 6) + 4
+	drops[i + 3] = (random() * 10) + 10
+end for
+
+createWindow(640, 360, "Purple Rain")
+
+openWindow()
+
+while windowIsOpen()
+	setColor(230, 230, 250)
+	clear()
+	
+	setColor(138, 43, 226)
+	
+    for i = 0 to dropCount step 4
+		let x = drops[i]
+		let y = drops[i + 1]
+		let ySpeed = drops[i + 2]
+		let len = drops[i + 3]
+		
+		drawLine(x as int, y as int, x as int, (y + len) as int)
+		
+		drops[i + 1] = y + ySpeed
+        
+		if drops[i + 1] > 360
+			drops[i + 1] = (random() * 100) - 200
+			drops[i + 2] = (random() * 6) + 4
+		end if
+        
+		drops[i + 2] += 0.2
+	end for
+	
+	flip()
+	
+	sleep(1 / 60.0)
+end while
+
+closeWindow()

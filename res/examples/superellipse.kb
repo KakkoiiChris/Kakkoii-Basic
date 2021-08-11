@@ -1,0 +1,31 @@
+createWindow(400, 400, "Superellipse")
+
+openWindow()
+
+let a = 100.0
+let b = 150.0
+let n = 4.0
+
+while windowIsOpen()
+	setColor(51)
+	clear()
+	
+	setColor(255)
+	
+	translate(200, 200)
+	
+	for theta = 0.0 to PI * 2 step (PI * 2) / 100.0
+		let na = 2.0 / n
+		
+		let x = pow(abs(cos(theta)), na) * a * sign(cos(theta))
+		let y = pow(abs(sin(theta)), na) * b * sign(sin(theta))
+		
+		fillOval(x as int, y as int, 2, 2)
+	end for
+	
+	translate(-200, -200)
+	
+	flip()
+	
+	sleep(1.0 / 60)
+end while

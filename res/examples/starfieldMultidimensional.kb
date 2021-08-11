@@ -1,0 +1,77 @@
+let WIDTH  = 400
+let HEIGHT = 400
+
+let STAR_COUNT = 400
+let STAR_SIZE  = 8
+let STAR_SPEED = 5.0
+
+let FRAME_RATE = 1.0 / 60.0
+
+let stars as double[STAR_COUNT, 3]
+
+for i = 0 to STAR_COUNT
+	stars[i, 0] = (random() * WIDTH)  - WIDTH  / 2
+	stars[i, 1] = (random() * HEIGHT) - HEIGHT / 2
+	stars[i, 2] =  random() * WIDTH
+end for
+
+var paused = false
+
+createWindow(WIDTH, HEIGHT, "Starfield")
+
+openWindow()
+
+setColor(0)
+clear()
+
+while windowIsOpen()
+	setColor(0.0, 0.4)
+	clear()
+	
+	translate(WIDTH / 2, HEIGHT / 2)
+    
+	for i = 0 to STAR_COUNT
+		if stars[i, 2] < 1.0
+			stars[i, 0] = (random() * WIDTH) - WIDTH / 2
+			stars[i, 1] = (random() * HEIGHT) - HEIGHT / 2
+			stars[i, 2] = WIDTH as double
+		end if
+	
+		let x = stars[i, 0]
+		let y = stars[i, 1]
+		let z = stars[i, 2]
+		
+		let sx = map(x / z, 0.0, 1.0, 0.0, WIDTH as double)
+		let sy = map(y / z, 0.0, 1.0, 0.0, HEIGHT as double)
+		
+		let r = map(z, 0.0, WIDTH as double, 16.0, 0.0)
+		
+		let hue = map(z, 0.0, WIDTH as double, 0.0, 1.0)
+		
+		setColor(hsbToColor(hue, 1.0, 1.0))
+		
+		fillOval(sx as int, sy as int, r as int, r as int)
+		
+		if not paused
+			stars[i, 2] -= STAR_SPEED
+		end if
+	end for
+    
+	translate(-WIDTH / 2, -HEIGHT / 2)
+	
+	flip()
+	
+	sleep(FRAME_RATE)
+	
+	if keyIsDown(VK_SPACE)
+		paused = not paused
+	end if
+	
+	if keyIsDown(VK_ESCAPE)
+		closeWindow()
+	end if
+	
+	poll()
+end while
+
+closeWindow()

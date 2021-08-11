@@ -1,0 +1,50 @@
+rem MODE 7 IN KBASIC
+
+let width   = 256
+let height  = 224
+let horizon = 20.0
+let fov     = 200.0
+let scaling = 100.0
+
+window(width, height, 2, "MODE 7")
+
+var r = 0.0
+
+while shown() do
+	color(0)
+	clear()
+	
+	pushmatrix()
+	move(width/2, height/2)
+	
+	for var y = -height / 2 to y < height / 2 step y = y + 1 do
+		for var x = -width / 2 to x < width / 2 step x = x + 1 do
+			let px = x
+			let py = fov
+			let pz = y + horizon
+			
+			rem projection 
+			let sx = px / pz
+			let sy = py / pz
+			
+			rem rotation
+			let rx = sx * cos(r) - sy * sin(r)
+			let ry = sx * sin(r) + sy * cos(r)
+	
+			rem put (color) at (x, y) on screen
+			if sx/16 % 2 <> sx/16 % 2 then
+				color(255)
+			else
+				color(127)
+			end if
+			point(x, y)
+		end for
+	end for
+	
+	r = r + 0.01
+	
+	popmatrix()
+	
+	flip()
+	pause(17)
+end while
