@@ -34,16 +34,10 @@ class Memory {
     fun new(constant: Boolean, name: Expr.Name, type: DataType, value: Any) =
         stack.peek()?.new(constant, name.value, type, value) ?: error("NEW: NO ACTIVE SCOPE")
     
-    fun newVar(name: Expr.Name, type: DataType, value: Any) =
-        stack.peek()?.newVar(name, type, value) ?: error("NEW VAR: NO ACTIVE SCOPE")
-    
     fun newLet(name: Expr.Name, type: DataType, value: Any) =
         stack.peek()?.newLet(name, type, value) ?: error("NEW LET: NO ACTIVE SCOPE")
     
     fun getRef(name: Expr.Name): Scope.Reference? =
-        stack.peek()?.getRef(name)
-    
-    fun getRef(name: String): Scope.Reference? =
         stack.peek()?.getRef(name)
     
     fun newSub(sub: Stmt.Sub) =
@@ -52,19 +46,13 @@ class Memory {
     fun getSubs(name: Expr.Name) =
         stack.peek()?.getSubs(name)
     
-    fun clear() =
-        stack.peek()?.clear() ?: error("CLEAR: NO ACTIVE SCOPE")
-    
-    fun isEmpty() =
-        stack.peek() == null
-    
-    fun peek()=
+    fun peek() =
         stack.peek()
     
-    open class Scope(val id: String, val parent: Scope? = null) {
+    open class Scope(private val id: String, private val parent: Scope? = null) {
         val references = mutableMapOf<String, Reference>()
         
-        val allSubs = mutableMapOf<String, Subs>()
+        private val allSubs = mutableMapOf<String, Subs>()
         
         val datas = mutableMapOf<String, Stmt.Data>()
         
@@ -78,19 +66,10 @@ class Memory {
                 false
             }
         }
-        
-        fun newVar(name: Expr.Name, type: DataType, value: Any) =
-            new(false, name.value, type, value)
-        
-        fun newVar(name: String, type: DataType, value: Any) =
-            new(false, name, type, value)
-        
+    
         fun newLet(name: Expr.Name, type: DataType, value: Any) =
             new(true, name.value, type, value)
-        
-        fun newLet(name: String, type: DataType, value: Any) =
-            new(true, name, type, value)
-        
+    
         fun getRef(name: Expr.Name): Reference? =
             getRef(name.value)
         
@@ -118,12 +97,10 @@ class Memory {
         fun getSubs(name: Expr.Name) =
             getSubs(name.value)
         
-        fun getSubs(name: String): Subs? =
+        private fun getSubs(name: String): Subs? =
             allSubs[name] ?: parent?.getSubs(name)
-        
-        fun clear() {
-            references.clear()
-        }
+    
+        override fun toString() = "Scope $id"
         
         data class Reference(val constant: Boolean, val type: DataType, var value: Any) {
             fun put(script: Script, x: Any): Boolean? {

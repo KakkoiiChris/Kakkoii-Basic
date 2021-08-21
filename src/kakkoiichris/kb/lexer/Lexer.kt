@@ -1,6 +1,5 @@
 package kakkoiichris.kb.lexer
 
-import kakkoiichris.kb.lexer.Token.Type.*
 import kakkoiichris.kb.util.KBError
 import kakkoiichris.kb.util.Source
 
@@ -9,40 +8,40 @@ class Lexer(private val source: Source) {
         const val NUL = '\u0000'
         
         val keywords = mapOf(
-            LET.kw,
-            VAR.kw,
-            IFF.kw,
-            ELF.kw,
-            ELS.kw,
-            WHL.kw,
-            DOO.kw,
-            FOR.kw,
-            TOO.kw,
-            STP.kw,
-            INN.kw,
-            DAT.kw,
-            SBR.kw,
-            BRK.kw,
-            NXT.kw,
-            RET.kw,
-            YLD.kw,
-            END.kw,
-            VOI.kw,
-            BOL.kw,
-            BYT.kw,
-            SHR.kw,
-            INT.kw,
-            LNG.kw,
-            FLT.kw,
-            DBL.kw,
-            CHR.kw,
-            STR.kw,
-            ANY.kw,
-            ORR.kw,
-            AND.kw,
-            ISS.kw,
-            AAS.kw,
-            NOT.kw
+            Token.Type.Let.kw,
+            Token.Type.Var.kw,
+            Token.Type.If.kw,
+            Token.Type.Elif.kw,
+            Token.Type.Else.kw,
+            Token.Type.While.kw,
+            Token.Type.Do.kw,
+            Token.Type.For.kw,
+            Token.Type.To.kw,
+            Token.Type.Step.kw,
+            Token.Type.In.kw,
+            Token.Type.Data.kw,
+            Token.Type.Sub.kw,
+            Token.Type.Break.kw,
+            Token.Type.Next.kw,
+            Token.Type.Return.kw,
+            Token.Type.Yield.kw,
+            Token.Type.End.kw,
+            Token.Type.Void.kw,
+            Token.Type.Bool.kw,
+            Token.Type.Byte.kw,
+            Token.Type.Short.kw,
+            Token.Type.Int.kw,
+            Token.Type.Long.kw,
+            Token.Type.Float.kw,
+            Token.Type.Double.kw,
+            Token.Type.Char.kw,
+            Token.Type.String.kw,
+            Token.Type.Any.kw,
+            Token.Type.Or.kw,
+            Token.Type.And.kw,
+            Token.Type.Is.kw,
+            Token.Type.As.kw,
+            Token.Type.Not.kw
         )
         
         val literals = mapOf(
@@ -73,7 +72,7 @@ class Lexer(private val source: Source) {
                 continue
             }
             
-            if (match(';')) {
+            if (match("rem")) {
                 skipLineComment()
                 continue
             }
@@ -91,7 +90,7 @@ class Lexer(private val source: Source) {
             }
         }
         
-        tokens += Token(here(), EOF)
+        tokens += Token(here(), Token.Type.EndOfFile)
         
         return tokens
     }
@@ -187,7 +186,7 @@ class Lexer(private val source: Source) {
     }
     
     private fun skipLineComment() {
-        mustSkip(';')
+        mustSkip("rem")
         
         while (!skip('\n')) {
             step()
@@ -258,16 +257,16 @@ class Lexer(private val source: Source) {
                     }
                 }
             }
-    
+            
             if (match { this in "Ee" }) {
                 take()
-        
+                
                 do {
                     take()
                 }
                 while (match { isDigit() })
             }
-    
+            
             if (match { this in "FfDd" }) {
                 take()
             }
@@ -293,7 +292,7 @@ class Lexer(private val source: Source) {
             else                            -> KBError.forLexer("Unexpected number '$result'!", loc)
         }
         
-        return Token(loc, VAL, number)
+        return Token(loc, Token.Type.Value, number)
     }
     
     private fun word(): Token {
@@ -306,19 +305,19 @@ class Lexer(private val source: Source) {
             while (match { isLetterOrDigit() || this == '_' })
         }
         
-        val keyword = keywords[result]
+        val keyword = keywords[result.lowercase()]
         
         if (keyword != null) {
             return Token(loc, keyword)
         }
         
-        val literal = literals[result]
+        val literal = literals[result.lowercase()]
         
         if (literal != null) {
-            return Token(loc, VAL, literal)
+            return Token(loc, Token.Type.Value, literal)
         }
         
-        return Token(loc, NAM, result)
+        return Token(loc, Token.Type.Word, result)
     }
     
     private fun unicode(size: Int): Char {
@@ -375,7 +374,7 @@ class Lexer(private val source: Source) {
         
         mustSkip('\'')
         
-        return Token(loc, VAL, result)
+        return Token(loc, Token.Type.Value, result)
     }
     
     private fun string(): Token {
@@ -394,7 +393,7 @@ class Lexer(private val source: Source) {
             }
         }
         
-        return Token(loc, VAL, result)
+        return Token(loc, Token.Type.Value, result)
     }
     
     private fun operator(): Token {
@@ -402,74 +401,74 @@ class Lexer(private val source: Source) {
         
         val op = when {
             skip('=') -> when {
-                skip('=') -> EQU
+                skip('=') -> Token.Type.DoubleEqual
                 
-                else      -> ASN
+                else      -> Token.Type.EqualSign
             }
             
             skip('+') -> when {
-                skip('=') -> CAD
+                skip('=') -> Token.Type.PlusEqual
                 
-                else      -> ADD
+                else      -> Token.Type.Plus
             }
             
             skip('-') -> when {
-                skip('=') -> CSB
+                skip('=') -> Token.Type.MinusEqual
                 
-                else      -> SUB
+                else      -> Token.Type.Minus
             }
             
             skip('*') -> when {
-                skip('=') -> CML
+                skip('=') -> Token.Type.StarEqual
                 
-                else      -> MUL
+                else      -> Token.Type.Star
             }
             
             skip('/') -> when {
-                skip('=') -> CDV
+                skip('=') -> Token.Type.SlashEqual
                 
-                else      -> DIV
+                else      -> Token.Type.Slash
             }
             
             skip('%') -> when {
-                skip('=') -> CRM
+                skip('=') -> Token.Type.PercentEqual
                 
-                else      -> REM
+                else      -> Token.Type.Percent
             }
             
             skip('<') -> when {
-                skip('>') -> NEQ
+                skip('>') -> Token.Type.LessGreater
                 
-                skip('=') -> LEQ
+                skip('=') -> Token.Type.LessEqualSign
                 
-                else      -> LSS
+                else      -> Token.Type.LessSign
             }
             
             skip('>') -> when {
-                skip('=') -> GEQ
+                skip('=') -> Token.Type.GreaterEqualSign
                 
-                else      -> GRT
+                else      -> Token.Type.GreaterSign
             }
             
-            skip('#') -> LEN
+            skip('#') -> Token.Type.Pound
             
-            skip('.') -> DOT
+            skip('.') -> Token.Type.Dot
             
-            skip(':') -> PIP
+            skip(':') -> Token.Type.Colon
             
-            skip('(') -> LPR
+            skip('(') -> Token.Type.LeftParen
             
-            skip(')') -> RPR
+            skip(')') -> Token.Type.RightParen
             
-            skip('[') -> LSQ
+            skip('[') -> Token.Type.LeftSquare
             
-            skip(']') -> RSQ
+            skip(']') -> Token.Type.RightSquare
             
-            skip('{') -> LBC
+            skip('{') -> Token.Type.LeftBrace
             
-            skip('}') -> RBC
+            skip('}') -> Token.Type.RightBrace
             
-            skip(',') -> SEP
+            skip(',') -> Token.Type.Comma
             
             else      -> KBError.forLexer("Character '${peek()}' is invalid!", here())
         }

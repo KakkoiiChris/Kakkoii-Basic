@@ -43,6 +43,9 @@ class Window(width: Int, height: Int, title: String) : KeyListener, MouseListene
             }
         })
         
+        val icon = ImageIO.read(javaClass.getResource("/img/KakkoiiBasic.png"))
+        frame.iconImage = icon
+        
         canvas.createBufferStrategy(2)
         buffer = canvas.bufferStrategy
         graphics = buffer.drawGraphics as Graphics2D
@@ -67,14 +70,14 @@ class Window(width: Int, height: Int, title: String) : KeyListener, MouseListene
     
     val isOpen get() = frame.isVisible
     
-    fun getColor() =
+    fun getColor(): Color =
         graphics.color
     
     fun setColor(red: Int, green: Int, blue: Int, alpha: Int) {
         graphics.color = Color(red, green, blue, alpha)
     }
     
-    fun getFont() =
+    fun getFont(): Font =
         graphics.font
     
     fun setFont(name: String, style: Int, size: Int) {
@@ -237,8 +240,8 @@ class Window(width: Int, height: Int, title: String) : KeyListener, MouseListene
     }
     
     class Toggle {
-        var now = false
-        var then = false
+        private var now = false
+        private var then = false
         
         val isDown get() = now && !then
         

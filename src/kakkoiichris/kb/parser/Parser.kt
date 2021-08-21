@@ -5,7 +5,6 @@ import kakkoiichris.kb.lexer.Token.Type.*
 import kakkoiichris.kb.script.DataType
 import kakkoiichris.kb.util.KBError
 import java.lang.Integer.min
-import kotlin.reflect.jvm.internal.impl.types.checker.StrictEqualityTypeChecker
 
 class Parser(private val tokens: List<Token>) {
     private var pos = 0
@@ -79,49 +78,49 @@ class Parser(private val tokens: List<Token>) {
     }
     
     private fun eof() =
-        match(EOF)
+        match(EndOfFile)
     
     private fun stmt() =
         when {
-            matchAny(LET, VAR) -> decl()
+            matchAny(Let, Var) -> declStmt()
             
-            match(DOO)         -> doo()
+            match(Do)          -> doStmt()
             
-            match(IFF)         -> iff()
+            match(If)          -> ifStmt()
             
-            match(WHL)         -> whilee()
+            match(While)       -> whileStmt()
             
-            match(FOR)         -> forr()
+            match(For)         -> forStmt()
             
-            match(DAT)         -> data()
+            match(Data)        -> dataStmt()
             
-            match(SBR)         -> sub()
+            match(Sub)         -> subStmt()
             
-            match(BRK)         -> breakk()
+            match(Break)       -> breakStmt()
             
-            match(NXT)         -> next()
+            match(Next)        -> nextStmt()
             
-            match(RET)         -> returnn()
+            match(Return)      -> returnStmt()
             
-            match(YLD)         -> yield()
+            match(Yield)       -> yieldStmt()
             
-            else               -> expression()
+            else               -> expressionStmt()
         }
     
-    private fun decl(): Stmt.Decl {
+    private fun declStmt(): Stmt.Decl {
         val loc = here()
         
-        val constant = skip(LET)
+        val constant = skip(Let)
         
         if (!constant) {
-            mustSkip(VAR)
+            mustSkip(Var)
         }
         
         val name = name()
         
-        val type = if (skip(AAS)) type() else Expr.Type(name.loc, DataType.Inferred)
+        val type = if (skip(As)) type() else Expr.Type(name.loc, DataType.Inferred)
         
-        val expr = if (skip(ASN)) expr() else Expr.None
+        val expr = if (skip(EqualSign)) expr() else Expr.None
         
         return Stmt.Decl(loc, constant, name, type, expr)
     }
@@ -138,192 +137,192 @@ class Parser(private val tokens: List<Token>) {
         return Stmt.Block(loc, stmts)
     }
     
-    private fun doo(): Stmt.Do {
+    private fun doStmt(): Stmt.Do {
         val loc = here()
         
-        mustSkip(DOO)
+        mustSkip(Do)
         
-        val body = block(END)
+        val body = block(End)
         
-        mustSkipAll(END, DOO)
+        mustSkipAll(End, Do)
         
         return Stmt.Do(loc, body)
     }
     
-    private fun iff(): Stmt.If {
+    private fun ifStmt(): Stmt.If {
         val loc = here()
         
-        mustSkip(IFF)
+        mustSkip(If)
         
         val branches = mutableListOf<Pair<Expr, Stmt.Block>>()
         
         do {
             val test = expr()
             
-            val body = block(ELF, ELS, END)
+            val body = block(Elif, Else, End)
             
             branches += test to body
         }
-        while (skip(ELF))
+        while (skip(Elif))
         
-        val elze = if (skip(ELS)) block(END) else Stmt.None
+        val elze = if (skip(Else)) block(End) else Stmt.None
         
-        mustSkipAll(END, IFF)
+        mustSkipAll(End, If)
         
         return Stmt.If(loc, branches, elze)
     }
     
-    private fun whilee(): Stmt.While {
+    private fun whileStmt(): Stmt.While {
         val loc = here()
         
-        mustSkip(WHL)
+        mustSkip(While)
         
         val test = expr()
         
-        val body = block(END)
+        val body = block(End)
         
-        mustSkipAll(END, WHL)
+        mustSkipAll(End, While)
         
         return Stmt.While(loc, test, body)
     }
     
-    private fun forr(): Stmt {
+    private fun forStmt(): Stmt {
         val loc = here()
         
-        mustSkip(FOR)
+        mustSkip(For)
         
         val pointer = name()
         
-        val type = if (skip(AAS)) type() else Expr.Type(pointer.loc, DataType.Inferred)
+        val type = if (skip(As)) type() else Expr.Type(pointer.loc, DataType.Inferred)
         
         return when {
-            matchAny(ASN, TOO) -> {
-                val start = if (skip(ASN)) expr() else Expr.None
+            matchAny(EqualSign, To) -> {
+                val start = if (skip(EqualSign)) expr() else Expr.None
                 
                 val decl = Stmt.Decl(pointer.loc, false, pointer, type, start)
                 
-                mustSkip(TOO)
+                mustSkip(To)
                 
                 val to = expr()
                 
-                val step = if (skip(STP)) expr() else 1.toExpr()
+                val step = if (skip(Step)) expr() else 1.toExpr()
                 
-                val body = block(END)
+                val body = block(End)
                 
-                mustSkipAll(END, FOR)
+                mustSkipAll(End, For)
                 
                 Stmt.For(loc, decl, to, step, body)
             }
             
-            skip(INN)          -> {
+            skip(In)                -> {
                 val decl = Stmt.Decl(pointer.loc, false, pointer, type, Expr.None)
                 
                 val iterable = expr()
                 
-                val body = block(END)
+                val body = block(End)
                 
-                mustSkipAll(END, FOR)
+                mustSkipAll(End, For)
                 
                 Stmt.Foreach(loc, decl, iterable, body)
             }
             
-            else               -> KBError.forParser("For loop type is invalid; expected '$TOO' or '$INN'!", here())
+            else                    -> KBError.forParser("For loop type is invalid; expected '$To' or '$In'!", here())
         }
     }
     
-    private fun data(): Stmt.Data {
+    private fun dataStmt(): Stmt.Data {
         val loc = here()
         
-        mustSkip(DAT)
+        mustSkip(Data)
         
         val name = name()
         
         val decls = mutableListOf<Stmt.Decl>()
         
-        if (!skipAll(END, DAT)) {
+        if (!skipAll(End, Data)) {
             do {
-                decls += decl()
+                decls += declStmt()
             }
-            while (skip(SEP))
+            while (skip(Comma))
             
-            mustSkipAll(END, DAT)
+            mustSkipAll(End, Data)
         }
         
         return Stmt.Data(loc, name, decls)
     }
     
-    private fun sub(): Stmt.Sub {
+    private fun subStmt(): Stmt.Sub {
         val loc = here()
         
-        mustSkip(SBR)
+        mustSkip(Sub)
         
         val name = name()
         
         val params = mutableListOf<Stmt.Decl>()
         
-        mustSkip(LPR)
+        mustSkip(LeftParen)
         
-        if (!skip(RPR)) {
+        if (!skip(RightParen)) {
             do {
                 val paramName = name()
                 
-                mustSkip(AAS)
+                mustSkip(As)
                 
                 val paramType = type()
                 
                 params += Stmt.Decl(name.loc, false, paramName, paramType, Expr.None)
             }
-            while (skip(SEP))
+            while (skip(Comma))
             
-            mustSkip(RPR)
+            mustSkip(RightParen)
         }
         
-        val type = if (skip(AAS)) type() else DataType.Primitive.VOID.toType()
+        val type = if (skip(As)) type() else DataType.Primitive.VOID.toType()
         
-        val body = block(END)
+        val body = block(End)
         
-        mustSkipAll(END, SBR)
+        mustSkipAll(End, Sub)
         
         return Stmt.Sub(loc, name, params, type, body)
     }
     
-    private fun breakk(): Stmt.Break {
+    private fun breakStmt(): Stmt.Break {
         val loc = here()
         
-        mustSkip(BRK)
+        mustSkip(Break)
         
         return Stmt.Break(loc)
     }
     
-    private fun next(): Stmt.Next {
+    private fun nextStmt(): Stmt.Next {
         val loc = here()
         
-        mustSkip(NXT)
+        mustSkip(Next)
         
         val pointer = name()
         
         return Stmt.Next(loc, pointer)
     }
     
-    private fun returnn(): Stmt.Return {
+    private fun returnStmt(): Stmt.Return {
         val loc = here()
         
-        mustSkip(RET)
+        mustSkip(Return)
         
         return Stmt.Return(loc)
     }
     
-    private fun yield(): Stmt.Yield {
+    private fun yieldStmt(): Stmt.Yield {
         val loc = here()
         
-        mustSkip(YLD)
+        mustSkip(Yield)
         
         val expr = expr()
         
         return Stmt.Yield(loc, expr)
     }
     
-    private fun expression() =
+    private fun expressionStmt() =
         Stmt.Expression(expr())
     
     private fun expr(): Expr = assign()
@@ -331,19 +330,38 @@ class Parser(private val tokens: List<Token>) {
     private fun assign(): Expr {
         val expr = disjunction()
         
-        return if (matchAny(ASN, CAD, CSB, CML, CDV, CRM)) {
+        return if (matchAny(EqualSign, PlusEqual, MinusEqual, StarEqual, SlashEqual, PercentEqual)) {
             val op = peek()
             
             mustSkip(op.type)
             
             when (op.type) {
-                ASN  -> Expr.Binary(op.loc, op.type, expr, disjunction())
-                CAD  -> Expr.Binary(op.loc, ASN, expr, Expr.Binary(op.loc, ADD, expr, disjunction()))
-                CSB  -> Expr.Binary(op.loc, ASN, expr, Expr.Binary(op.loc, SUB, expr, disjunction()))
-                CML  -> Expr.Binary(op.loc, ASN, expr, Expr.Binary(op.loc, MUL, expr, disjunction()))
-                CDV  -> Expr.Binary(op.loc, ASN, expr, Expr.Binary(op.loc, DIV, expr, disjunction()))
-                CRM  -> Expr.Binary(op.loc, ASN, expr, Expr.Binary(op.loc, REM, expr, disjunction()))
-                else -> TODO("BROKEN ASSIGN")
+                PlusEqual    -> Expr.Binary(op.loc,
+                    Expr.Binary.Operator.Assign,
+                    expr,
+                    Expr.Binary(op.loc, Expr.Binary.Operator.Add, expr, disjunction()))
+                
+                MinusEqual   -> Expr.Binary(op.loc,
+                    Expr.Binary.Operator.Assign,
+                    expr,
+                    Expr.Binary(op.loc, Expr.Binary.Operator.Subtract, expr, disjunction()))
+                
+                StarEqual    -> Expr.Binary(op.loc,
+                    Expr.Binary.Operator.Assign,
+                    expr,
+                    Expr.Binary(op.loc, Expr.Binary.Operator.Multiply, expr, disjunction()))
+                
+                SlashEqual   -> Expr.Binary(op.loc,
+                    Expr.Binary.Operator.Assign,
+                    expr,
+                    Expr.Binary(op.loc, Expr.Binary.Operator.Divide, expr, disjunction()))
+                
+                PercentEqual -> Expr.Binary(op.loc,
+                    Expr.Binary.Operator.Assign,
+                    expr,
+                    Expr.Binary(op.loc, Expr.Binary.Operator.Modulus, expr, disjunction()))
+                
+                else         -> Expr.Binary(op.loc, Expr.Binary.Operator[op.type], expr, disjunction())
             }
         }
         else {
@@ -354,12 +372,12 @@ class Parser(private val tokens: List<Token>) {
     private fun disjunction(): Expr {
         var expr = conjunction()
         
-        while (match(ORR)) {
+        while (match(Or)) {
             val op = peek()
             
             mustSkip(op.type)
             
-            expr = Expr.Binary(op.loc, op.type, expr, conjunction())
+            expr = Expr.Binary(op.loc, Expr.Binary.Operator[op.type], expr, conjunction())
         }
         
         return expr
@@ -368,12 +386,12 @@ class Parser(private val tokens: List<Token>) {
     private fun conjunction(): Expr {
         var expr = equality()
         
-        while (match(AND)) {
+        while (match(And)) {
             val op = peek()
             
             mustSkip(op.type)
             
-            expr = Expr.Binary(op.loc, op.type, expr, equality())
+            expr = Expr.Binary(op.loc, Expr.Binary.Operator[op.type], expr, equality())
         }
         
         return expr
@@ -382,12 +400,12 @@ class Parser(private val tokens: List<Token>) {
     private fun equality(): Expr {
         var expr = comparison()
         
-        while (matchAny(EQU, NEQ)) {
+        while (matchAny(DoubleEqual, LessGreater)) {
             val op = peek()
             
             mustSkip(op.type)
             
-            expr = Expr.Binary(op.loc, op.type, expr, comparison())
+            expr = Expr.Binary(op.loc, Expr.Binary.Operator[op.type], expr, comparison())
         }
         
         return expr
@@ -396,12 +414,12 @@ class Parser(private val tokens: List<Token>) {
     private fun comparison(): Expr {
         var expr = typeCheck()
         
-        while (matchAny(LSS, LEQ, GRT, GEQ)) {
+        while (matchAny(LessSign, LessEqualSign, GreaterSign, GreaterEqualSign)) {
             val op = peek()
             
             mustSkip(op.type)
             
-            expr = Expr.Binary(op.loc, op.type, expr, typeCheck())
+            expr = Expr.Binary(op.loc, Expr.Binary.Operator[op.type], expr, typeCheck())
         }
         
         return expr
@@ -410,12 +428,12 @@ class Parser(private val tokens: List<Token>) {
     private fun typeCheck(): Expr {
         var expr = additive()
         
-        while (match(ISS)) {
+        while (match(Is)) {
             val op = peek()
             
             mustSkip(op.type)
             
-            expr = Expr.Binary(op.loc, op.type, expr, type())
+            expr = Expr.Binary(op.loc, Expr.Binary.Operator[op.type], expr, type())
         }
         
         return expr
@@ -424,12 +442,12 @@ class Parser(private val tokens: List<Token>) {
     private fun additive(): Expr {
         var expr = multiplicative()
         
-        while (matchAny(ADD, SUB)) {
+        while (matchAny(Plus, Minus)) {
             val op = peek()
             
             mustSkip(op.type)
             
-            expr = Expr.Binary(op.loc, op.type, expr, multiplicative())
+            expr = Expr.Binary(op.loc, Expr.Binary.Operator[op.type], expr, multiplicative())
         }
         
         return expr
@@ -438,12 +456,12 @@ class Parser(private val tokens: List<Token>) {
     private fun multiplicative(): Expr {
         var expr = typeCast()
         
-        while (matchAny(MUL, DIV, REM)) {
+        while (matchAny(Star, Slash, Percent)) {
             val op = peek()
             
             mustSkip(op.type)
             
-            expr = Expr.Binary(op.loc, op.type, expr, typeCast())
+            expr = Expr.Binary(op.loc, Expr.Binary.Operator[op.type], expr, typeCast())
         }
         
         return expr
@@ -452,24 +470,24 @@ class Parser(private val tokens: List<Token>) {
     private fun typeCast(): Expr {
         var expr = prefix()
         
-        while (match(AAS)) {
+        while (match(As)) {
             val op = peek()
             
             mustSkip(op.type)
             
-            expr = Expr.Binary(op.loc, op.type, expr, type())
+            expr = Expr.Binary(op.loc, Expr.Binary.Operator[op.type], expr, type())
         }
         
         return expr
     }
     
     private fun prefix(): Expr {
-        return if (matchAny(SUB, NOT, LEN)) {
+        return if (matchAny(Minus, Not, Pound)) {
             val op = peek()
             
             mustSkip(op.type)
             
-            Expr.Unary(op.loc, op.type, prefix())
+            Expr.Unary(op.loc, Expr.Unary.Operator[op.type], prefix())
         }
         else {
             pipeline()
@@ -479,7 +497,7 @@ class Parser(private val tokens: List<Token>) {
     private fun pipeline(): Expr {
         var expr = postfix()
         
-        while (matchAny(PIP)) {
+        while (matchAny(Colon)) {
             val op = peek()
             
             mustSkip(op.type)
@@ -497,7 +515,8 @@ class Parser(private val tokens: List<Token>) {
                 
                 is Expr.Name   -> Expr.Invoke(op.loc, right, listOf(expr))
                 
-                else           -> TODO("INVALID PIPELINE RIGHT SIDE")
+                else           -> KBError.forParser("Right side of pipe operator must be a function name or invocation!",
+                    right.loc)
             }
         }
         
@@ -507,23 +526,23 @@ class Parser(private val tokens: List<Token>) {
     private fun postfix(): Expr {
         var expr = terminal()
         
-        while (matchAny(DOT, LSQ, LPR, LBC)) {
+        while (matchAny(Dot, LeftSquare, LeftParen, LeftBrace)) {
             val op = peek()
             
             mustSkip(op.type)
             
             expr = when (op.type) {
-                DOT  -> Expr.Binary(op.loc, op.type, expr, terminal())
+                Dot        -> Expr.Binary(op.loc, Expr.Binary.Operator[op.type], expr, terminal())
                 
-                LSQ  -> {
+                LeftSquare -> {
                     val indices = mutableListOf<Expr>()
                     
                     do {
                         indices += expr()
                     }
-                    while (skip(SEP))
+                    while (skip(Comma))
                     
-                    mustSkip(RSQ)
+                    mustSkip(RightSquare)
                     
                     var subExpr = expr
                     
@@ -531,7 +550,7 @@ class Parser(private val tokens: List<Token>) {
                         subExpr = Expr.Get(index.loc, subExpr, index)
                     }
                     
-                    if (matchAny(ASN, CAD, CSB, CML, CDV, CRM)) {
+                    if (matchAny(EqualSign, PlusEqual, MinusEqual, StarEqual, SlashEqual, PercentEqual)) {
                         val subOp = peek()
                         
                         mustSkip(subOp.type)
@@ -543,73 +562,86 @@ class Parser(private val tokens: List<Token>) {
                         val index = top.index
                         
                         subExpr = when (subOp.type) {
-                            ASN -> Expr.Set(loc, target, index, expr())
-                            
-                            CAD -> Expr.Set(loc,
+                            PlusEqual    -> Expr.Set(loc,
                                 target,
                                 index,
-                                Expr.Binary(subOp.loc, ADD, Expr.Get(loc, target, index), expr()))
+                                Expr.Binary(subOp.loc, Expr.Binary.Operator.Add, Expr.Get(loc, target, index), expr()))
                             
-                            CSB -> Expr.Set(loc,
+                            MinusEqual   -> Expr.Set(loc,
                                 target,
                                 index,
-                                Expr.Binary(subOp.loc, SUB, Expr.Get(loc, target, index), expr()))
+                                Expr.Binary(subOp.loc,
+                                    Expr.Binary.Operator.Subtract,
+                                    Expr.Get(loc, target, index),
+                                    expr()))
                             
-                            CML -> Expr.Set(loc,
+                            StarEqual    -> Expr.Set(loc,
                                 target,
                                 index,
-                                Expr.Binary(subOp.loc, MUL, Expr.Get(loc, target, index), expr()))
+                                Expr.Binary(subOp.loc,
+                                    Expr.Binary.Operator.Multiply,
+                                    Expr.Get(loc, target, index),
+                                    expr()))
                             
-                            CDV -> Expr.Set(loc,
+                            SlashEqual   -> Expr.Set(loc,
                                 target,
                                 index,
-                                Expr.Binary(subOp.loc, DIV, Expr.Get(loc, target, index), expr()))
+                                Expr.Binary(subOp.loc,
+                                    Expr.Binary.Operator.Divide,
+                                    Expr.Get(loc, target, index),
+                                    expr()))
                             
-                            CRM -> Expr.Set(loc,
+                            PercentEqual -> Expr.Set(loc,
                                 target,
                                 index,
-                                Expr.Binary(subOp.loc, REM, Expr.Get(loc, target, index), expr()))
+                                Expr.Binary(subOp.loc,
+                                    Expr.Binary.Operator.Modulus,
+                                    Expr.Get(loc, target, index),
+                                    expr()))
                             
-                            else-> TODO("SET COMPOUND ERROR")
+                            else         -> Expr.Set(loc, target, index, expr())
                         }
                     }
                     
                     subExpr
                 }
                 
-                LPR  -> {
+                LeftParen  -> {
                     val args = mutableListOf<Expr>()
                     
-                    if (!skip(RPR)) {
+                    if (!skip(RightParen)) {
                         do {
                             args += expr()
                         }
-                        while (skip(SEP))
+                        while (skip(Comma))
                         
-                        mustSkip(RPR)
+                        mustSkip(RightParen)
                     }
                     
-                    Expr.Invoke(op.loc, expr as? Expr.Name ?: TODO("NOT A NAME INVOKE"), args)
+                    Expr.Invoke(op.loc,
+                        expr as? Expr.Name ?: KBError.forParser("Invoke left side must be a variable name!", expr.loc),
+                        args)
                 }
                 
-                LBC  -> {
+                LeftBrace  -> {
                     val elements = mutableListOf<Expr>()
                     
-                    if (!skip(RBC)) {
+                    if (!skip(RightBrace)) {
                         do {
                             elements += expr()
                         }
-                        while (skip(SEP))
+                        while (skip(Comma))
                         
-                        mustSkip(RBC)
+                        mustSkip(RightBrace)
                     }
                     
                     Expr.Instantiate(op.loc,
-                        expr as? Expr.Name ?: TODO("INSTANTIATE TARGET NOT NAME '$expr'"),
+                        expr as? Expr.Name ?: KBError.forParser("Instantiation left side must be a variable name!",
+                            expr.loc),
                         elements)
                 }
                 
-                else -> KBError.forParser("Broken postfix operator '${op.type}'!", op.loc)
+                else       -> KBError.forParser("Broken postfix operator '${op.type}'!", op.loc)
             }
         }
         
@@ -618,15 +650,15 @@ class Parser(private val tokens: List<Token>) {
     
     private fun terminal(): Expr {
         return when {
-            match(VAL) -> value()
+            match(Value)     -> value()
             
-            match(NAM) -> name()
+            match(Word)      -> name()
             
-            match(LBC) -> array()
+            match(LeftBrace) -> array()
             
-            match(LPR) -> nested()
+            match(LeftParen) -> nested()
             
-            else       -> KBError.forParser("Terminal expression beginning with '${peek().type}' is invalid!",
+            else             -> KBError.forParser("Terminal expression beginning with '${peek().type}' is invalid!",
                 here())
         }
     }
@@ -634,7 +666,7 @@ class Parser(private val tokens: List<Token>) {
     private fun value(): Expr.Value {
         val token = peek()
         
-        mustSkip(VAL)
+        mustSkip(Value)
         
         return Expr.Value(token.loc, token.value)
     }
@@ -642,7 +674,7 @@ class Parser(private val tokens: List<Token>) {
     private fun name(): Expr.Name {
         val token = peek()
         
-        mustSkip(NAM)
+        mustSkip(Word)
         
         return Expr.Name(token.loc, token.value as String)
     }
@@ -651,9 +683,9 @@ class Parser(private val tokens: List<Token>) {
         val loc = here()
         
         var type = when {
-            match(NAM) -> DataType.Data(name())
+            match(Word) -> DataType.Data(name())
             
-            else       -> {
+            else        -> {
                 val token = peek()
                 
                 val primitive = DataType
@@ -672,19 +704,19 @@ class Parser(private val tokens: List<Token>) {
             }
         }
         
-        while (skip(LSQ)) {
+        while (skip(LeftSquare)) {
             when {
-                skip(RSQ) -> type = DataType.Array(type)
+                skip(RightSquare) -> type = DataType.Array(type)
                 
-                else      -> {
+                else              -> {
                     do {
-                        val initSize = if (!matchAny(SEP, RSQ)) expr() else (-1).toExpr()
+                        val initSize = if (!matchAny(Comma, RightSquare)) expr() else (-1).toExpr()
                         
                         type = DataType.Array(type, initSize)
                     }
-                    while (skip(SEP))
+                    while (skip(Comma))
                     
-                    mustSkip(RSQ)
+                    mustSkip(RightSquare)
                 }
             }
         }
@@ -707,7 +739,7 @@ class Parser(private val tokens: List<Token>) {
             }
         }
         
-        if (skip(MUL)) {
+        if (skip(Star)) {
             type = DataType.Vararg(type)
         }
         
@@ -717,28 +749,28 @@ class Parser(private val tokens: List<Token>) {
     private fun array(): Expr.Array {
         val loc = here()
         
-        mustSkip(LBC)
+        mustSkip(LeftBrace)
         
         val elements = mutableListOf<Expr>()
         
-        if (!skip(RBC)) {
+        if (!skip(RightBrace)) {
             do {
                 elements += expr()
             }
-            while (skip(SEP))
+            while (skip(Comma))
             
-            mustSkip(RBC)
+            mustSkip(RightBrace)
         }
         
         return Expr.Array(loc, elements)
     }
     
     private fun nested(): Expr {
-        mustSkip(LPR)
+        mustSkip(LeftParen)
         
         val expr = expr()
         
-        mustSkip(RPR)
+        mustSkip(RightParen)
         
         return expr
     }

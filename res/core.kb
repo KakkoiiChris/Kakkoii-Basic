@@ -1,4 +1,4 @@
-; general
+rem general
 
 sub print(args as any*) end sub
 
@@ -30,7 +30,7 @@ sub exit()
     exit(0)
 end sub
 
-; char
+rem char
 
 sub isAlpha(c as char) as bool end sub
 
@@ -50,7 +50,7 @@ sub toLower(c as char) as char end sub
 
 sub toUpper(c as char) as char end sub
 
-; string
+rem string
 
 sub isBlank(s as string) as bool end sub
 
@@ -108,7 +108,7 @@ sub replace(s as string, old as char, new as char) as string end sub
 
 sub replace(s as string, old as string, new as string) as string end sub
 
-; arrays
+rem arrays
 
 sub forEach(x as any[], action as string)
     for y in x
@@ -126,7 +126,7 @@ sub map(x as any[], transform as string) as any[]
     yield new
 end sub
 
-; math
+rem math
 
 let E =  2.718281828459045
 
@@ -196,9 +196,9 @@ sub hypot(x as double, y as double) as double end sub
 
 sub hypot(x as float, y as double) as float end sub
 
-; sub (double) remIEEE(divisor as double) as double end sub
+rem sub (double) remIEEE(divisor as double) as double end sub
 
-; sub (float) remIEEE(divisor as float) as float end sub
+rem sub (float) remIEEE(divisor as float) as float end sub
 
 sub ln(n as double) as double end sub
 
@@ -310,7 +310,7 @@ sub map(n as int, fromMin as int, fromMax as int, toMin as int, toMax as int) as
 
 sub map(n as long, fromMin as long, fromMax as long, toMin as long, toMax as long) as long end sub
 
-; graphics
+rem graphics
 
 let VK_ENTER                     = '\n' as int
 let VK_BACK_SPACE                = '\b' as int

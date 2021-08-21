@@ -45,10 +45,6 @@ sealed class Expr(val loc: Location) {
     }
     
     class Name(loc: Location, val value: String) : Expr(loc) {
-        companion object {
-            val none = Name(Location.none, "")
-        }
-        
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitNameExpr(this)
         
@@ -79,12 +75,52 @@ sealed class Expr(val loc: Location) {
             visitor.visitArrayExpr(this)
     }
     
-    class Unary(loc: Location, val op: Token.Type, val expr: Expr) : Expr(loc) {
+    class Unary(loc: Location, val op: Operator, val expr: Expr) : Expr(loc) {
+        enum class Operator(private val type: Token.Type) {
+            Negate(Token.Type.Minus),
+            Not(Token.Type.Not),
+            Length(Token.Type.Pound);
+            
+            companion object {
+                operator fun get(type: Token.Type) =
+                    values().first { it.type == type }
+            }
+            
+            override fun toString() = type.toString()
+        }
+        
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitUnaryExpr(this)
     }
     
-    class Binary(loc: Location, val op: Token.Type, val left: Expr, val right: Expr) : Expr(loc) {
+    class Binary(loc: Location, val op: Operator, val left: Expr, val right: Expr) : Expr(loc) {
+        enum class Operator(private val type: Token.Type) {
+            Assign(Token.Type.EqualSign),
+            Or(Token.Type.Or),
+            And(Token.Type.And),
+            Equal(Token.Type.DoubleEqual),
+            NotEqual(Token.Type.LessGreater),
+            Less(Token.Type.LessSign),
+            LessEqual(Token.Type.LessEqualSign),
+            Greater(Token.Type.GreaterSign),
+            GreaterEqual(Token.Type.GreaterEqualSign),
+            Is(Token.Type.Is),
+            Add(Token.Type.Plus),
+            Subtract(Token.Type.Minus),
+            Multiply(Token.Type.Star),
+            Divide(Token.Type.Slash),
+            Modulus(Token.Type.Percent),
+            As(Token.Type.As),
+            Dot(Token.Type.Dot);
+            
+            companion object {
+                operator fun get(type: Token.Type) =
+                    values().first { it.type == type }
+            }
+            
+            override fun toString() = type.toString()
+        }
+        
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitBinaryExpr(this)
     }
