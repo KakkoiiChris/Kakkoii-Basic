@@ -1,4 +1,3 @@
 package kakkoiichris.kb.script
 
-object Empty {
-}
+object Empty

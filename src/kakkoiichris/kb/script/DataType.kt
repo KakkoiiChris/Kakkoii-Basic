@@ -51,7 +51,7 @@ interface DataType {
     object Inferred : DataType {
         override val iterableType: DataType? get() = null
         
-        override fun matches(script: Script, x: Any?) = x!!
+        override fun matches(script: Script, x: Any?) = x
         
         override fun cast(script: Script, x: Any?): Any? = null
         
@@ -250,14 +250,19 @@ interface DataType {
         
         override fun cast(script: Script, x: Any?) = when (x) {
             is String        -> when (subType) {
-                Primitive.CHAR -> ArrayInstance(subType, x.toMutableList().toMutableList())
+                Primitive.CHAR -> ArrayInstance(subType, x.toList().toMutableList())
                 
-                else           -> TODO()
+                else           -> null
             }
             
-            is ArrayInstance -> ArrayInstance(subType, x.map { subType.cast(script, it) ?: TODO() }.toMutableList())
+            is ArrayInstance -> if (x.type == subType)
+                x
+            else
+                ArrayInstance(subType, x.map {
+                    subType.cast(script, it) ?: return null
+                }.toMutableList())
             
-            else             -> TODO()
+            else             -> null
         }
         
         override fun iterable(script: Script, x: Any?) = cast(script, x)
@@ -299,12 +304,12 @@ interface DataType {
         
         override fun matches(script: Script, x: Any?): Any? = x.takeIf { it is DataInstance && it.name == name }
         
-        override fun cast(script: Script, x: Any?): Any? = null
+        override fun cast(script: Script, x: Any?): Any? = (x as? DataInstance)?.takeIf { it.name == name }
         
-        override fun iterable(script: Script, x: Any?): List<Any>? = null
+        override fun iterable(script: Script, x: Any?): List<Any>? = (x as? DataInstance)?.deref()
         
         override fun default(script: Script): Any {
-            val data = script.memory.getRef(name)?.fromRef() as? Stmt.Data ?: TODO("Corrupted Data Default")
+            val data = script.memory.getRef(name)?.fromRef() as Stmt.Data
             
             val scope = Memory.Scope(name.value)
             

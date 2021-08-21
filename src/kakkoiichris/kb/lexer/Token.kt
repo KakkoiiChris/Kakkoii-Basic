@@ -1,102 +1,102 @@
 package kakkoiichris.kb.lexer
 
 data class Token(val loc: Location, val type: Type, val value: Any = Unit) {
-    enum class Type(private val rep: String) {
+    enum class Type(private val rep: kotlin.String) {
         // Keywords
-        LET("let"),
-        VAR("var"),
-        IFF("if"),
-        ELF("elif"),
-        ELS("else"),
-        WHL("while"),
-        DOO("do"),
-        FOR("for"),
-        TOO("to"),
-        STP("step"),
-        INN("in"),
-        DAT("data"),
-        SBR("sub"),
-        BRK("break"),
-        NXT("next"),
-        RET("return"),
-        YLD("yield"),
-        END("end"),
+        Let("let"),
+        Var("var"),
+        If("if"),
+        Elif("elif"),
+        Else("else"),
+        While("while"),
+        Do("do"),
+        For("for"),
+        To("to"),
+        Step("step"),
+        In("in"),
+        Data("data"),
+        Sub("sub"),
+        Break("break"),
+        Next("next"),
+        Return("return"),
+        Yield("yield"),
+        End("end"),
         
         // Types
-        VOI("void"),
-        BOL("bool"),
-        BYT("byte"),
-        SHR("short"),
-        INT("int"),
-        LNG("long"),
-        FLT("float"),
-        DBL("double"),
-        CHR("char"),
-        STR("string"),
-        ANY("any"),
+        Void("void"),
+        Bool("bool"),
+        Byte("byte"),
+        Short("short"),
+        Int("int"),
+        Long("long"),
+        Float("float"),
+        Double("double"),
+        Char("char"),
+        String("string"),
+        Any("any"),
         
         // Assignment
-        ASN("="),
-        CAD("+="),
-        CSB("-="),
-        CML("*="),
-        CDV("/="),
-        CRM("%="),
+        EqualSign("="),
+        PlusEqual("+="),
+        MinusEqual("-="),
+        StarEqual("*="),
+        SlashEqual("/="),
+        PercentEqual("%="),
         
         // Disjunction
-        ORR("or"),
+        Or("or"),
         
         // Conjunction
-        AND("and"),
+        And("and"),
         
         // Equality
-        EQU("=="),
-        NEQ("<>"),
+        DoubleEqual("=="),
+        LessGreater("<>"),
         
         // Comparison
-        LSS("<"),
-        LEQ("<="),
-        GRT(">"),
-        GEQ(">="),
+        LessSign("<"),
+        LessEqualSign("<="),
+        GreaterSign(">"),
+        GreaterEqualSign(">="),
         
         // Type Check
-        ISS("is"),
+        Is("is"),
         
         // Additive
-        ADD("+"),
-        SUB("-"),
+        Plus("+"),
+        Minus("-"),
         
         // Multiplicative
-        MUL("*"),
-        DIV("/"),
-        REM("%"),
+        Star("*"),
+        Slash("/"),
+        Percent("%"),
         
         // Type Cast
-        AAS("as"),
+        As("as"),
         
         // Prefix
-        NOT("not"),
-        LEN("#"),
+        Not("not"),
+        Pound("#"),
         
         // Pipeline
-        PIP(":"),
+        Colon(":"),
         
         // Postfix
-        DOT("."),
+        Dot("."),
         
         // Terminals
-        VAL("V"),
-        NAM("N"),
+        Value("V"),
+        Word("N"),
         
         // Delimiters
-        LPR("("),
-        RPR(")"),
-        LSQ("["),
-        RSQ("]"),
-        LBC("{"),
-        RBC("}"),
-        SEP(","),
-        EOF("0");
+        LeftParen("("),
+        RightParen(")"),
+        LeftSquare("["),
+        RightSquare("]"),
+        LeftBrace("{"),
+        RightBrace("}"),
+        Comma(","),
+        EndOfFile("0");
         
         val kw get() = rep to this
         

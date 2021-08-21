@@ -1,6 +1,7 @@
 <component name="ProjectDictionaryState">
   <dictionary name="chris">
     <words>
+      <w>alnum</w>
       <w>cadd</w>
       <w>cdiv</w>
       <w>cmod</w>
@@ -8,10 +9,13 @@
       <w>csub</w>
       <w>decl</w>
       <w>fabcdef</w>
+      <w>kakkoii</w>
       <w>kbasic</w>
       <w>prgm</w>
+      <w>repl</w>
       <w>sbrt</w>
       <w>stmts</w>
+      <w>uaeiou</w>
     </words>
   </dictionary>
 </component>

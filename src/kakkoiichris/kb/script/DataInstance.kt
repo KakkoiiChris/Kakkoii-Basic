@@ -7,16 +7,16 @@ class DataInstance(val name: Expr.Name, private val members: Memory.Scope) {
         members.references.values.map { it.fromRef() }
     
     operator fun get(name: Expr.Name) =
-        members.getRef(name) ?: TODO("NO MEMBER")
+        members.getRef(name)
     
     operator fun get(name: String) =
-        members.getRef(name) ?: TODO()
+        members.getRef(name)
     
     override fun toString() =
         members
             .references
             .entries
             .joinToString(prefix = "$name { ", postfix = " }") { (name, ref) ->
-                "$name : ${ref.fromRef().toString()}"
+                "$name : ${ref.fromRef()}"
             }
 }
