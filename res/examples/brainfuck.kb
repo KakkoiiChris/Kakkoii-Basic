@@ -1,5 +1,6 @@
 rem Brainfuck Interpreter
-let t as byte[30000]
+let size = 30000
+let t as int[size]
 var tp = 0
 let c = input("brainfuck> ")
 var ip = 0
@@ -8,25 +9,44 @@ while ip < #c
 	var i = c[ip]
 	
 	if i == '+'
-		t[tp] += 1 as byte
+		t[tp] += 1
+        
+        if t[tp] > 255
+            t[tp] = 0
+        end if
 	elif i == '-'
-		t[tp] -= 1 as byte
+		t[tp] -= 1
+        
+        if t[tp] < 0
+            t[tp] = 255
+        end if
 	elif i == '<'
 		tp -= 1
+        
+        if tp < 0
+            tp = size - 1
+        end if
 	elif i == '>'
 		tp += 1
+        
+        if tp >= size
+            tp = 0
+        end if
 	elif i == '['
 		if t[tp] == 0
 			while i <> ']'
 				ip += 1
+                
 				i = c[ip]
 			end while
+            
 			ip += 1
 		end if
 	elif i == ']'
 		if t[tp] <> 0
 			while i <> ']'
 				ip -= 1
+                
 				i = c[ip]
 			end while
 		end if

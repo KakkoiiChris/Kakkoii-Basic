@@ -1,3 +1,15 @@
 rem File Test
 
-write("writeTest.txt", {"Hello", "World", "How", "Are", "You", "Today"})
+let path = "fileTest.txt"
+
+do
+    let text = input()
+    
+    write(path, text)
+end do
+
+do
+    let text = read(path)
+    
+    print(text)
+end do

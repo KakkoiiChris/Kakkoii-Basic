@@ -6,5 +6,5 @@ data class Location(val name: String, val row: Int, val col: Int) {
     }
     
     override fun toString() =
-        "$name.kb @ $row, $col"
+        if (name.isNotEmpty()) " @ $name.kb ($row, $col)" else ""
 }

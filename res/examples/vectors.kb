@@ -1,0 +1,28 @@
+data Vector
+    var x as double,
+    var y as double
+end
+
+sub negate(this as Vector) as Vector
+    negate = Vector { -this.x, -this.y }
+end
+
+sub add(this as Vector, that as Vector) as Vector
+    add = Vector { this.x + that.x, this.y + that.y }
+end
+
+sub add(this as Vector, that as int) as Vector
+    add = Vector { that, that }
+end
+
+sub add(this as Vector, that as double) as Vector
+    add = Vector { this.x + that, this.y + that }
+end
+
+let x = Vector { 3, 5 }
+
+let y = Vector { 4, 1 }
+
+print("x + -y = ", x + -y, '\n')
+
+print("x + 4 = ", x + 5, '\n')

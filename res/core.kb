@@ -4,6 +4,10 @@ sub print(args as any*) end sub
 
 sub input(args as any*) as string end sub
 
+sub read(path as string) as string end sub
+
+sub write(path as string, value as any) end sub
+
 sub concat(args as any*) as string end sub
 
 sub sleep(milliseconds as long) end sub
@@ -12,21 +16,19 @@ sub sleep(seconds as double)
     sleep((seconds * 1000) as long)
 end sub
 
-sub getMilliseconds() as long end sub
+sub milliseconds as long end sub
 
-sub getNanoseconds() as long end sub
+sub nanoseconds as long end sub
 
-sub getSeconds() as double
-    yield getNanoseconds() / 1E9
+sub seconds as double
+    yield nanoseconds() / 1E9
 end sub
 
 sub typeOf(x as any) as string end sub
 
-sub invoke(name as string, args as any*) as any end sub
-
 sub exit(code as int) end sub
 
-sub exit()
+sub exit
     exit(0)
 end sub
 
@@ -83,6 +85,8 @@ sub substring(s as string, startIndex as int, endIndex as int) as string end sub
 sub substring(s as string, startIndex as int) as string
     yield substring(s, startIndex, #s)
 end sub
+
+sub split(s as string, regex as string) as string[] end sub
 
 sub indexOf(s as string, c as char) as int end sub
 
@@ -196,9 +200,9 @@ sub hypot(x as double, y as double) as double end sub
 
 sub hypot(x as float, y as double) as float end sub
 
-rem sub (double) remIEEE(divisor as double) as double end sub
+rem sub (double) remIEEE(divisor as double) as double end
 
-rem sub (float) remIEEE(divisor as float) as float end sub
+rem sub (float) remIEEE(divisor as float) as float end
 
 sub ln(n as double) as double end sub
 
@@ -256,7 +260,7 @@ sub pow(b as double, e as int) as double end sub
 
 sub pow(b as float, e as int) as float end sub
 
-sub random() as double end sub
+sub random as double end sub
 
 sub round(n as double) as double end sub
 
@@ -285,6 +289,10 @@ sub sin(n as float) as float end sub
 sub sinh(n as double) as double end sub
 
 sub sinh(n as float) as float end sub
+
+sub sqrt(n as double) as double end sub
+
+sub sqrt(n as float) as float end sub
 
 sub tan(n as double) as double end sub
 
@@ -504,11 +512,11 @@ let VK_UNDEFINED                 = 0x0
 
 sub createWindow(width as int, height as int, title as string) end sub
 
-sub openWindow() end sub
+sub openWindow end sub
 
-sub closeWindow() end sub
+sub closeWindow end sub
 
-sub windowIsOpen() as bool end sub
+sub windowIsOpen as bool end sub
 
 data Color
     var red   as int,
@@ -517,7 +525,7 @@ data Color
     var alpha as int = 255
 end data
 
-sub getColor() as Color end sub
+sub getColor as Color end sub
 
 sub setColor(red as int, green as int, blue as int, alpha as int) end sub
 
@@ -561,7 +569,7 @@ data Font
     var size  as int
 end data
 
-sub getFont() as Font end sub
+sub getFont as Font end sub
 
 sub setFont(name as string, style as int, size  as int) end sub
 
@@ -578,7 +586,7 @@ data Stroke
     var dashPhase  as float
 end data
 
-sub getStroke() as Stroke end sub
+sub getStroke as Stroke end sub
 
 sub setStroke(width as float, cap as int, join as int, miterLimit as float, dash as float[], dashPhase as float) end sub
 
@@ -598,11 +606,11 @@ sub scale(x as double, y as double) end sub
 
 sub shear(x as double, y as double) end sub
 
-sub pushMatrix() end sub
+sub pushMatrix end sub
 
-sub popMatrix() end sub
+sub popMatrix end sub
 
-sub clear() end sub
+sub clear end sub
 
 sub drawLine(xa as int, ya as int, xb as int, yb as int) end sub
 
@@ -660,22 +668,24 @@ sub drawImage(image as Image, x as int, y as int, width as int, height as int) e
 
 sub drawImage(image as Image, dxa as int, dya as int, dxb as int, dyb as int, sxa as int, sya as int, sxb as int, syb as int) end sub
 
-sub flip() end sub
+sub flip end sub
 
-sub keyIsDown(keyCode as int) as bool end sub
+sub keyIsDown(code as int) as bool end sub
 
-sub keyIsHeld(keyCode as int) as bool end sub
+sub keyIsHeld(code as int) as bool end sub
 
-sub keyIsUp(keyCode as int) as bool end sub
+sub keyIsUp(code as int) as bool end sub
 
-sub buttonIsDown(buttonCode as int) as bool end sub
+sub buttonIsDown(code as int) as bool end sub
 
-sub buttonIsHeld(buttonCode as int) as bool end sub
+sub buttonIsHeld(code as int) as bool end sub
 
-sub buttonIsUp(buttonCode as int) as bool end sub
+sub buttonIsUp(code as int) as bool end sub
 
-sub mouseX() as int end sub
+sub mouseX as int end sub
 
-sub mouseY() as int end sub
+sub mouseY as int end sub
 
-sub poll() end sub
+sub mouseWheel as int end sub
+
+sub poll end sub

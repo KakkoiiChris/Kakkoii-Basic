@@ -1,0 +1,20 @@
+data A
+    var s as string,
+    var n as int
+end data
+
+data B
+    var s as string,
+    var n as double
+end data
+
+data C
+    var a as A,
+    var b as B
+end data
+
+var c as C
+
+c = { { "Hello", 69 }, { "World", 420 } }
+
+print(c & '\n')

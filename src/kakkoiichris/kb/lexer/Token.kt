@@ -1,15 +1,19 @@
 package kakkoiichris.kb.lexer
 
-data class Token(val loc: Location, val type: Type, val value: Any = Unit) {
-    enum class Type(private val rep: kotlin.String) {
+data class Token(val location: Location, val type: Type, val value: Any = Unit) {
+    enum class Type(val symbol: kotlin.String) {
         // Keywords
         Let("let"),
         Var("var"),
+        Each("each"),
+        Do("do"),
         If("if"),
         Elif("elif"),
         Else("else"),
+        Switch("switch"),
+        Case("case"),
         While("while"),
-        Do("do"),
+        Until("until"),
         For("for"),
         To("to"),
         Step("step"),
@@ -20,10 +24,11 @@ data class Token(val loc: Location, val type: Type, val value: Any = Unit) {
         Next("next"),
         Return("return"),
         Yield("yield"),
+        Goto("goto"),
         End("end"),
         
         // Types
-        Void("void"),
+        None("none"),
         Bool("bool"),
         Byte("byte"),
         Short("short"),
@@ -42,6 +47,7 @@ data class Token(val loc: Location, val type: Type, val value: Any = Unit) {
         StarEqual("*="),
         SlashEqual("/="),
         PercentEqual("%="),
+        Dollar("$"),
         
         // Disjunction
         Or("or"),
@@ -61,6 +67,9 @@ data class Token(val loc: Location, val type: Type, val value: Any = Unit) {
         
         // Type Check
         Is("is"),
+        
+        // Concatenate
+        Ampersand("&"),
         
         // Additive
         Plus("+"),
@@ -87,6 +96,7 @@ data class Token(val loc: Location, val type: Type, val value: Any = Unit) {
         // Terminals
         Value("V"),
         Word("N"),
+        Label("@"),
         
         // Delimiters
         LeftParen("("),
@@ -98,8 +108,6 @@ data class Token(val loc: Location, val type: Type, val value: Any = Unit) {
         Comma(","),
         EndOfFile("0");
         
-        val kw get() = rep to this
-        
-        override fun toString() = rep
+        override fun toString() = symbol
     }
 }

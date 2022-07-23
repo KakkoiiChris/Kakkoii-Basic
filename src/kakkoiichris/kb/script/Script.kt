@@ -44,33 +44,93 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         }
     }
     
+    override fun visit(stmt: Stmt) {
+        try {
+            super<Stmt.Visitor>.visit(stmt)
+        }
+        catch (e: KBError) {
+            e.push(stmt)
+            
+            throw e
+        }
+    }
+    
     override fun visitNoneStmt(stmt: Stmt.None) =
         Unit
     
     override fun visitDeclStmt(stmt: Stmt.Decl) {
+        if (memory.hasRef(stmt.name)) {
+            KBError.alreadyDeclaredVariable(stmt.name, stmt.name.location)
+        }
+        
         var value = visit(stmt.expr).fromRef()
         
         if (value === Unit) {
-            KBError.forScript("Cannot assign void to a variable!", stmt.expr.loc)
+            KBError.assignedNone(stmt.expr.location)
         }
         
         var type = stmt.type.value
         
         if (type === DataType.Inferred) {
+            if (value === Empty) {
+                KBError.inferEmpty(stmt.location)
+            }
+            
             type = DataType.infer(this, value)
         }
         
         if (value === Empty) {
-            value = type.default(this)
-                ?: KBError.forScript("No default value for data type '$type'!", stmt.expr.loc)
+            value = type.default(this) ?: KBError.noDefaultValue(type, stmt.expr.location)
         }
         
-        if (type.matches(this, value) == null) {
-            KBError.forScript("Assigned value '$value' is not of type '${type}'!", stmt.loc)
+        value = type.coerce(value) ?: value
+        
+        if (type.filter(this, value) == null) {
+            KBError.mismatchedType(value, type, stmt.location)
         }
         
-        if (!memory.new(stmt.constant, stmt.name, type, value)) {
-            KBError.forScript("Variable '${stmt.name.value}' is already declared!", stmt.name.loc)
+        memory.newRef(stmt.constant, stmt.name, type, value)
+    }
+    
+    override fun visitDeclEachStmt(stmt: Stmt.DeclEach) {
+        for ((name, _) in stmt.pairs) {
+            if (memory.hasRef(name)) {
+                KBError.alreadyDeclaredVariable(name, name.location)
+            }
+        }
+        
+        val value = visit(stmt.expr).fromRef()
+        
+        if (value === Unit) {
+            KBError.assignedNone(stmt.expr.location)
+        }
+        
+        for ((i, pair) in stmt.pairs.withIndex()) {
+            var subValue = when (value) {
+                is String        -> value[i]
+                
+                is ArrayInstance -> value[i]
+                
+                is DataInstance  -> value.deref()[i]
+                
+                else             -> KBError.nonPartitionedType(DataType.infer(this, value), stmt.expr.location)
+            }
+            
+            val (name, type) = pair
+            
+            var subType = type.value
+            
+            if (subType === DataType.Inferred) {
+                subType = DataType.infer(this, subValue)
+            }
+            
+            subValue = subType.coerce(subValue) ?: subValue
+            
+            if (subType.filter(this, subValue) == null) {
+                KBError.mismatchedType(subValue, subType, stmt.location)
+            }
+            
+            memory.newRef(stmt.constant, name, subType, subValue)
         }
     }
     
@@ -78,8 +138,24 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         try {
             memory.push()
             
-            for (subStmt in stmt.stmts) {
-                visit(subStmt)
+            var i = 0
+            
+            while (i < stmt.stmts.size) {
+                val subStmt = stmt.stmts[i]
+                
+                try {
+                    visit(subStmt)
+                    
+                    i++
+                }
+                catch (r: Redirect.Goto) {
+                    i = stmt.stmts
+                        .withIndex()
+                        .filter { (_, s) -> s.label == r.destination }
+                        .map { (i, _) -> i }
+                        .firstOrNull()
+                        ?: KBError.undeclaredLabel(r.destination, r.origin)
+                }
             }
         }
         finally {
@@ -88,49 +164,112 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
     
     override fun visitDoStmt(stmt: Stmt.Do) {
-        visit(stmt.body)
+        try {
+            visit(stmt.body)
+        }
+        catch (r: Redirect.Break) {
+            if (!(r.label.isEmptyValue() || r.label == stmt.label)) {
+                throw r
+            }
+        }
     }
     
     override fun visitIfStmt(stmt: Stmt.If) {
-        for ((test, body) in stmt.branches) {
-            val testValue = visit(test).fromRef()
-            
-            testValue as? Boolean
-                ?: KBError.forScript("Test expression '$testValue' is invalid; must be a bool!", test.loc)
-            
-            if (testValue) {
-                visit(body)
+        try {
+            for ((test, body) in stmt.branches) {
+                val testValue = visit(test).fromRef()
                 
-                return
+                testValue as? Boolean ?: KBError.invalidTestExpression(testValue, test.location)
+                
+                if (testValue) {
+                    visit(body)
+                    
+                    return
+                }
+            }
+            
+            visit(stmt.elze)
+        }
+        catch (r: Redirect.Break) {
+            if (!(r.label.isEmptyValue() || r.label == stmt.label)) {
+                throw r
             }
         }
+    }
+    
+    override fun visitSwitchStmt(stmt: Stmt.Switch) {
+        val subject = visit(stmt.subject).fromRef()
         
-        visit(stmt.elze)
+        for (case in stmt.cases) {
+            when (case) {
+                is Stmt.Switch.Case.Values -> {
+                    for (test in case.tests) {
+                        if (subject == test) {
+                            visit(case.block)
+                            
+                            return
+                        }
+                    }
+                }
+                
+                is Stmt.Switch.Case.Type   -> {
+                    case.type.value.filter(this, subject) ?: continue
+                    
+                    visit(case.block)
+                    
+                    return
+                }
+                
+                is Stmt.Switch.Case.Else   -> visit(case.block)
+            }
+        }
     }
     
     override fun visitWhileStmt(stmt: Stmt.While) {
         while (true) {
             val testValue = visit(stmt.test).fromRef()
             
-            testValue as? Boolean
-                ?: KBError.forScript("Test expression '$testValue' is invalid; must be a bool!", stmt.test.loc)
+            testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.location)
             
-            if (!testValue) {
-                break
-            }
+            if (!testValue) break
             
             try {
                 visit(stmt.body)
             }
             catch (r: Redirect.Break) {
-                break
+                if (!(r.label.isEmptyValue() || r.label == stmt.label)) {
+                    throw r
+                }
             }
             catch (r: Redirect.Next) {
+                continue
             }
         }
     }
     
-    override fun visitForStmt(stmt: Stmt.For) {
+    override fun visitUntilStmt(stmt: Stmt.Until) {
+        while (true) {
+            try {
+                visit(stmt.body)
+            }
+            catch (r: Redirect.Break) {
+                if (!(r.label.isEmptyValue() || r.label == stmt.label)) {
+                    throw r
+                }
+            }
+            catch (r: Redirect.Next) {
+                continue
+            }
+            
+            val testValue = visit(stmt.test).fromRef()
+            
+            testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.location)
+            
+            if (!testValue) break
+        }
+    }
+    
+    override fun visitForCounterStmt(stmt: Stmt.ForCounter) {
         try {
             memory.push("for pointer")
             
@@ -138,22 +277,29 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             
             val pointer = stmt.decl.name
             
-            val test = Expr.Binary(stmt.to.loc, Expr.Binary.Operator.Less, pointer, stmt.to)
+            val test = Expr.Binary(stmt.to.location, Expr.Binary.Operator.Less, pointer, stmt.to)
             
             val increment =
-                Expr.Binary(stmt.step.loc,
+                Expr.Binary(
+                    stmt.step.location,
                     Expr.Binary.Operator.Assign,
                     pointer,
-                    Expr.Binary(stmt.step.loc, Expr.Binary.Operator.Add, pointer, stmt.step))
+                    Expr.Binary(stmt.step.location, Expr.Binary.Operator.Add, pointer, stmt.step)
+                )
             
             do {
                 try {
                     visit(stmt.body)
                 }
                 catch (r: Redirect.Break) {
-                    break
+                    if (!(r.label.isEmptyValue() || r.label == stmt.label)) {
+                        throw r
+                    }
                 }
                 catch (r: Redirect.Next) {
+                    if (!r.pointer.isEmptyValue() && r.pointer != stmt.decl.name) {
+                        throw r
+                    }
                 }
                 
                 visit(increment)
@@ -165,81 +311,120 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         }
     }
     
-    override fun visitForeachStmt(stmt: Stmt.Foreach) {
-        try {
-            memory.push("for each pointer")
-            
-            val iterableValue = visit(stmt.iterable).fromRef()
-            
-            val iterableType = DataType.infer(this, iterableValue)
-            
-            val iterable = iterableType.iterable(this, iterableValue)
-                ?: KBError.forScript("Value of type '$iterableType' is not iterable!", stmt.iterable.loc)
-            
-            val decl = if (stmt.decl.type.value == DataType.Inferred)
-                stmt.decl.withNewType(iterableType.iterableType!!)
-            else
-                stmt.decl
-            
-            visit(decl)
-            
-            val pointer = decl.name
-            
-            for (x in iterable) {
-                val assign = Expr.Binary(stmt.iterable.loc, Expr.Binary.Operator.Assign, pointer, x.toExpr())
+    override fun visitForIterateStmt(stmt: Stmt.ForIterate) {
+        val iterableValue = visit(stmt.iterable).fromRef()
+        
+        val iterableType = DataType.infer(this, iterableValue)
+        
+        val iterable = iterableType.iterable(this, iterableValue) ?: KBError.nonIterableType(iterableType, stmt.iterable.location)
+        
+        for (x in iterable) {
+            try {
+                memory.push("for iterate pointer")
                 
-                visit(assign)
+                val decl = stmt.decl.withValue(x)
                 
-                visit(stmt.body)
+                visit(decl)
+                
+                try {
+                    visit(stmt.body)
+                }
+                catch (r: Redirect.Break) {
+                    if (!(r.label.isEmptyValue() || r.label == stmt.label)) {
+                        throw r
+                    }
+                }
+                catch (r: Redirect.Next) {
+                    continue
+                }
+            }
+            finally {
+                memory.pop()
             }
         }
-        finally {
-            memory.pop()
+    }
+    
+    override fun visitForIterateEachStmt(stmt: Stmt.ForIterateEach) {
+        val iterableValue = visit(stmt.iterable).fromRef()
+        
+        val iterableType = DataType.infer(this, iterableValue)
+        
+        val iterable = iterableType.iterable(this, iterableValue) ?: KBError.nonIterableType(iterableType, stmt.iterable.location)
+        
+        for (x in iterable) {
+            try {
+                memory.push("for iterate each pointers")
+                
+                val decl = stmt.decl.withValue(x)
+                
+                visit(decl)
+                
+                try {
+                    visit(stmt.body)
+                }
+                catch (r: Redirect.Break) {
+                    if (!(r.label.isEmptyValue() || r.label == stmt.label)) {
+                        throw r
+                    }
+                }
+                catch (r: Redirect.Next) {
+                    continue
+                }
+            }
+            finally {
+                memory.pop()
+            }
         }
     }
     
     override fun visitDataStmt(stmt: Stmt.Data) {
-        if (!memory.newLet(stmt.name, DataType.Primitive.ANY, stmt)) {
-            KBError.forScript("Name '${stmt.name}' has already been declared in this scope!", stmt.name.loc)
+        if (!memory.newData(stmt)) {
+            KBError.alreadyDeclaredData(stmt.name, stmt.location)
         }
     }
     
     override fun visitSubStmt(stmt: Stmt.Sub) {
         if (!memory.newSub(stmt)) {
-            KBError.forScript("Sub with signature '${stmt.fullSignature}' already declared!", stmt.loc)
+            KBError.alreadyDeclaredSub(stmt.signature, stmt.location)
         }
+        
+        stmt.scope = memory.peek() ?: KBError.noScope(stmt.location)
     }
     
     override fun visitBreakStmt(stmt: Stmt.Break) {
-        throw Redirect.Break(stmt.loc)
+        throw Redirect.Break(stmt.location, stmt.destination)
     }
     
     override fun visitNextStmt(stmt: Stmt.Next) {
-        throw Redirect.Next(stmt.loc, stmt.pointer)
+        throw Redirect.Next(stmt.location, stmt.pointer)
     }
     
     override fun visitReturnStmt(stmt: Stmt.Return) {
-        throw Redirect.Return(stmt.loc)
+        throw Redirect.Return(stmt.location)
     }
     
     override fun visitYieldStmt(stmt: Stmt.Yield) {
         val value = visit(stmt.value).fromRef()
         
-        throw Redirect.Yield(stmt.loc, value)
+        throw Redirect.Yield(stmt.location, value)
+    }
+    
+    override fun visitGotoStmt(stmt: Stmt.Goto) {
+        throw Redirect.Goto(stmt.location, stmt.destination)
     }
     
     override fun visitExpressionStmt(stmt: Stmt.Expression) {
         visit(stmt.expr)
     }
     
-    override fun visitNoneExpr(expr: Expr.None) =
+    override fun visitEmptyExpr(expr: Expr.Empty) =
         Empty
     
     override fun visitValueExpr(expr: Expr.Value) =
         expr.value
     
     override fun visitNameExpr(expr: Expr.Name) =
-        memory.getRef(expr) ?: KBError.forScript("Name '$expr' has not been declared in this scope!", expr.loc)
+        memory.getRef(expr) ?: KBError.undeclaredVariable(expr, expr.location)
     
     override fun visitTypeExpr(expr: Expr.Type) =
         expr.value
@@ -259,28 +444,28 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     override fun visitUnaryExpr(expr: Expr.Unary): Any {
         return when (expr.op) {
             Expr.Unary.Operator.Negate -> when (val e = visit(expr.expr).fromRef()) {
-                is Byte   -> -e
+                is Byte          -> (-e).toByte()
                 
-                is Short  -> -e
+                is Short         -> (-e).toShort()
                 
-                is Int    -> -e
+                is Int           -> -e
                 
-                is Long   -> -e
+                is Long          -> -e
                 
-                is Float  -> -e
+                is Float         -> -e
                 
-                is Double -> -e
+                is Double        -> -e
                 
-                else      -> KBError.forScript("Operand '$e' is invalid for unary '${expr.op}' operator!",
-                    expr.expr.loc)
+                is String        -> e.reversed()
+                
+                is ArrayInstance -> ArrayInstance(e.type, e.reversed().toMutableList())
+                
+                is DataInstance  -> e.invokeUnaryOperator(this, expr.op)
+                
+                else             -> KBError.invalidUnaryOperand(e, expr.op, expr.expr.location)
             }
             
-            Expr.Unary.Operator.Not    -> when (val e = visit(expr.expr).fromRef()) {
-                is Boolean -> !e
-                
-                else       -> KBError.forScript("Operand '$e' is invalid for unary '${expr.op}' operator!",
-                    expr.expr.loc)
-            }
+            Expr.Unary.Operator.Not    -> visit(expr.expr).fromRef().isEmptyValue()
             
             Expr.Unary.Operator.Length -> when (val e = visit(expr.expr).fromRef()) {
                 is String        -> e.length
@@ -298,39 +483,66 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         return when (expr.op) {
             Expr.Binary.Operator.Assign       -> when (val l = visit(expr.left)) {
                 is Memory.Scope.Reference -> {
-                    val r = visit(expr.right).fromRef()
+                    var right = expr.right
+                    
+                    if (l.type is DataType.Data && right is Expr.Instantiate && right.isInferred) {
+                        right = right.withTarget(l.type.name)
+                    }
+                    
+                    var r = visit(right).fromRef()
+                    
+                    if (r === Empty) {
+                        r = l.type.default(this) ?: KBError.noDefaultValue(l.type, expr.left.location)
+                    }
+                    
+                    r = l.type.coerce(r) ?: r
                     
                     when (l.put(this, r)) {
                         true  -> r
                         
-                        false -> KBError.forScript("Assigned value '$r' (${
-                            DataType.infer(this,
-                                r)
-                        }) doesn't match reference type '${l.type}'!", expr.loc)
+                        false -> KBError.mismatchedType(r, l.type, expr.location)
                         
-                        null  -> KBError.forScript("Constant cannot be reassigned!", expr.loc)
+                        null  -> KBError.reassignedConstant(expr.location)
                     }
                 }
                 
-                else                      -> KBError.forScript("Value '$l' cannot be assigned to!", expr.left.loc)
+                else                      -> KBError.assignedToValue(expr.left.location)
+            }
+            
+            Expr.Binary.Operator.Swap         -> {
+                val l = visit(expr.left) as? Memory.Scope.Reference ?: KBError.assignedToValue(expr.left.location)
+                val r = visit(expr.right) as? Memory.Scope.Reference ?: KBError.assignedToValue(expr.right.location)
+                
+                val lv = r.type.coerce(l.value) ?: l.value
+                val rv = l.type.coerce(r.value) ?: r.value
+                
+                when (l.put(this, rv)) {
+                    true  -> Unit
+                    
+                    false -> KBError.mismatchedType(r, l.type, expr.left.location)
+                    
+                    null  -> KBError.reassignedConstant(expr.left.location)
+                }
+                
+                when (r.put(this, lv)) {
+                    true  -> Unit
+                    
+                    false -> KBError.mismatchedType(r, l.type, expr.right.location)
+                    
+                    null  -> KBError.reassignedConstant(expr.right.location)
+                }
             }
             
             Expr.Binary.Operator.Or           -> {
                 val l = visit(expr.left).fromRef()
                 
-                l as? Boolean
-                    ?: KBError.forScript("Left operand '$l' is invalid for binary '${expr.op}' operator!",
-                        expr.left.loc)
+                l as? Boolean ?: KBError.invalidLeftOperand(l, expr.op, expr.left.location)
                 
-                if (l) {
-                    return true
-                }
+                if (l) return true
                 
                 val r = visit(expr.right).fromRef()
                 
-                r as? Boolean
-                    ?: KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                r as? Boolean ?: KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 
                 return r
             }
@@ -338,179 +550,215 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             Expr.Binary.Operator.And          -> {
                 val l = visit(expr.left).fromRef()
                 
-                l as? Boolean
-                    ?: KBError.forScript("Left operand '$l' is invalid for binary '${expr.op}' operator!",
-                        expr.left.loc)
+                l as? Boolean ?: KBError.invalidLeftOperand(l, expr.op, expr.left.location)
                 
-                if (!l) {
-                    return false
-                }
+                if (!l) return false
                 
                 val r = visit(expr.right).fromRef()
                 
-                r as? Boolean
-                    ?: KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                r as? Boolean ?: KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 
                 return r
             }
             
             Expr.Binary.Operator.Equal        -> when (val l = visit(expr.left).fromRef()) {
-                is Boolean -> when (val r = visit(expr.right).fromRef()) {
+                is Boolean       -> when (val r = visit(expr.right).fromRef()) {
                     is Boolean -> l == r
+                    Empty      -> l.isEmptyValue()
                     else       -> false
                 }
                 
-                is Byte    -> when (val r = visit(expr.right).fromRef()) {
+                is Byte          -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l == r
                     is Short  -> l == r
                     is Int    -> l == r
                     is Long   -> l == r
                     is Float  -> l == r
                     is Double -> l == r
+                    Empty     -> l.isEmptyValue()
                     else      -> false
                 }
                 
-                is Short   -> when (val r = visit(expr.right).fromRef()) {
+                is Short         -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l == r
                     is Short  -> l == r
                     is Int    -> l == r
                     is Long   -> l == r
                     is Float  -> l == r
                     is Double -> l == r
+                    Empty     -> l.isEmptyValue()
                     else      -> false
                 }
                 
-                is Int     -> when (val r = visit(expr.right).fromRef()) {
+                is Int           -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l == r
                     is Short  -> l == r
                     is Int    -> l == r
                     is Long   -> l == r
                     is Float  -> l == r
                     is Double -> l == r
+                    Empty     -> l.isEmptyValue()
                     else      -> false
                 }
                 
-                is Long    -> when (val r = visit(expr.right).fromRef()) {
+                is Long          -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l == r
                     is Short  -> l == r
                     is Int    -> l == r
                     is Long   -> l == r
                     is Float  -> l == r
                     is Double -> l == r
+                    Empty     -> l.isEmptyValue()
                     else      -> false
                 }
                 
-                is Float   -> when (val r = visit(expr.right).fromRef()) {
+                is Float         -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l == r
                     is Short  -> l == r
                     is Int    -> l == r
                     is Long   -> l == r
                     is Float  -> l == r
                     is Double -> l == r
+                    Empty     -> l.isEmptyValue()
                     else      -> false
                 }
                 
-                is Double  -> when (val r = visit(expr.right).fromRef()) {
+                is Double        -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l == r
                     is Short  -> l == r
                     is Int    -> l == r
                     is Long   -> l == r
                     is Float  -> l == r
                     is Double -> l == r
+                    Empty     -> l.isEmptyValue()
                     else      -> false
                 }
                 
-                is Char    -> when (val r = visit(expr.right).fromRef()) {
+                is Char          -> when (val r = visit(expr.right).fromRef()) {
                     is Char -> l == r
+                    Empty   -> l.isEmptyValue()
                     else    -> false
                 }
                 
-                is String  -> when (val r = visit(expr.right).fromRef()) {
+                is String        -> when (val r = visit(expr.right).fromRef()) {
                     is String -> l == r
+                    Empty     -> l.isEmptyValue()
                     else      -> false
                 }
                 
-                else       -> false
+                is ArrayInstance -> when (val r = visit(expr.right).fromRef()) {
+                    is ArrayInstance -> l == r
+                    Empty            -> l.isEmpty()
+                    else             -> false
+                }
+                
+                is DataInstance  -> when (val r = visit(expr.right).fromRef()) {
+                    is DataInstance -> l == r
+                    Empty           -> l.isEmpty()
+                    else            -> false
+                }
+                
+                else             -> false
             }
             
             Expr.Binary.Operator.NotEqual     -> when (val l = visit(expr.left).fromRef()) {
-                is Boolean -> when (val r = visit(expr.right).fromRef()) {
+                is Boolean       -> when (val r = visit(expr.right).fromRef()) {
                     is Boolean -> l != r
+                    Empty      -> !l.isEmptyValue()
                     else       -> true
                 }
                 
-                is Byte    -> when (val r = visit(expr.right).fromRef()) {
+                is Byte          -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l != r
                     is Short  -> l != r
                     is Int    -> l != r
                     is Long   -> l != r
                     is Float  -> l != r
                     is Double -> l != r
+                    Empty     -> !l.isEmptyValue()
                     else      -> true
                 }
                 
-                is Short   -> when (val r = visit(expr.right).fromRef()) {
+                is Short         -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l != r
                     is Short  -> l != r
                     is Int    -> l != r
                     is Long   -> l != r
                     is Float  -> l != r
                     is Double -> l != r
+                    Empty     -> !l.isEmptyValue()
                     else      -> true
                 }
                 
-                is Int     -> when (val r = visit(expr.right).fromRef()) {
+                is Int           -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l != r
                     is Short  -> l != r
                     is Int    -> l != r
                     is Long   -> l != r
                     is Float  -> l != r
                     is Double -> l != r
+                    Empty     -> !l.isEmptyValue()
                     else      -> true
                 }
                 
-                is Long    -> when (val r = visit(expr.right).fromRef()) {
+                is Long          -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l != r
                     is Short  -> l != r
                     is Int    -> l != r
                     is Long   -> l != r
                     is Float  -> l != r
                     is Double -> l != r
+                    Empty     -> !l.isEmptyValue()
                     else      -> true
                 }
                 
-                is Float   -> when (val r = visit(expr.right).fromRef()) {
+                is Float         -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l != r
                     is Short  -> l != r
                     is Int    -> l != r
                     is Long   -> l != r
                     is Float  -> l != r
                     is Double -> l != r
+                    Empty     -> !l.isEmptyValue()
                     else      -> true
                 }
                 
-                is Double  -> when (val r = visit(expr.right).fromRef()) {
+                is Double        -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l != r
                     is Short  -> l != r
                     is Int    -> l != r
                     is Long   -> l != r
                     is Float  -> l != r
                     is Double -> l != r
+                    Empty     -> !l.isEmptyValue()
                     else      -> true
                 }
                 
-                is Char    -> when (val r = visit(expr.right).fromRef()) {
+                is Char          -> when (val r = visit(expr.right).fromRef()) {
                     is Char -> l != r
+                    Empty   -> !l.isEmptyValue()
                     else    -> true
                 }
                 
-                is String  -> when (val r = visit(expr.right).fromRef()) {
+                is String        -> when (val r = visit(expr.right).fromRef()) {
                     is String -> l != r
+                    Empty     -> !l.isEmptyValue()
                     else      -> true
                 }
                 
-                else       -> true
+                is ArrayInstance -> when (val r = visit(expr.right).fromRef()) {
+                    is ArrayInstance -> l != r
+                    Empty            -> !l.isEmpty()
+                    else             -> true
+                }
+                
+                is DataInstance  -> when (val r = visit(expr.right).fromRef()) {
+                    is DataInstance -> l != r
+                    Empty           -> !l.isEmpty()
+                    else            -> true
+                }
+                
+                else             -> true
             }
             
             Expr.Binary.Operator.Less         -> when (val l = visit(expr.left).fromRef()) {
@@ -521,8 +769,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l < r
                     is Float  -> l < r
                     is Double -> l < r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Short  -> when (val r = visit(expr.right).fromRef()) {
@@ -532,8 +779,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l < r
                     is Float  -> l < r
                     is Double -> l < r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Int    -> when (val r = visit(expr.right).fromRef()) {
@@ -543,8 +789,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l < r
                     is Float  -> l < r
                     is Double -> l < r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Long   -> when (val r = visit(expr.right).fromRef()) {
@@ -554,8 +799,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l < r
                     is Float  -> l < r
                     is Double -> l < r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Float  -> when (val r = visit(expr.right).fromRef()) {
@@ -565,8 +809,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l < r
                     is Float  -> l < r
                     is Double -> l < r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Double -> when (val r = visit(expr.right).fromRef()) {
@@ -576,24 +819,20 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l < r
                     is Float  -> l < r
                     is Double -> l < r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Char   -> when (val r = visit(expr.right).fromRef()) {
                     is Char -> l < r
-                    else    -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else    -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is String -> when (val r = visit(expr.right).fromRef()) {
                     is String -> l < r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                else      -> KBError.forScript("Left operand '$l' is invalid for binary '${expr.op}' operator!",
-                    expr.left.loc)
+                else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
             Expr.Binary.Operator.LessEqual    -> when (val l = visit(expr.left).fromRef()) {
@@ -604,8 +843,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l <= r
                     is Float  -> l <= r
                     is Double -> l <= r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Short  -> when (val r = visit(expr.right).fromRef()) {
@@ -615,8 +853,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l <= r
                     is Float  -> l <= r
                     is Double -> l <= r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Int    -> when (val r = visit(expr.right).fromRef()) {
@@ -626,8 +863,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l <= r
                     is Float  -> l <= r
                     is Double -> l <= r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Long   -> when (val r = visit(expr.right).fromRef()) {
@@ -637,8 +873,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l <= r
                     is Float  -> l <= r
                     is Double -> l <= r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Float  -> when (val r = visit(expr.right).fromRef()) {
@@ -648,8 +883,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l <= r
                     is Float  -> l <= r
                     is Double -> l <= r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Double -> when (val r = visit(expr.right).fromRef()) {
@@ -659,24 +893,20 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l <= r
                     is Float  -> l <= r
                     is Double -> l <= r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Char   -> when (val r = visit(expr.right).fromRef()) {
                     is Char -> l <= r
-                    else    -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else    -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is String -> when (val r = visit(expr.right).fromRef()) {
                     is String -> l <= r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                else      -> KBError.forScript("Left operand '$l' is invalid for binary '${expr.op}' operator!",
-                    expr.left.loc)
+                else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
             Expr.Binary.Operator.Greater      -> when (val l = visit(expr.left).fromRef()) {
@@ -687,8 +917,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l > r
                     is Float  -> l > r
                     is Double -> l > r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Short  -> when (val r = visit(expr.right).fromRef()) {
@@ -698,8 +927,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l > r
                     is Float  -> l > r
                     is Double -> l > r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Int    -> when (val r = visit(expr.right).fromRef()) {
@@ -709,8 +937,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l > r
                     is Float  -> l > r
                     is Double -> l > r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Long   -> when (val r = visit(expr.right).fromRef()) {
@@ -720,8 +947,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l > r
                     is Float  -> l > r
                     is Double -> l > r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Float  -> when (val r = visit(expr.right).fromRef()) {
@@ -731,8 +957,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l > r
                     is Float  -> l > r
                     is Double -> l > r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Double -> when (val r = visit(expr.right).fromRef()) {
@@ -742,24 +967,20 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l > r
                     is Float  -> l > r
                     is Double -> l > r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Char   -> when (val r = visit(expr.right).fromRef()) {
                     is Char -> l > r
-                    else    -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else    -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is String -> when (val r = visit(expr.right).fromRef()) {
                     is String -> l > r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                else      -> KBError.forScript("Left operand '$l' is invalid for binary '${expr.op}' operator!",
-                    expr.left.loc)
+                else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
             Expr.Binary.Operator.GreaterEqual -> when (val l = visit(expr.left).fromRef()) {
@@ -770,8 +991,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l >= r
                     is Float  -> l >= r
                     is Double -> l >= r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Short  -> when (val r = visit(expr.right).fromRef()) {
@@ -781,8 +1001,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l >= r
                     is Float  -> l >= r
                     is Double -> l >= r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Int    -> when (val r = visit(expr.right).fromRef()) {
@@ -792,8 +1011,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l >= r
                     is Float  -> l >= r
                     is Double -> l >= r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Long   -> when (val r = visit(expr.right).fromRef()) {
@@ -803,8 +1021,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l >= r
                     is Float  -> l >= r
                     is Double -> l >= r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Float  -> when (val r = visit(expr.right).fromRef()) {
@@ -814,8 +1031,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l >= r
                     is Float  -> l >= r
                     is Double -> l >= r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Double -> when (val r = visit(expr.right).fromRef()) {
@@ -825,24 +1041,20 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l >= r
                     is Float  -> l >= r
                     is Double -> l >= r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is Char   -> when (val r = visit(expr.right).fromRef()) {
                     is Char -> l >= r
-                    else    -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else    -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
                 is String -> when (val r = visit(expr.right).fromRef()) {
                     is String -> l >= r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                else      -> KBError.forScript("Left operand '$l' is invalid for binary '${expr.op}' operator!",
-                    expr.left.loc)
+                else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
             Expr.Binary.Operator.Is           -> {
@@ -850,384 +1062,349 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 
                 val type = visit(expr.right).fromRef() as DataType
                 
-                type.matches(this, value) != null
+                type.filter(this, value) != null
+            }
+            
+            Expr.Binary.Operator.Concat       -> {
+                val l = visit(expr.left).fromRef()
+                val r = visit(expr.right).fromRef()
+                
+                "$l$r"
             }
             
             Expr.Binary.Operator.Add          -> when (val l = visit(expr.left).fromRef()) {
-                is Byte   -> when (val r = visit(expr.right).fromRef()) {
+                is Byte         -> when (val r = visit(expr.right).fromRef()) {
+                    is Byte   -> (l + r).toByte()
+                    is Short  -> (l + r).toShort()
+                    is Int    -> l + r
+                    is Long   -> l + r
+                    is Float  -> l + r
+                    is Double -> l + r
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                }
+                
+                is Short        -> when (val r = visit(expr.right).fromRef()) {
+                    is Byte   -> (l + r).toShort()
+                    is Short  -> (l + r).toShort()
+                    is Int    -> l + r
+                    is Long   -> l + r
+                    is Float  -> l + r
+                    is Double -> l + r
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                }
+                
+                is Int          -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l + r
                     is Short  -> l + r
                     is Int    -> l + r
                     is Long   -> l + r
                     is Float  -> l + r
                     is Double -> l + r
-                    is Char   -> l.toString() + r
-                    is String -> l.toString() + r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Short  -> when (val r = visit(expr.right).fromRef()) {
+                is Long         -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l + r
                     is Short  -> l + r
                     is Int    -> l + r
                     is Long   -> l + r
                     is Float  -> l + r
                     is Double -> l + r
-                    is Char   -> l.toString() + r
-                    is String -> l.toString() + r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Int    -> when (val r = visit(expr.right).fromRef()) {
+                is Float        -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l + r
                     is Short  -> l + r
                     is Int    -> l + r
                     is Long   -> l + r
                     is Float  -> l + r
                     is Double -> l + r
-                    is Char   -> l.toString() + r
-                    is String -> l.toString() + r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Long   -> when (val r = visit(expr.right).fromRef()) {
+                is Double       -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l + r
                     is Short  -> l + r
                     is Int    -> l + r
                     is Long   -> l + r
                     is Float  -> l + r
                     is Double -> l + r
-                    is Char   -> l.toString() + r
-                    is String -> l.toString() + r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Float  -> when (val r = visit(expr.right).fromRef()) {
-                    is Byte   -> l + r
-                    is Short  -> l + r
-                    is Int    -> l + r
-                    is Long   -> l + r
-                    is Float  -> l + r
-                    is Double -> l + r
-                    is Char   -> l.toString() + r
-                    is String -> l.toString() + r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                is Char         -> when (val r = visit(expr.right).fromRef()) {
+                    is Int -> l + r
+                    else   -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Double -> when (val r = visit(expr.right).fromRef()) {
-                    is Byte   -> l + r
-                    is Short  -> l + r
-                    is Int    -> l + r
-                    is Long   -> l + r
-                    is Float  -> l + r
-                    is Double -> l + r
-                    is Char   -> l.toString() + r
-                    is String -> l.toString() + r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
-                }
+                is DataInstance -> l.invokeBinaryOperator(this, expr.op, visit(expr.right).fromRef())
                 
-                is Char   -> when (val r = visit(expr.right).fromRef()) {
-                    is Int    -> l + r
-                    is Char   -> l.toString() + r.toString()
-                    is String -> l + r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
-                }
-                
-                is String -> l + visit(expr.right).fromRef()
-                
-                else      -> KBError.forScript("Left operand '$l' is invalid for binary '${expr.op}' operator!",
-                    expr.left.loc)
+                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
             Expr.Binary.Operator.Subtract     -> when (val l = visit(expr.left).fromRef()) {
-                is Byte   -> when (val r = visit(expr.right).fromRef()) {
+                is Byte         -> when (val r = visit(expr.right).fromRef()) {
+                    is Byte   -> (l - r).toByte()
+                    is Short  -> (l - r).toShort()
+                    is Int    -> l - r
+                    is Long   -> l - r
+                    is Float  -> l - r
+                    is Double -> l - r
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                }
+                
+                is Short        -> when (val r = visit(expr.right).fromRef()) {
+                    is Byte   -> (l - r).toShort()
+                    is Short  -> (l - r).toShort()
+                    is Int    -> l - r
+                    is Long   -> l - r
+                    is Float  -> l - r
+                    is Double -> l - r
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                }
+                
+                is Int          -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l - r
                     is Short  -> l - r
                     is Int    -> l - r
                     is Long   -> l - r
                     is Float  -> l - r
                     is Double -> l - r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Short  -> when (val r = visit(expr.right).fromRef()) {
+                is Long         -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l - r
                     is Short  -> l - r
                     is Int    -> l - r
                     is Long   -> l - r
                     is Float  -> l - r
                     is Double -> l - r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Int    -> when (val r = visit(expr.right).fromRef()) {
+                is Float        -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l - r
                     is Short  -> l - r
                     is Int    -> l - r
                     is Long   -> l - r
                     is Float  -> l - r
                     is Double -> l - r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Long   -> when (val r = visit(expr.right).fromRef()) {
+                is Double       -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l - r
                     is Short  -> l - r
                     is Int    -> l - r
                     is Long   -> l - r
                     is Float  -> l - r
                     is Double -> l - r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Float  -> when (val r = visit(expr.right).fromRef()) {
-                    is Byte   -> l - r
-                    is Short  -> l - r
-                    is Int    -> l - r
-                    is Long   -> l - r
-                    is Float  -> l - r
-                    is Double -> l - r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
-                }
+                is DataInstance -> l.invokeBinaryOperator(this, expr.op, visit(expr.right).fromRef())
                 
-                is Double -> when (val r = visit(expr.right).fromRef()) {
-                    is Byte   -> l - r
-                    is Short  -> l - r
-                    is Int    -> l - r
-                    is Long   -> l - r
-                    is Float  -> l - r
-                    is Double -> l - r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
-                }
-                
-                else      -> KBError.forScript("Left operand '$l' is invalid for binary '${expr.op}' operator!",
-                    expr.left.loc)
+                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
             Expr.Binary.Operator.Multiply     -> when (val l = visit(expr.left).fromRef()) {
-                is Byte   -> when (val r = visit(expr.right).fromRef()) {
+                is Byte         -> when (val r = visit(expr.right).fromRef()) {
+                    is Byte   -> (l * r).toByte()
+                    is Short  -> (l * r).toShort()
+                    is Int    -> l * r
+                    is Long   -> l * r
+                    is Float  -> l * r
+                    is Double -> l * r
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                }
+                
+                is Short        -> when (val r = visit(expr.right).fromRef()) {
+                    is Byte   -> (l * r).toShort()
+                    is Short  -> (l * r).toShort()
+                    is Int    -> l * r
+                    is Long   -> l * r
+                    is Float  -> l * r
+                    is Double -> l * r
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                }
+                
+                is Int          -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l * r
                     is Short  -> l * r
                     is Int    -> l * r
                     is Long   -> l * r
                     is Float  -> l * r
                     is Double -> l * r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Short  -> when (val r = visit(expr.right).fromRef()) {
+                is Long         -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l * r
                     is Short  -> l * r
                     is Int    -> l * r
                     is Long   -> l * r
                     is Float  -> l * r
                     is Double -> l * r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Int    -> when (val r = visit(expr.right).fromRef()) {
+                is Float        -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l * r
                     is Short  -> l * r
                     is Int    -> l * r
                     is Long   -> l * r
                     is Float  -> l * r
                     is Double -> l * r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Long   -> when (val r = visit(expr.right).fromRef()) {
+                is Double       -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l * r
                     is Short  -> l * r
                     is Int    -> l * r
                     is Long   -> l * r
                     is Float  -> l * r
                     is Double -> l * r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Float  -> when (val r = visit(expr.right).fromRef()) {
-                    is Byte   -> l * r
-                    is Short  -> l * r
-                    is Int    -> l * r
-                    is Long   -> l * r
-                    is Float  -> l * r
-                    is Double -> l * r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
-                }
+                is DataInstance -> l.invokeBinaryOperator(this, expr.op, visit(expr.right).fromRef())
                 
-                is Double -> when (val r = visit(expr.right).fromRef()) {
-                    is Byte   -> l * r
-                    is Short  -> l * r
-                    is Int    -> l * r
-                    is Long   -> l * r
-                    is Float  -> l * r
-                    is Double -> l * r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
-                }
-                
-                else      -> KBError.forScript("Left operand '$l' is invalid for binary '${expr.op}' operator!",
-                    expr.left.loc)
+                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
             Expr.Binary.Operator.Divide       -> when (val l = visit(expr.left).fromRef()) {
-                is Byte   -> when (val r = visit(expr.right).fromRef()) {
+                is Byte         -> when (val r = visit(expr.right).fromRef()) {
+                    is Byte   -> (l / r).toByte()
+                    is Short  -> (l / r).toShort()
+                    is Int    -> l / r
+                    is Long   -> l / r
+                    is Float  -> l / r
+                    is Double -> l / r
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                }
+                
+                is Short        -> when (val r = visit(expr.right).fromRef()) {
+                    is Byte   -> (l / r).toShort()
+                    is Short  -> (l / r).toShort()
+                    is Int    -> l / r
+                    is Long   -> l / r
+                    is Float  -> l / r
+                    is Double -> l / r
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                }
+                
+                is Int          -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l / r
                     is Short  -> l / r
                     is Int    -> l / r
                     is Long   -> l / r
                     is Float  -> l / r
                     is Double -> l / r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Short  -> when (val r = visit(expr.right).fromRef()) {
+                is Long         -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l / r
                     is Short  -> l / r
                     is Int    -> l / r
                     is Long   -> l / r
                     is Float  -> l / r
                     is Double -> l / r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Int    -> when (val r = visit(expr.right).fromRef()) {
+                is Float        -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l / r
                     is Short  -> l / r
                     is Int    -> l / r
                     is Long   -> l / r
                     is Float  -> l / r
                     is Double -> l / r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Long   -> when (val r = visit(expr.right).fromRef()) {
+                is Double       -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l / r
                     is Short  -> l / r
                     is Int    -> l / r
                     is Long   -> l / r
                     is Float  -> l / r
                     is Double -> l / r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Float  -> when (val r = visit(expr.right).fromRef()) {
-                    is Byte   -> l / r
-                    is Short  -> l / r
-                    is Int    -> l / r
-                    is Long   -> l / r
-                    is Float  -> l / r
-                    is Double -> l / r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
-                }
+                is DataInstance -> l.invokeBinaryOperator(this, expr.op, visit(expr.right).fromRef())
                 
-                is Double -> when (val r = visit(expr.right).fromRef()) {
-                    is Byte   -> l / r
-                    is Short  -> l / r
-                    is Int    -> l / r
-                    is Long   -> l / r
-                    is Float  -> l / r
-                    is Double -> l / r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
-                }
-                
-                else      -> KBError.forScript("Left operand '$l' is invalid for binary '${expr.op}' operator!",
-                    expr.left.loc)
+                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
             Expr.Binary.Operator.Modulus      -> when (val l = visit(expr.left).fromRef()) {
-                is Byte   -> when (val r = visit(expr.right).fromRef()) {
+                is Byte         -> when (val r = visit(expr.right).fromRef()) {
+                    is Byte   -> (l % r).toByte()
+                    is Short  -> (l % r).toShort()
+                    is Int    -> l % r
+                    is Long   -> l % r
+                    is Float  -> l % r
+                    is Double -> l % r
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                }
+                
+                is Short        -> when (val r = visit(expr.right).fromRef()) {
+                    is Byte   -> (l % r).toShort()
+                    is Short  -> (l % r).toShort()
+                    is Int    -> l % r
+                    is Long   -> l % r
+                    is Float  -> l % r
+                    is Double -> l % r
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                }
+                
+                is Int          -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l % r
                     is Short  -> l % r
                     is Int    -> l % r
                     is Long   -> l % r
                     is Float  -> l % r
                     is Double -> l % r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Short  -> when (val r = visit(expr.right).fromRef()) {
+                is Long         -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l % r
                     is Short  -> l % r
                     is Int    -> l % r
                     is Long   -> l % r
                     is Float  -> l % r
                     is Double -> l % r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Int    -> when (val r = visit(expr.right).fromRef()) {
+                is Float        -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l % r
                     is Short  -> l % r
                     is Int    -> l % r
                     is Long   -> l % r
                     is Float  -> l % r
                     is Double -> l % r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Long   -> when (val r = visit(expr.right).fromRef()) {
+                is Double       -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l % r
                     is Short  -> l % r
                     is Int    -> l % r
                     is Long   -> l % r
                     is Float  -> l % r
                     is Double -> l % r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                is Float  -> when (val r = visit(expr.right).fromRef()) {
-                    is Byte   -> l % r
-                    is Short  -> l % r
-                    is Int    -> l % r
-                    is Long   -> l % r
-                    is Float  -> l % r
-                    is Double -> l % r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
-                }
+                is DataInstance -> l.invokeBinaryOperator(this, expr.op, visit(expr.right).fromRef())
                 
-                is Double -> when (val r = visit(expr.right).fromRef()) {
-                    is Byte   -> l % r
-                    is Short  -> l % r
-                    is Int    -> l % r
-                    is Long   -> l % r
-                    is Float  -> l % r
-                    is Double -> l % r
-                    else      -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
-                }
-                
-                else      -> KBError.forScript("Left operand '$l' is invalid for binary '${expr.op}' operator!",
-                    expr.left.loc)
+                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
             Expr.Binary.Operator.As           -> {
@@ -1235,131 +1412,129 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 
                 val type = visit(expr.right).fromRef() as DataType
                 
-                type.cast(this, value)
-                    ?: KBError.forScript("Value '$value' cannot be cast to type '$type'!", expr.loc)
+                type.cast(this, value) ?: KBError.invalidCast(value, type, expr.location)
             }
             
             Expr.Binary.Operator.Dot          -> when (val l = visit(expr.left).fromRef()) {
                 is DataInstance -> when (val r = expr.right) {
-                    is Expr.Name -> l[r] ?: KBError.forScript("Instance of data '${l.name}' doesn't have member '$r'!",
-                        expr.right.loc)
+                    is Expr.Name -> l[r] ?: KBError.noMember(l.name, r.value, expr.right.location)
                     
-                    else         -> KBError.forScript("Right operand '$r' is invalid for binary '${expr.op}' operator!",
-                        expr.right.loc)
+                    else         -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
                 
-                else            -> KBError.forScript("Left operand '$l' is invalid for binary '${expr.op}' operator!",
-                    expr.left.loc)
+                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
         }
     }
     
-    override fun visitGetExpr(expr: Expr.Get): Any {
+    //fun getString
+    
+    override fun visitGetIndexExpr(expr: Expr.GetIndex): Any {
         return when (val target = visit(expr.target).fromRef()) {
             is String        -> when (val index = visit(expr.index).fromRef()) {
                 is Int -> target[index]
                 
-                else   -> KBError.forScript("Value '$target' cannot be indexed with the value '$index'!",
-                    expr.index.loc)
+                else   -> KBError.invalidIndex(DataType.infer(this, target), DataType.infer(this, index), expr.index.location)
             }
             
-            is ArrayInstance -> when (val index = visit(expr.index).fromRef()) {
+            is ArrayInstance -> when (val index = DataType.Primitive.INT.coerce(visit(expr.index).fromRef())) {
                 is Int -> target[index]
                 
-                else   -> KBError.forScript("Value '$target' cannot be indexed with the value '$index'!",
-                    expr.index.loc)
+                else   -> KBError.invalidIndex(DataType.infer(this, target), DataType.infer(this, index), expr.index.location)
             }
             
             is DataInstance  -> when (val index = visit(expr.index).fromRef()) {
-                is Char ->target[index.toString()] ?: KBError.forScript("Instance of data '${target.name}' doesn't have member '$index'!", expr.index.loc)
+                is Char   -> target[index.toString()] ?: KBError.noMember(target.name, index.toString(), expr.index.location)
                 
-                is String -> target[index] ?: KBError.forScript("Instance of data '${target.name}' doesn't have member '$index'!", expr.index.loc)
+                is String -> target[index] ?: KBError.noMember(target.name, index, expr.index.location)
                 
-                else      -> KBError.forScript("Value '$target' cannot be indexed with the value '$index'!",
-                    expr.index.loc)
+                else      -> KBError.invalidIndex(DataType.infer(this, target), DataType.infer(this, index), expr.index.location)
             }
             
-            else             -> KBError.forScript("Value '$target' cannot be indexed!", expr.target.loc)
+            else             -> KBError.nonIndexedType(DataType.infer(this, target), expr.target.location)
         }
     }
     
-    override fun visitSetExpr(expr: Expr.Set): Any {
+    override fun visitSetIndexExpr(expr: Expr.SetIndex): Any {
         return when (val target = visit(expr.target).fromRef()) {
-            is ArrayInstance -> when (val index = visit(expr.index).fromRef()) {
+            is ArrayInstance -> when (val index = DataType.Primitive.INT.coerce(visit(expr.index).fromRef())) {
                 is Int -> {
                     val subExpr = visit(expr.expr).fromRef()
                     
-                    if (target.type.matches(this, subExpr) != null) {
-                        target[index] = subExpr
-                        
-                        subExpr
+                    if (target.type.filter(this, subExpr) == null) {
+                        KBError.mismatchedType(subExpr, target.type, expr.location)
                     }
-                    else {
-                        KBError.forScript("Assigned value '$subExpr' (${
-                            DataType.infer(this,
-                                subExpr)
-                        }) doesn't match array type '${target.type}'!", expr.loc)
-                    }
+                    
+                    target[index] = subExpr
+                    
+                    subExpr
                 }
                 
-                else   -> KBError.forScript("Value '$target' cannot be indexed with the value '$index'!",
-                    expr.index.loc)
+                else   -> KBError.invalidIndex(DataType.infer(this, target), DataType.infer(this, index), expr.index.location)
             }
             
             is DataInstance  -> when (val index = visit(expr.index).fromRef()) {
-                is Char -> {
-                    val ref = target[index.toString()]
-                        ?: KBError.forScript("Instance of data '${target.name}' doesn't have member '$index'!",
-                            expr.index.loc)
-        
+                is Char   -> {
+                    val ref = target[index.toString()] ?: KBError.noMember(target.name, index.toString(), expr.index.location)
+                    
                     val subExpr = visit(expr.expr).fromRef()
-        
+                    
                     when (ref.put(this, subExpr)) {
                         true  -> subExpr
-            
-                        false -> KBError.forScript("Assigned value '$subExpr' (${
-                            DataType.infer(this,
-                                subExpr)
-                        }) doesn't match data member type '${ref.type}'!", expr.loc)
-            
-                        null  -> KBError.forScript("Instance of data '${target.name}' member '$index' cannot be reassigned!",
-                            expr.index.loc)
+                        
+                        false -> KBError.mismatchedType(subExpr, ref.type, expr.location)
+                        
+                        null  -> KBError.reassignedConstant(expr.index.location)
                     }
                 }
                 
                 is String -> {
-                    val ref = target[index]
-                        ?: KBError.forScript("Instance of data '${target.name}' doesn't have member '$index'!",
-                            expr.index.loc)
+                    val ref = target[index] ?: KBError.noMember(target.name, index, expr.index.location)
                     
                     val subExpr = visit(expr.expr).fromRef()
                     
                     when (ref.put(this, subExpr)) {
                         true  -> subExpr
                         
-                        false -> KBError.forScript("Assigned value '$subExpr' (${
-                            DataType.infer(this,
-                                subExpr)
-                        }) doesn't match data member type '${ref.type}'!", expr.loc)
+                        false -> KBError.mismatchedType(subExpr, ref.type, expr.location)
                         
-                        null  -> KBError.forScript("Instance of data '${target.name}' member '$index' cannot be reassigned!",
-                            expr.index.loc)
+                        null  -> KBError.reassignedConstant(expr.index.location)
                     }
                 }
                 
-                else      -> KBError.forScript("Value '$target' cannot be indexed with the value '$index'!",
-                    expr.index.loc)
+                else      -> KBError.invalidIndex(DataType.infer(this, target), DataType.infer(this, index), expr.index.location)
             }
             
-            else             -> KBError.forScript("Value '$target' cannot be indexed!", expr.target.loc)
+            else             -> KBError.nonIndexedType(DataType.infer(this, target), expr.target.location)
         }
     }
     
-    override fun visitInvokeExpr(expr: Expr.Invoke): Any {
-        val subs =
-            memory.getSubs(expr.name) ?: KBError.forScript("Sub name '${expr.name}' is undeclared!", expr.name.loc)
+    override fun visitGetMemberExpr(expr: Expr.GetMember): Any {
+        val target = visit(expr.target).fromRef()
         
-        val args = expr.args.map { visit(it).toExpr(it.loc) }
+        if (target is DataInstance) {
+            return target[expr.member] ?: KBError.noMember(target.name, expr.member.value, expr.location)
+        }
+        
+        KBError.nonAccessedType(DataType.infer(this, target), expr.location)
+    }
+    
+    override fun visitSetMemberExpr(expr: Expr.SetMember): Any {
+        val target = visit(expr.target).fromRef()
+        
+        if (target is DataInstance) {
+            target[expr.member]?.put(this, visit(expr.expr).fromRef())
+            
+            return Unit
+        }
+        
+        KBError.nonAccessedType(DataType.infer(this, target), expr.location)
+    }
+    
+    override fun visitInvokeExpr(expr: Expr.Invoke): Any {
+        val subs = memory.getSubs(expr.name) ?: KBError.undeclaredSub(expr.name, expr.name.location)
+        
+        val args = expr.args
         
         val positionValid = mutableListOf<Pair<Stmt.Sub, List<Stmt.Decl>>>()
         
@@ -1370,7 +1545,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         }
         
         if (positionValid.isEmpty()) {
-            KBError.forScript("Can't resolve argument positions (${expr.name})!", expr.loc)
+            KBError.unresolvedPositions(expr.name, expr.location)
         }
         
         val typeValid = mutableListOf<Pair<Stmt.Sub, List<Stmt.Decl>>>()
@@ -1382,18 +1557,20 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         }
         
         if (typeValid.isEmpty()) {
-            KBError.forScript("Can't resolve argument types (${expr.name})!", expr.loc)
+            KBError.unresolvedTypes(expr.name, expr.location)
         }
         
-        val (sub, decls) = when (typeValid.size) {
-            1    -> typeValid[0]
-            
-            else -> typeValid.minByOrNull { (_, decls) -> decls.size }!!
-        }
+        val (sub, decls) = if (typeValid.size == 1)
+            typeValid[0]
+        else
+            typeValid.minByOrNull { (_, decls) -> decls.size }!!
+        
         
         val type = visit(sub.type).fromRef() as DataType
         
-        val scope = Memory.Scope(sub.name.value, global)
+        val scope = Memory.Scope(sub.name.value, sub.scope)
+        
+        val ref: Memory.Scope.Reference
         
         try {
             memory.push(scope)
@@ -1402,13 +1579,24 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 visit(decl)
             }
             
+            memory.newRef(
+                false,
+                sub.name,
+                sub.type.value,
+                sub.type.value.default(this) ?: KBError.noDefaultValue(sub.type.value, sub.name.location)
+            )
+            
+            ref = memory.getRef(sub.name)!!
+            
             if (sub.body.stmts.isNotEmpty()) {
                 try {
                     visit(sub.body)
                 }
                 catch (r: Redirect.Yield) {
-                    return type.matches(this, r.value)
-                        ?: KBError.forScript("Function '${sub.name}' must yield a value of type '$type'!", r.origin)
+                    return type.filter(this, r.value) ?: KBError.mismatchedReturnType(sub.name, type, r.origin)
+                }
+                catch (r: Redirect.Return) {
+                    return ref.value
                 }
             }
             else {
@@ -1418,26 +1606,19 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     subArgs += memory.getRef(name)!!.fromRef()
                 }
                 
-                val builtin = library[sub] ?: KBError.forScript("No builtin found: '${sub.name}'!", sub.loc)
+                val builtin = library[sub] ?: KBError.noBuiltin(sub.name, sub.location)
                 
-                val result = builtin(this, subArgs)
+                val result = builtin(this, subArgs) ?: KBError.mismatchedBuiltinType(sub.name, type, sub.location)
                 
-                return type.matches(this, result)
-                    ?: KBError.forScript(
-                        "Function '${sub.name}' must yield a value of type '$type'!",
-                        Location.none
-                    )
+                return type.filter(this, result) ?: KBError.mismatchedReturnType(sub.name, type, Location.none)
             }
         }
         finally {
             memory.pop()
         }
         
-        if (type.matches(this, Unit) == null) {
-            KBError.forScript("Function '${sub.name}' must yield a value!", expr.name.loc)
-        }
+        return type.filter(this, ref.value) ?: KBError.noYield(sub.name, expr.name.location)
         
-        return Unit
     }
     
     private fun resolvePosition(params: List<Stmt.Decl>, args: List<Expr>): List<Stmt.Decl>? {
@@ -1447,7 +1628,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             return null
         }
         
-        val exprs = MutableList<Expr>(params.size) { Expr.None }
+        val exprs = MutableList<Expr>(params.size) { Expr.Empty }
         
         var p = 0
         
@@ -1466,22 +1647,22 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 val arg = args[p++]
                 
                 varargs += arg/*if (arg.spread) {
-                    Expr.Spread(arg.loc, arg.expr)
+                    Expr.Spread(arg.location, arg.expr)
                 }
                 else {
                     arg.expr
                 }*/
             }
             
-            exprs[exprs.lastIndex] = Expr.Array(varargs[0].loc, varargs)
+            exprs[exprs.lastIndex] = Expr.Array(varargs[0].location, varargs)
         }
         
-        if (isVararg && exprs.last() is Expr.None) {
+        if (isVararg && exprs.last() is Expr.Empty) {
             exprs[exprs.lastIndex] = Expr.Array(Location.none, emptyList())
         }
         
-        return if (exprs.all { it !is Expr.None })
-            params.mapIndexed { i, decl -> decl.with(exprs[i]) }
+        return if (exprs.all { it !is Expr.Empty })
+            params.mapIndexed { i, decl -> decl.withExpr(exprs[i]) }
         else
             null
     }
@@ -1494,39 +1675,44 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             
             val value = visit(decl.expr).fromRef()
             
-            val finalValue = decl.type.value.matches(this, value) ?: return null
+            val finalValue = decl.type.value.filter(this, decl.type.value.coerce(value) ?: value) ?: return null
             
             exprs[i] = finalValue.toExpr()
         }
         
-        return params.mapIndexed { i, decl -> decl.with(exprs[i]) }
+        return params.mapIndexed { i, decl -> decl.withExpr(exprs[i]) }
     }
     
     fun instantiate(name: String, vararg elements: Any): DataInstance {
-        val instantiate = Expr.Instantiate(Location.none, name.toName(), elements.map { it.toExpr() }.toList())
+        val instantiate = Expr.Instantiate(Location.none, name.lowercase().toName(), elements.map { it.toExpr() }.toList())
         
         return visit(instantiate) as DataInstance
     }
     
     override fun visitInstantiateExpr(expr: Expr.Instantiate): Any {
-        val data = visit(expr.target).fromRef()
-        
-        data as? Stmt.Data ?: KBError.forScript("Value '$data' cannot be instantiated!", expr.target.loc)
+        val data = memory.getData(expr.target) ?: KBError.undeclaredData(expr.target, expr.target.location)
         
         val scope = Memory.Scope(data.name.value, memory.peek())
         
         try {
             memory.push(scope)
             
-            for ((i, decl) in data.decls.withIndex()) {
-                visit(decl)
+            for (i in data.decls.indices) {
+                var decl = data.decls[i]
                 
                 if (i in expr.elements.indices) {
-                    val assign =
-                        Expr.Binary(expr.elements[i].loc, Expr.Binary.Operator.Assign, decl.name, expr.elements[i])
+                    var element = expr.elements[i]
                     
-                    visit(assign)
+                    val declType = decl.type.value
+                    
+                    if (declType is DataType.Data && element is Expr.Instantiate && element.isInferred) {
+                        element = element.withTarget(declType.name)
+                    }
+                    
+                    decl = decl.withExpr(element)
                 }
+                
+                visit(decl)
             }
         }
         finally {

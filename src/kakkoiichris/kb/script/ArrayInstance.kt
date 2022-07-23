@@ -28,8 +28,28 @@ class ArrayInstance(val type: DataType, private val elements: MutableList<Any>) 
     fun asStringArray() =
         map { it as String }.toTypedArray()
     
+    override fun equals(other: Any?): Boolean {
+        if (other == null) return false
+        
+        if (other !is ArrayInstance) return false
+        
+        if (size != other.size) return false
+        
+        for (i in 0 until size) {
+            if (get(i) != other[i]) return false
+        }
+        
+        return true
+    }
+    
     override fun toString() =
-        joinToString(prefix = "{ ", postfix = " }")
+        joinToString(prefix = "[ ", postfix = " ]")
+    
+    override fun hashCode(): Int {
+        var result = type.hashCode()
+        result = 31 * result + elements.hashCode()
+        return result
+    }
 }
 
 fun BooleanArray.toArrayInstance() =

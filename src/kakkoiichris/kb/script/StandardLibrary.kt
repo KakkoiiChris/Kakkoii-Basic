@@ -1,3 +1,5 @@
+@file:Suppress("RedundantUnitExpression")
+
 package kakkoiichris.kb.script
 
 import kakkoiichris.kb.lexer.Location
@@ -5,6 +7,8 @@ import kakkoiichris.kb.parser.Expr
 import kakkoiichris.kb.parser.Stmt
 import kakkoiichris.kb.parser.toExpr
 import java.awt.Color
+import java.nio.file.Files
+import java.nio.file.Paths
 import kotlin.math.*
 import kotlin.system.exitProcess
 
@@ -26,7 +30,7 @@ class StandardLibrary {
     }
     
     private fun addGeneral() {
-        add("print", DataType.Primitive.VOID, DataType.Primitive.ANY.vararg()) { _, args ->
+        add("print", DataType.Primitive.NONE, DataType.Primitive.ANY.vararg) { _, args ->
             val (subArgs) = args
             
             subArgs as ArrayInstance
@@ -36,7 +40,7 @@ class StandardLibrary {
             }
         }
         
-        add("input", DataType.Primitive.STRING, DataType.Primitive.ANY.vararg()) { _, args ->
+        add("input", DataType.Primitive.STRING, DataType.Primitive.ANY.vararg) { _, args ->
             val (subArgs) = args
             
             subArgs as ArrayInstance
@@ -48,7 +52,25 @@ class StandardLibrary {
             readLine() ?: ""
         }
         
-        add("concat", DataType.Primitive.STRING, DataType.Primitive.ANY.vararg()) { _, args ->
+        add("read", DataType.Primitive.STRING, DataType.Primitive.STRING) { _, args ->
+            val (path) = args
+            
+            path as String
+            
+            Files.readString(Paths.get(path))
+        }
+        
+        add("write", DataType.Primitive.NONE, DataType.Primitive.STRING, DataType.Primitive.ANY) { _, args ->
+            val (path, data) = args
+            
+            path as String
+            
+            Files.writeString(Paths.get(path), data.toString())
+            
+            Unit
+        }
+        
+        add("concat", DataType.Primitive.STRING, DataType.Primitive.ANY.vararg) { _, args ->
             val (subArgs) = args
             
             subArgs as ArrayInstance
@@ -60,7 +82,7 @@ class StandardLibrary {
             }
         }
         
-        add("sleep", DataType.Primitive.VOID, DataType.Primitive.LONG) { _, args ->
+        add("sleep", DataType.Primitive.NONE, DataType.Primitive.LONG) { _, args ->
             val (milliseconds) = args
             
             milliseconds as Long
@@ -68,31 +90,17 @@ class StandardLibrary {
             Thread.sleep(milliseconds)
         }
         
-        add("getMilliseconds", DataType.Primitive.LONG) { _, _ -> System.currentTimeMillis() }
+        add("milliseconds", DataType.Primitive.LONG) { _, _ -> System.currentTimeMillis() }
         
-        add("getNanoseconds", DataType.Primitive.LONG) { _, _ -> System.nanoTime() }
+        add("nanoseconds", DataType.Primitive.LONG) { _, _ -> System.nanoTime() }
         
-        add("typeOf", DataType.Primitive.STRING, DataType.Primitive.ANY) { script, args ->
+        add("typeof", DataType.Primitive.STRING, DataType.Primitive.ANY) { script, args ->
             val (x) = args
             
             DataType.infer(script, x).toString()
         }
         
-        add("invoke",
-            DataType.Primitive.ANY,
-            DataType.Primitive.STRING,
-            DataType.Primitive.ANY.vararg()) { script, args ->
-            val (name, _args) = args
-            
-            name as String
-            _args as ArrayInstance
-            
-            val invoke = Expr.Invoke(Location.none, Expr.Name(Location.none, name), _args.map { it.toExpr() })
-            
-            script.visit(invoke)
-        }
-        
-        add("exit", DataType.Primitive.VOID, DataType.Primitive.INT) { _, args ->
+        add("exit", DataType.Primitive.NONE, DataType.Primitive.INT) { _, args ->
             val (code) = args
             
             code as Int
@@ -272,6 +280,19 @@ class StandardLibrary {
             endIndex as Int
             
             s.substring(startIndex, endIndex)
+        }
+        
+        add("split",
+            DataType.Primitive.STRING.array,
+            DataType.Primitive.STRING,
+            DataType.Primitive.STRING) { _, args ->
+            
+            val (s, regex) = args
+            
+            s as String
+            regex as String
+            
+            s.split(regex.toRegex()).toTypedArray().toArrayInstance()
         }
         
         add("indexOf", DataType.Primitive.INT, DataType.Primitive.STRING, DataType.Primitive.CHAR) { _, args ->
@@ -785,7 +806,7 @@ class StandardLibrary {
             min(a, b)
         }
         
-        add("nextDown", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("nextdown", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -793,7 +814,7 @@ class StandardLibrary {
             n.nextDown()
         }
         
-        add("nextDown", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("nextdown", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -801,7 +822,7 @@ class StandardLibrary {
             n.nextDown()
         }
         
-        add("nextTowards",
+        add("nexttowards",
             DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
             val (a, b) = args
             
@@ -811,7 +832,7 @@ class StandardLibrary {
             a.nextTowards(b)
         }
         
-        add("nextTowards",
+        add("nexttowards",
             DataType.Primitive.FLOAT, DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
             val (a, b) = args
             
@@ -821,7 +842,7 @@ class StandardLibrary {
             a.nextTowards(b)
         }
         
-        add("nextUp", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("nextup", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -829,7 +850,7 @@ class StandardLibrary {
             n.nextUp()
         }
         
-        add("nextUp", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("nextup", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -987,6 +1008,22 @@ class StandardLibrary {
             sinh(n)
         }
         
+        add("sqrt", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+            val (n) = args
+            
+            n as Double
+            
+            sqrt(n)
+        }
+        
+        add("sqrt", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+            val (n) = args
+            
+            n as Float
+            
+            sqrt(n)
+        }
+        
         add("tan", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
             val (n) = args
             
@@ -1126,7 +1163,7 @@ class StandardLibrary {
     
     private fun addGraphics() {
         add("createWindow",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.STRING) { _, args ->
@@ -1141,20 +1178,20 @@ class StandardLibrary {
             Unit
         }
         
-        add("openWindow", DataType.Primitive.VOID) { _, _ -> window.open() }
+        add("openWindow", DataType.Primitive.NONE) { _, _ -> window.open() }
         
-        add("closeWindow", DataType.Primitive.VOID) { _, _ -> window.close() }
+        add("closeWindow", DataType.Primitive.NONE) { _, _ -> window.close() }
         
         add("windowIsOpen", DataType.Primitive.BOOL) { _, _ -> window.isOpen }
         
-        add("getColor", "Color".data()) { script, _ ->
+        add("getColor", "Color".data) { script, _ ->
             val color = window.getColor()
             
             script.instantiate("Color", color.red, color.green, color.blue, color.alpha)
         }
         
         add("setColor",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
@@ -1170,7 +1207,7 @@ class StandardLibrary {
         }
         
         add("hsbToColor",
-            "Color".data(),
+            "Color".data,
             DataType.Primitive.DOUBLE,
             DataType.Primitive.DOUBLE,
             DataType.Primitive.DOUBLE) { script, args ->
@@ -1185,14 +1222,14 @@ class StandardLibrary {
             script.instantiate("Color", color.red, color.green, color.blue, color.alpha)
         }
         
-        add("getFont", "Font".data()) { script, _ ->
+        add("getFont", "Font".data) { script, _ ->
             val font = window.getFont()
             
             script.instantiate("Font", font.name, font.style, font.size)
         }
         
         add("setFont",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.STRING,
             DataType.Primitive.INT,
             DataType.Primitive.INT) { _, args ->
@@ -1205,7 +1242,7 @@ class StandardLibrary {
             window.setFont(name, style, size)
         }
         
-        add("getStroke", "Font".data()) { script, _ ->
+        add("getStroke", "Font".data) { script, _ ->
             val stroke = window.getStroke()
             
             script.instantiate("Stroke",
@@ -1218,12 +1255,12 @@ class StandardLibrary {
         }
         
         add("setStroke",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.FLOAT,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.FLOAT,
-            DataType.Primitive.FLOAT.array(),
+            DataType.Primitive.FLOAT.array,
             DataType.Primitive.FLOAT) { _, args ->
             val (width, cap, join, miterLimit, dash, dashPhase) = args
             
@@ -1239,7 +1276,7 @@ class StandardLibrary {
             window.setStroke(width, cap, join, miterLimit, dashFA, dashPhase)
         }
         
-        add("translate", DataType.Primitive.VOID, DataType.Primitive.INT, DataType.Primitive.INT) { _, args ->
+        add("translate", DataType.Primitive.NONE, DataType.Primitive.INT, DataType.Primitive.INT) { _, args ->
             val (x, y) = args
             
             x as Int
@@ -1248,7 +1285,7 @@ class StandardLibrary {
             window.translate(x, y)
         }
         
-        add("translate", DataType.Primitive.VOID, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("translate", DataType.Primitive.NONE, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
             val (x, y) = args
             
             x as Double
@@ -1257,7 +1294,7 @@ class StandardLibrary {
             window.translate(x, y)
         }
         
-        add("rotate", DataType.Primitive.VOID, DataType.Primitive.DOUBLE) { _, args ->
+        add("rotate", DataType.Primitive.NONE, DataType.Primitive.DOUBLE) { _, args ->
             val (theta) = args
             
             theta as Double
@@ -1266,7 +1303,7 @@ class StandardLibrary {
         }
         
         add("rotate",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.DOUBLE,
             DataType.Primitive.DOUBLE,
             DataType.Primitive.DOUBLE) { _, args ->
@@ -1279,7 +1316,7 @@ class StandardLibrary {
             window.rotate(theta, x, y)
         }
         
-        add("scale", DataType.Primitive.VOID, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("scale", DataType.Primitive.NONE, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
             val (x, y) = args
             
             x as Double
@@ -1288,7 +1325,7 @@ class StandardLibrary {
             window.scale(x, y)
         }
         
-        add("shear", DataType.Primitive.VOID, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("shear", DataType.Primitive.NONE, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
             val (x, y) = args
             
             x as Double
@@ -1297,14 +1334,14 @@ class StandardLibrary {
             window.shear(x, y)
         }
         
-        add("pushMatrix", DataType.Primitive.VOID) { _, _ -> window.pushMatrix() }
+        add("pushMatrix", DataType.Primitive.NONE) { _, _ -> window.pushMatrix() }
         
-        add("popMatrix", DataType.Primitive.VOID) { _, _ -> window.popMatrix() }
+        add("popMatrix", DataType.Primitive.NONE) { _, _ -> window.popMatrix() }
         
-        add("clear", DataType.Primitive.VOID) { _, _ -> window.clear() }
+        add("clear", DataType.Primitive.NONE) { _, _ -> window.clear() }
         
         add("drawLine",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
@@ -1320,7 +1357,7 @@ class StandardLibrary {
         }
         
         add("drawRect",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
@@ -1336,7 +1373,7 @@ class StandardLibrary {
         }
         
         add("fillRect",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
@@ -1352,7 +1389,7 @@ class StandardLibrary {
         }
         
         add("drawOval",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
@@ -1368,7 +1405,7 @@ class StandardLibrary {
         }
         
         add("fillOval",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
@@ -1384,7 +1421,7 @@ class StandardLibrary {
         }
         
         add("drawRoundRect",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
@@ -1404,7 +1441,7 @@ class StandardLibrary {
         }
         
         add("fillRoundRect",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
@@ -1424,7 +1461,7 @@ class StandardLibrary {
         }
         
         add("draw3DRect",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
@@ -1442,7 +1479,7 @@ class StandardLibrary {
         }
         
         add("fill3DRect",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
@@ -1460,7 +1497,7 @@ class StandardLibrary {
         }
         
         add("drawArc",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
@@ -1480,7 +1517,7 @@ class StandardLibrary {
         }
         
         add("fillArc",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
@@ -1500,9 +1537,9 @@ class StandardLibrary {
         }
         
         add("drawPolyline",
-            DataType.Primitive.VOID,
-            DataType.Primitive.INT.array(),
-            DataType.Primitive.INT.array(),
+            DataType.Primitive.NONE,
+            DataType.Primitive.INT.array,
+            DataType.Primitive.INT.array,
             DataType.Primitive.INT) { _, args ->
             val (xPoints, yPoints, nPoints) = args
             
@@ -1517,9 +1554,9 @@ class StandardLibrary {
         }
         
         add("drawPolygon",
-            DataType.Primitive.VOID,
-            DataType.Primitive.INT.array(),
-            DataType.Primitive.INT.array(),
+            DataType.Primitive.NONE,
+            DataType.Primitive.INT.array,
+            DataType.Primitive.INT.array,
             DataType.Primitive.INT) { _, args ->
             val (xPoints, yPoints, nPoints) = args
             
@@ -1534,9 +1571,9 @@ class StandardLibrary {
         }
         
         add("fillPolygon",
-            DataType.Primitive.VOID,
-            DataType.Primitive.INT.array(),
-            DataType.Primitive.INT.array(),
+            DataType.Primitive.NONE,
+            DataType.Primitive.INT.array,
+            DataType.Primitive.INT.array,
             DataType.Primitive.INT) { _, args ->
             val (xPoints, yPoints, nPoints) = args
             
@@ -1551,7 +1588,7 @@ class StandardLibrary {
         }
         
         add("drawString",
-            DataType.Primitive.VOID,
+            DataType.Primitive.NONE,
             DataType.Primitive.STRING,
             DataType.Primitive.INT,
             DataType.Primitive.INT) { _, args ->
@@ -1564,7 +1601,7 @@ class StandardLibrary {
             window.drawString(s, x, y)
         }
         
-        add("loadImage", "Image".data(), DataType.Primitive.STRING) { script, args ->
+        add("loadImage", "Image".data, DataType.Primitive.STRING) { script, args ->
             val (path) = args
             
             path as String
@@ -1575,8 +1612,8 @@ class StandardLibrary {
         }
         
         add("drawImage",
-            DataType.Primitive.VOID,
-            "Image".data(),
+            DataType.Primitive.NONE,
+            "Image".data,
             DataType.Primitive.INT,
             DataType.Primitive.INT) { _, args ->
             val (image, x, y) = args
@@ -1590,11 +1627,13 @@ class StandardLibrary {
             val idI = id as Int
             
             window.drawImage(idI, x, y)
+            
+            Unit
         }
         
         add("drawImage",
-            DataType.Primitive.VOID,
-            "Image".data(),
+            DataType.Primitive.NONE,
+            "Image".data,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
@@ -1612,11 +1651,13 @@ class StandardLibrary {
             val idI = id as Int
             
             window.drawImage(idI, x, y, width, height)
+            
+            Unit
         }
         
         add("drawImage",
-            DataType.Primitive.VOID,
-            "Image".data(),
+            DataType.Primitive.NONE,
+            "Image".data,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
             DataType.Primitive.INT,
@@ -1642,9 +1683,11 @@ class StandardLibrary {
             val idI = id as Int
             
             window.drawImage(idI, dxa, dya, dxb, dyb, sxa, sya, sxb, syb)
+            
+            Unit
         }
         
-        add("flip", DataType.Primitive.VOID) { _, _ -> window.flip() }
+        add("flip", DataType.Primitive.NONE) { _, _ -> window.flip() }
         
         add("keyIsDown", DataType.Primitive.BOOL, DataType.Primitive.INT) { _, args ->
             val (keyCode) = args
@@ -1698,7 +1741,9 @@ class StandardLibrary {
         
         add("mouseY", DataType.Primitive.INT) { _, _ -> window.mousePoint.y }
         
-        add("poll", DataType.Primitive.VOID) { _, _ -> window.poll() }
+        add("mouseWheel", DataType.Primitive.INT) {_,_->window.mouseWheel}
+        
+        add("poll", DataType.Primitive.NONE) { _, _ -> window.poll() }
     }
     
     private fun add(
@@ -1707,17 +1752,20 @@ class StandardLibrary {
         vararg paramTypes: DataType,
         function: (script: Script, args: List<Any>) -> Any,
     ) {
-        val key = paramTypes.joinToString(prefix = "$name(", separator = ",", postfix = ")")
+        val key = paramTypes.joinToString(prefix = "${name.lowercase()}(", separator = ",", postfix = ")")
         
         builtins[key] = Builtin(returnType, function)
     }
     
     operator fun get(sub: Stmt.Sub) =
-        builtins[sub.fullSignature]
+        builtins[sub.signature]
     
-    class Builtin(val returnType: DataType, val function: (script: Script, args: List<Any>) -> Any) {
-        operator fun invoke(script: Script, args: List<Any>) =
-            function(script, args)
+    class Builtin(private val returnType: DataType, val function: (script: Script, args: List<Any>) -> Any) {
+        operator fun invoke(script: Script, args: List<Any>): Any? {
+            val result = function(script, args)
+            
+            return returnType.filter(script, result)
+        }
     }
 }
 

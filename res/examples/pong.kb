@@ -1,0 +1,77 @@
+let width  = 1024
+let height =  512
+let fps    =   30.0
+let title  = "Pong"
+
+data Vector
+    var x as double,
+    var y as double
+end data
+
+sub add(this as Vector, that as Vector) as Vector
+    add = Vector { this.x + that.x, this.y + that.y }
+end sub
+
+let paddleWidth  = 10.0
+let paddleHeight = 80.0
+let paddleSpeed  =  5.0
+
+data Paddle
+    let pos as Vector,
+    let upKey   as int,
+    let downKey as int
+end data
+
+let ballRadius = 5.0
+let ballSpeed  = 4.0
+
+data Ball
+    var x  as double = (width  - ballRadius) / 2,
+    var y  as double = (height - ballRadius) / 2,
+    var vx as double,
+    var vy as double
+end data
+
+sub randomVector as double[]
+    let angle = (random() * PI / 4) + PI / 8
+    
+    randomVector = [
+        cos(angle) * ballSpeed,
+        sin(angle) * ballSpeed
+    ]
+    
+    if random() > 0.5
+        randomVector[0] *= -1
+    end if
+end sub
+
+sub newBall as Ball
+    let v = randomVector()
+    
+    newBall.vx = v[0]
+    newBall.vy = v[1]
+end sub
+
+sub reset(this as Ball)
+    this.x = (width  - ballRadius) / 2
+    this.y = (height - ballRadius) / 2
+    
+    let v = randomVector()
+    
+    this.vx = v[0]
+    this.vy = v[1]
+end sub
+
+sub update(this as Ball, delta as double)
+    
+end sub
+
+sub render(this as Ball)
+    
+end sub
+
+sub main
+    
+end sub
+
+main()

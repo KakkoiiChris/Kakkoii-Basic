@@ -26,6 +26,8 @@ class Window(width: Int, height: Int, title: String) : KeyListener, MouseListene
     
     val mousePoint = Point()
     
+    var mouseWheel = 0; private set
+    
     init {
         val size = Dimension(width, height)
         
@@ -259,6 +261,10 @@ class Window(width: Int, height: Int, title: String) : KeyListener, MouseListene
     }
     
     fun poll() {
+        mouseWheel = 0
+        
+        if (pollBuffer.isEmpty()) return
+        
         pollBuffer.forEach(Toggle::poll)
         
         pollBuffer.clear()
@@ -327,5 +333,6 @@ class Window(width: Int, height: Int, title: String) : KeyListener, MouseListene
     }
     
     override fun mouseWheelMoved(e: MouseWheelEvent) {
+        mouseWheel -= e.wheelRotation
     }
 }

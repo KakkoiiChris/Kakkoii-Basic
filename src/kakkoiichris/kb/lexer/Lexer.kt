@@ -1,83 +1,53 @@
 package kakkoiichris.kb.lexer
 
+import kakkoiichris.kb.script.Empty
 import kakkoiichris.kb.util.KBError
 import kakkoiichris.kb.util.Source
+import java.util.*
 
-class Lexer(private val source: Source) {
+class Lexer(private val source: Source) : Iterator<Token> {
     companion object {
         const val NUL = '\u0000'
         
-        val keywords = mapOf(
-            Token.Type.Let.kw,
-            Token.Type.Var.kw,
-            Token.Type.If.kw,
-            Token.Type.Elif.kw,
-            Token.Type.Else.kw,
-            Token.Type.While.kw,
-            Token.Type.Do.kw,
-            Token.Type.For.kw,
-            Token.Type.To.kw,
-            Token.Type.Step.kw,
-            Token.Type.In.kw,
-            Token.Type.Data.kw,
-            Token.Type.Sub.kw,
-            Token.Type.Break.kw,
-            Token.Type.Next.kw,
-            Token.Type.Return.kw,
-            Token.Type.Yield.kw,
-            Token.Type.End.kw,
-            Token.Type.Void.kw,
-            Token.Type.Bool.kw,
-            Token.Type.Byte.kw,
-            Token.Type.Short.kw,
-            Token.Type.Int.kw,
-            Token.Type.Long.kw,
-            Token.Type.Float.kw,
-            Token.Type.Double.kw,
-            Token.Type.Char.kw,
-            Token.Type.String.kw,
-            Token.Type.Any.kw,
-            Token.Type.Or.kw,
-            Token.Type.And.kw,
-            Token.Type.Is.kw,
-            Token.Type.As.kw,
-            Token.Type.Not.kw
-        )
+        val keywords = Token.Type
+            .values()
+            .filter { it.symbol.all(Char::isLetter) }
+            .associateBy(Token.Type::symbol)
         
-        val literals = mapOf(
-            "true" to true,
-            "false" to false
-        )
+        val literals = listOf(true, false, Empty)
+            .associateBy(Objects::toString)
         
         val longRegex = """\d+[Ll]""".toRegex()
         val intRegex = """\d+""".toRegex()
         val floatRegex = """\d+(\.\d+)?([Ee][+-]?\d+)?[Ff]""".toRegex()
         val doubleRegex = """\d+(\.\d+)?([Ee][+-]?\d+)?[Dd]?""".toRegex()
         val longBinaryRegex = """0b[01]+[Ll]""".toRegex()
-        val longHexRegex = """0x[0-9A-Fa-f]+[Ll]""".toRegex()
+        val longHexRegex = """0x[\dA-Fa-f]+[Ll]""".toRegex()
         val intBinaryRegex = """0b[01]+""".toRegex()
-        val intHexRegex = """0x[0-9A-Fa-f]+""".toRegex()
+        val intHexRegex = """0x[\dA-Fa-f]+""".toRegex()
     }
     
     private var pos = 0
     private var row = 1
     private var col = 1
     
-    fun lex(): List<Token> {
-        val tokens = mutableListOf<Token>()
-        
-        while (!eof()) {
+    override fun hasNext() = pos <= source.content.length
+    
+    override fun next(): Token {
+        while (!atEndOfFile()) {
             if (match { isWhitespace() }) {
                 skipWhitespace()
+                
                 continue
             }
             
             if (match("rem")) {
                 skipLineComment()
+                
                 continue
             }
             
-            tokens += when {
+            return when {
                 match { isDigit() }  -> number()
                 
                 match { isLetter() } -> word()
@@ -86,18 +56,18 @@ class Lexer(private val source: Source) {
                 
                 match('"')           -> string()
                 
-                else                 -> operator()
+                match('@')           -> label()
+                
+                else                 -> symbol()
             }
         }
         
-        tokens += Token(here(), Token.Type.EndOfFile)
-        
-        return tokens
+        return Token(here(), Token.Type.EndOfFile)
     }
     
     private fun peek(offset: Int = 0) =
-        if (pos + offset in source.text.indices)
-            source.text[pos + offset]
+        if (pos + offset in source.content.indices)
+            source.content[pos + offset]
         else
             NUL
     
@@ -166,41 +136,40 @@ class Lexer(private val source: Source) {
     
     private fun mustSkip(char: Char) {
         if (!skip(char)) {
-            KBError.forLexer("Character '${peek()}' is invalid; expected $char!", here())
+            KBError.invalidCharacter(peek(), char, here())
         }
     }
     
     @Suppress("SameParameterValue")
     private fun mustSkip(string: String) {
         if (!skip(string)) {
-            KBError.forLexer("Sequence '${look(string.length)}' is invalid; expected $string!", here())
+            KBError.invalidSequence(look(string.length), string, here())
         }
     }
     
-    private fun eof() =
+    private fun atEndOfFile() =
         match(NUL)
     
-    @Suppress("ControlFlowWithEmptyBody")
     private fun skipWhitespace() {
-        while (skip { isWhitespace() });
+        while (skip { isWhitespace() }) Unit
     }
     
     private fun skipLineComment() {
         mustSkip("rem")
         
-        while (!skip('\n')) {
+        while (!atEndOfFile() && !skip('\n')) {
             step()
         }
     }
     
     private fun StringBuilder.take() {
         append(peek())
+        
         step()
     }
     
-    @Suppress("IMPLICIT_CAST_TO_ANY")
     private fun number(): Token {
-        val loc = here()
+        val location = here()
         
         val result = buildString {
             do {
@@ -272,7 +241,7 @@ class Lexer(private val source: Source) {
             }
         }
         
-        val number = when {
+        val number: Number = when {
             result.matches(longRegex)       -> result.dropLast(1).toLong()
             
             result.matches(intRegex)        -> result.toInt()
@@ -289,75 +258,77 @@ class Lexer(private val source: Source) {
             
             result.matches(intHexRegex)     -> result.substring(2).toInt(16)
             
-            else                            -> KBError.forLexer("Unexpected number '$result'!", loc)
+            else                            -> KBError.failure("UNEXPECTED NUMBER FORMAT")
         }
         
-        return Token(loc, Token.Type.Value, number)
+        return Token(location, Token.Type.Value, number)
     }
     
     private fun word(): Token {
-        val loc = here()
+        val location = here()
         
         val result = buildString {
             do {
                 take()
             }
             while (match { isLetterOrDigit() || this == '_' })
-        }
+        }.lowercase()
         
-        val keyword = keywords[result.lowercase()]
+        val keyword = keywords[result]
         
         if (keyword != null) {
-            return Token(loc, keyword)
+            return Token(location, keyword)
         }
         
-        val literal = literals[result.lowercase()]
+        val literal = literals[result]
         
         if (literal != null) {
-            return Token(loc, Token.Type.Value, literal)
+            return Token(location, Token.Type.Value, literal)
         }
         
-        return Token(loc, Token.Type.Word, result)
+        return Token(location, Token.Type.Word, result)
     }
     
     private fun unicode(size: Int): Char {
-        val loc = here()
-        
         val result = buildString {
             repeat(size) {
+                if (!match { this in "0123456789ABCDEFabcdef" }) {
+                    KBError.illegalUnicodeEscapeDigit(peek(), here())
+                }
+                
                 take()
             }
         }
         
-        return result.toIntOrNull(16)?.toChar() ?: KBError.forLexer("Unicode value '$result' is invalid!", loc)
+        return result.toInt(16).toChar()
     }
     
     private fun escape(delimiter: Char): Char {
         mustSkip('\\')
         
         return when {
-            skip('0')       -> '\u0000'
+            skip('0')              -> '\u0000'
             
-            skip('b')       -> '\b'
+            skip('B') || skip('b') -> '\b'
             
-            skip('n')       -> '\n'
+            skip('N') || skip('n') -> '\n'
             
-            skip('t')       -> '\t'
+            skip('T') || skip('t') -> '\t'
             
-            skip('u')       -> unicode(4)
+            skip('U') || skip('u') -> unicode(4)
             
-            skip('x')       -> unicode(2)
+            skip('X') || skip('x') -> unicode(2)
             
-            skip('\\')      -> '\\'
+            skip('\\')             -> '\\'
             
-            skip(delimiter) -> delimiter
+            skip(delimiter)        -> delimiter
             
-            else            -> KBError.forLexer("Character escape '\\${peek()}' is invalid!", here())
+            else                   -> KBError.invalidEscapeCharacter(peek(), here())
         }
     }
     
     private fun char(): Token {
-        val loc = here()
+        val location = here()
         
         mustSkip('\'')
         
@@ -374,11 +345,11 @@ class Lexer(private val source: Source) {
         
         mustSkip('\'')
         
-        return Token(loc, Token.Type.Value, result)
+        return Token(location, Token.Type.Value, result)
     }
     
     private fun string(): Token {
-        val loc = here()
+        val location = here()
         
         mustSkip('"')
         
@@ -393,11 +364,25 @@ class Lexer(private val source: Source) {
             }
         }
         
-        return Token(loc, Token.Type.Value, result)
+        return Token(location, Token.Type.Value, result)
     }
     
-    private fun operator(): Token {
-        val loc = here()
+    private fun label(): Token {
+        val location = here()
+        
+        mustSkip('@')
+        
+        val result = buildString {
+            while (match(Char::isLetterOrDigit)) {
+                take()
+            }
+        }
+        
+        return Token(location, Token.Type.Label, result)
+    }
+    
+    private fun symbol(): Token {
+        val location = here()
         
         val op = when {
             skip('=') -> when {
@@ -450,6 +435,10 @@ class Lexer(private val source: Source) {
                 else      -> Token.Type.GreaterSign
             }
             
+            skip('$') -> Token.Type.Dollar
+            
+            skip('&') -> Token.Type.Ampersand
+            
             skip('#') -> Token.Type.Pound
             
             skip('.') -> Token.Type.Dot
@@ -470,9 +459,9 @@ class Lexer(private val source: Source) {
             
             skip(',') -> Token.Type.Comma
             
-            else      -> KBError.forLexer("Character '${peek()}' is invalid!", here())
+            else      -> KBError.illegalCharacter(peek(), here())
         }
         
-        return Token(loc, op)
+        return Token(location, op)
     }
 }

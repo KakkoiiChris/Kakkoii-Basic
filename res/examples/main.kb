@@ -1,5 +1,0 @@
-data X var x = 3 end data
-
-let x = X{}
-
-print(x['y'], '\n')

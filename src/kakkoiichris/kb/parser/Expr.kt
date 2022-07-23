@@ -4,14 +4,14 @@ import kakkoiichris.kb.lexer.Location
 import kakkoiichris.kb.lexer.Token
 import kakkoiichris.kb.script.DataType
 
-sealed class Expr(val loc: Location) {
+sealed class Expr(val location: Location) {
     abstract fun <X> accept(visitor: Visitor<X>): X
     
     interface Visitor<X> {
         fun visit(expr: Expr) =
             expr.accept(this)
         
-        fun visitNoneExpr(expr: None): X
+        fun visitEmptyExpr(expr: Empty): X
         
         fun visitValueExpr(expr: Value): X
         
@@ -25,26 +25,34 @@ sealed class Expr(val loc: Location) {
         
         fun visitBinaryExpr(expr: Binary): X
         
-        fun visitGetExpr(expr: Get): X
+        fun visitGetIndexExpr(expr: GetIndex): X
         
-        fun visitSetExpr(expr: Set): X
+        fun visitSetIndexExpr(expr: SetIndex): X
+        
+        fun visitGetMemberExpr(expr: GetMember): X
+        
+        fun visitSetMemberExpr(expr: SetMember): X
         
         fun visitInvokeExpr(expr: Invoke): X
         
         fun visitInstantiateExpr(expr: Instantiate): X
     }
     
-    object None : Expr(Location.none) {
+    object Empty : Expr(Location.none) {
         override fun <X> accept(visitor: Visitor<X>): X =
-            visitor.visitNoneExpr(this)
+            visitor.visitEmptyExpr(this)
     }
     
-    class Value(loc: Location, val value: Any) : Expr(loc) {
+    class Value(location: Location, val value: Any) : Expr(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitValueExpr(this)
     }
     
-    class Name(loc: Location, val value: String) : Expr(loc) {
+    class Name(location: Location, val value: String) : Expr(location) {
+        companion object {
+            val none get() = Name(Location.none, "")
+        }
+        
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitNameExpr(this)
         
@@ -65,17 +73,21 @@ sealed class Expr(val loc: Location) {
             value
     }
     
-    class Type(loc: Location, val value: DataType) : Expr(loc) {
+    class Type(location: Location, val value: DataType) : Expr(location) {
+        companion object {
+            val none get() = Type(Location.none, DataType.Inferred)
+        }
+        
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitTypeExpr(this)
     }
     
-    class Array(loc: Location, val elements: List<Expr>) : Expr(loc) {
+    class Array(location: Location, val elements: List<Expr>) : Expr(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitArrayExpr(this)
     }
     
-    class Unary(loc: Location, val op: Operator, val expr: Expr) : Expr(loc) {
+    class Unary(location: Location, val op: Operator, val expr: Expr) : Expr(location) {
         enum class Operator(private val type: Token.Type) {
             Negate(Token.Type.Minus),
             Not(Token.Type.Not),
@@ -93,9 +105,10 @@ sealed class Expr(val loc: Location) {
             visitor.visitUnaryExpr(this)
     }
     
-    class Binary(loc: Location, val op: Operator, val left: Expr, val right: Expr) : Expr(loc) {
+    class Binary(location: Location, val op: Operator, val left: Expr, val right: Expr) : Expr(location) {
         enum class Operator(private val type: Token.Type) {
             Assign(Token.Type.EqualSign),
+            Swap(Token.Type.Dollar),
             Or(Token.Type.Or),
             And(Token.Type.And),
             Equal(Token.Type.DoubleEqual),
@@ -105,6 +118,7 @@ sealed class Expr(val loc: Location) {
             Greater(Token.Type.GreaterSign),
             GreaterEqual(Token.Type.GreaterEqualSign),
             Is(Token.Type.Is),
+            Concat(Token.Type.Ampersand),
             Add(Token.Type.Plus),
             Subtract(Token.Type.Minus),
             Multiply(Token.Type.Star),
@@ -125,22 +139,37 @@ sealed class Expr(val loc: Location) {
             visitor.visitBinaryExpr(this)
     }
     
-    class Get(loc: Location, val target: Expr, val index: Expr) : Expr(loc) {
+    class GetIndex(location: Location, val target: Expr, val index: Expr) : Expr(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
-            visitor.visitGetExpr(this)
+            visitor.visitGetIndexExpr(this)
     }
     
-    class Set(loc: Location, val target: Expr, val index: Expr, val expr: Expr) : Expr(loc) {
+    class SetIndex(location: Location, val target: Expr, val index: Expr, val expr: Expr) : Expr(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
-            visitor.visitSetExpr(this)
+            visitor.visitSetIndexExpr(this)
     }
     
-    class Invoke(loc: Location, val name: Name, val args: List<Expr>) : Expr(loc) {
+    class GetMember(location: Location, val target: Expr, val member: Name) : Expr(location) {
+        override fun <X> accept(visitor: Visitor<X>): X =
+            visitor.visitGetMemberExpr(this)
+    }
+    
+    class SetMember(location: Location, val target: Expr, val member: Name, val expr: Expr) : Expr(location) {
+        override fun <X> accept(visitor: Visitor<X>): X =
+            visitor.visitSetMemberExpr(this)
+    }
+    
+    class Invoke(location: Location, val name: Name, val args: List<Expr>) : Expr(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitInvokeExpr(this)
     }
     
-    class Instantiate(loc: Location, val target: Name, val elements: List<Expr>) : Expr(loc) {
+    class Instantiate(location: Location, val target: Name, val elements: List<Expr>) : Expr(location) {
+        val isInferred get() = target == Name.none
+        
+        fun withTarget(target: Name) =
+            Instantiate(location, target, elements)
+        
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitInstantiateExpr(this)
     }

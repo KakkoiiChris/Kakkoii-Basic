@@ -1,21 +1,54 @@
 rem Pig Latin Translator
 
-print("Welcome!\n")
+print("PIG LATIN TRANSLATOR\n")
 
-var again as string
+sub isVowel(c as char) as bool
+    isVowel = "AEIOUaeiou":indexOf(c) <> -1
+end sub
 
-while again:toLower <> "no"
-	let word = input("Translate: "):toLower
-	
+var phrase = input("> ")
+
+while not phrase:isEmpty
+    var translation as string
+    
+    var first = 0
+    var vowel = 0
+    var last  = 0
+    
+    while first <= #phrase
+        while phrase[first]:isSpace
+            first += 1
+        end while
+        
+        vowel = first
+        
+        while not phrase[vowel]:isVowel
+            vowel += 1
+        end while
+        
+        last = vowel
+        
+        while not phrase[last]:isSpace
+            last += 1
+        end while
+        
+        if first == vowel
+            translation = concat(translation)
+        elif
+        end if
+        
+        let front = phrase:substring(first, vowel)
+    end while
+    
 	var iv = 0
 	
 	while "aeiou":indexOf(word[iv]) == -1
 		iv += 1
 	end while
 	
-	var translation as string
 	
-	if iv == 0 then
+	
+	if iv == 0
 		translation = concat(word, "way")
 	else
 		translation = concat(word:substring(iv), word:substring(0, iv), "ay")
@@ -23,7 +56,5 @@ while again:toLower <> "no"
 	
 	print(translation, "\n\n")
 	
-	again = input("Go again? (yes/no): "):toLower
+	phrase = input("> ")
 end while
-
-print("Farewell!\n")

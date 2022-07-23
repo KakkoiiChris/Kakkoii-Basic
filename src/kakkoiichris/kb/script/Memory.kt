@@ -31,11 +31,11 @@ class Memory {
         stack.pop()
     }
     
-    fun new(constant: Boolean, name: Expr.Name, type: DataType, value: Any) =
-        stack.peek()?.new(constant, name.value, type, value) ?: error("NEW: NO ACTIVE SCOPE")
+    fun hasRef(name: Expr.Name) =
+        stack.peek()?.hasRef(name) ?: error("NEW LET: NO ACTIVE SCOPE")
     
-    fun newLet(name: Expr.Name, type: DataType, value: Any) =
-        stack.peek()?.newLet(name, type, value) ?: error("NEW LET: NO ACTIVE SCOPE")
+    fun newRef(constant: Boolean, name: Expr.Name, type: DataType, value: Any) =
+        stack.peek()?.newRef(constant, name.value, type, value) ?: error("NEW: NO ACTIVE SCOPE")
     
     fun getRef(name: Expr.Name): Scope.Reference? =
         stack.peek()?.getRef(name)
@@ -46,6 +46,12 @@ class Memory {
     fun getSubs(name: Expr.Name) =
         stack.peek()?.getSubs(name)
     
+    fun newData(data: Stmt.Data) =
+        stack.peek()?.newData(data) ?: error("NEW LET: NO ACTIVE SCOPE")
+    
+    fun getData(name: Expr.Name) =
+        stack.peek()?.getData(name)
+    
     fun peek() =
         stack.peek()
     
@@ -54,22 +60,15 @@ class Memory {
         
         private val allSubs = mutableMapOf<String, Subs>()
         
-        val datas = mutableMapOf<String, Stmt.Data>()
+        private val datas = mutableMapOf<String, Stmt.Data>()
         
-        fun new(constant: Boolean, name: String, type: DataType, value: Any): Boolean {
-            return if (references[name] == null) {
-                references[name] = Reference(constant, type, value)
-                
-                true
-            }
-            else {
-                false
-            }
+        fun hasRef(name: Expr.Name) =
+            references.containsKey(name.value)
+        
+        fun newRef(constant: Boolean, name: String, type: DataType, value: Any) {
+            references[name] = Reference(constant, type, value)
         }
-    
-        fun newLet(name: Expr.Name, type: DataType, value: Any) =
-            new(true, name.value, type, value)
-    
+        
         fun getRef(name: Expr.Name): Reference? =
             getRef(name.value)
         
@@ -77,14 +76,14 @@ class Memory {
             references[name] ?: parent?.getRef(name)
         
         fun newSub(sub: Stmt.Sub): Boolean {
-            if (allSubs[sub.name.value] == null) {
-                allSubs[sub.name.value] = emptySubs()
+            if (allSubs[sub.name.value.lowercase()] == null) {
+                allSubs[sub.name.value.lowercase()] = emptySubs()
             }
             
-            val subs = allSubs[sub.name.value]!!
+            val subs = allSubs[sub.name.value.lowercase()]!!
             
             for (other in subs) {
-                if (sub.fullSignature == other.fullSignature) {
+                if (sub.signature == other.signature) {
                     return false
                 }
             }
@@ -98,8 +97,24 @@ class Memory {
             getSubs(name.value)
         
         private fun getSubs(name: String): Subs? =
-            allSubs[name] ?: parent?.getSubs(name)
-    
+            allSubs[name.lowercase()] ?: parent?.getSubs(name)
+        
+        fun newData(data: Stmt.Data) =
+            if (datas[data.name.value] == null) {
+                datas[data.name.value] = data
+                
+                true
+            }
+            else {
+                false
+            }
+        
+        fun getData(name: Expr.Name) =
+            getData(name.value)
+        
+        private fun getData(name: String): Stmt.Data? =
+            datas[name] ?: parent?.getData(name)
+        
         override fun toString() = "Scope $id"
         
         data class Reference(val constant: Boolean, val type: DataType, var value: Any) {
@@ -108,7 +123,7 @@ class Memory {
                     return null
                 }
                 
-                return if (type.matches(script, x) != null) {
+                return if (type.filter(script, x) != null) {
                     value = x
                     
                     true

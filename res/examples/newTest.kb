@@ -1,4 +1,0 @@
-let a = 3
-for i = 0 to a
-	print(i)
-end for

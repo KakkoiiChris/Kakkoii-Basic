@@ -2,6 +2,7 @@ package kakkoiichris.kb
 
 import kakkoiichris.kb.script.Redirect
 import kakkoiichris.kb.script.Script
+import kakkoiichris.kb.util.KBError
 import kakkoiichris.kb.util.Source
 import java.io.File
 
@@ -53,18 +54,22 @@ private fun exec(name: String, text: String) {
     val value = try {
         script.run()
     }
-    catch (e: Redirect.Yield) {
-        e.value
+    catch (r: Redirect.Yield) {
+        r.value
     }
     catch (_: Redirect.Return) {
+    }
+    catch (e: KBError) {
+        System.err.println(e.kbStackTrace)
+        
+        e.printStackTrace()
     }
     
     val end = System.nanoTime()
     
-    if (value === Unit) {
-        println("\nFinished in ${(end - start) / 1E9} seconds!")
-    }
-    else {
-        println("\nFinished in ${(end - start) / 1E9} seconds! Yielded '$value'!")
-    }
+    val seconds = (end - start) / 1E9
+    
+    val result = if (value === Unit) "" else " Yielded '$value'!"
+    
+    println("\nFinished in $seconds seconds!$result")
 }

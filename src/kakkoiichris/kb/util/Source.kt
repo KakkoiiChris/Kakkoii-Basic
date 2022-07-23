@@ -4,7 +4,7 @@ import kakkoiichris.kb.lexer.Lexer
 import kakkoiichris.kb.parser.Parser
 import kakkoiichris.kb.parser.Stmt
 
-class Source(val name: String, val text: String) {
+class Source(val name: String, val content: String) {
     companion object {
         fun readLocal(path: String): Source {
             val name = path.substring(path.lastIndexOf('/'), path.indexOf('.'))
@@ -14,7 +14,7 @@ class Source(val name: String, val text: String) {
                 .getResourceAsStream(path)
                 ?.bufferedReader()
                 ?.readText()
-                ?: error("LOCAL FILE UNAVAILABLE")
+                ?: KBError.failure("Could not load local file '$path'!")
             
             return Source(name, text)
         }
@@ -23,9 +23,7 @@ class Source(val name: String, val text: String) {
     fun compile(): List<Stmt> {
         val lexer = Lexer(this)
         
-        val tokens = lexer.lex()
-        
-        val parser = Parser(tokens)
+        val parser = Parser(lexer)
         
         return parser.parse()
     }

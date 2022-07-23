@@ -1,22 +1,22 @@
 package kakkoiichris.kb.script
 
+import kakkoiichris.kb.lexer.Location
 import kakkoiichris.kb.parser.Expr
-import kakkoiichris.kb.parser.Stmt
 import kakkoiichris.kb.parser.toExpr
 import kakkoiichris.kb.parser.toName
+import kakkoiichris.kb.util.KBError
 import kotlin.reflect.KClass
 
 interface DataType {
     companion object {
         fun infer(script: Script, x: Any?): DataType =
             when (x) {
-                is ArrayInstance -> {
-                    if (x.drop(1).all { x.first()::class.isInstance(it) }) {
-                        Array(infer(script, x[0]))
-                    }
-                    else {
-                        Array(Primitive.ANY)
-                    }
+                is ArrayInstance -> when {
+                    x.isEmpty()                                       -> Primitive.ANY.array
+                    
+                    x.drop(1).all { x.first()::class.isInstance(it) } -> Array(infer(script, x[0]))
+                    
+                    else                                              -> Primitive.ANY.array
                 }
                 
                 is DataInstance  -> Data(x.name)
@@ -28,7 +28,7 @@ interface DataType {
                         Array(infer(script, xn[0]))
                     }
                     else {
-                        Array(Primitive.ANY)
+                        Primitive.ANY.array
                     }
                 }
                 
@@ -36,34 +36,24 @@ interface DataType {
             }
     }
     
-    val iterableType: DataType?
+    val iterableType: DataType? get() = null
     
-    fun matches(script: Script, x: Any?): Any?
+    fun filter(script: Script, x: Any?): Any? = x.takeIf { it === Empty }
     
-    fun cast(script: Script, x: Any?): Any?
+    fun cast(script: Script, x: Any?): Any? = null
     
-    fun iterable(script: Script, x: Any?): List<Any>?
+    fun coerce(x: Any?): Any? = null
     
-    fun default(script: Script): Any?
+    fun iterable(script: Script, x: Any?): List<Any>? = null
     
-    fun getKClass(script: Script) = default(script)!!::class
+    fun default(script: Script): Any? = null
     
     object Inferred : DataType {
-        override val iterableType: DataType? get() = null
-        
-        override fun matches(script: Script, x: Any?) = x
-        
-        override fun cast(script: Script, x: Any?): Any? = null
-        
-        override fun iterable(script: Script, x: Any?): List<Any>? = null
-        
-        override fun default(script: Script): Any? = null
+        override fun filter(script: Script, x: Any?) = x
     }
     
     enum class Primitive(private val clazz: KClass<out Any>) : DataType {
-        VOID(Unit::class) {
-            override fun cast(script: Script, x: Any?): Any? = null
-            
+        NONE(Unit::class) {
             override fun default(script: Script) = Unit
         },
         
@@ -98,6 +88,11 @@ interface DataType {
                 else       -> null
             }
             
+            override fun coerce(x: Any?) = when (x) {
+                is Byte -> x
+                else    -> null
+            }
+            
             override fun default(script: Script) = 0.toByte()
         },
         
@@ -113,6 +108,12 @@ interface DataType {
                 is Char    -> x.code.toShort()
                 is String  -> x.toShort()
                 else       -> null
+            }
+            
+            override fun coerce(x: Any?) = when (x) {
+                is Byte  -> x.toShort()
+                is Short -> x
+                else     -> null
             }
             
             override fun default(script: Script) = 0.toShort()
@@ -132,6 +133,14 @@ interface DataType {
                 else       -> null
             }
             
+            override fun coerce(x: Any?) = when (x) {
+                is Byte  -> x.toInt()
+                is Short -> x.toInt()
+                is Int   -> x
+                is Char  -> x.code
+                else     -> null
+            }
+            
             override fun default(script: Script) = 0
         },
         
@@ -147,6 +156,15 @@ interface DataType {
                 is Char    -> x.code.toLong()
                 is String  -> x.toLong()
                 else       -> null
+            }
+            
+            override fun coerce(x: Any?) = when (x) {
+                is Byte  -> x.toLong()
+                is Short -> x.toLong()
+                is Int   -> x.toLong()
+                is Long  -> x
+                is Char  -> x.code.toLong()
+                else     -> null
             }
             
             override fun default(script: Script) = 0L
@@ -166,6 +184,16 @@ interface DataType {
                 else       -> null
             }
             
+            override fun coerce(x: Any?) = when (x) {
+                is Byte  -> x.toFloat()
+                is Short -> x.toFloat()
+                is Int   -> x.toFloat()
+                is Long  -> x.toFloat()
+                is Float -> x
+                is Char  -> x.code.toFloat()
+                else     -> null
+            }
+            
             override fun default(script: Script) = 0F
         },
         
@@ -181,6 +209,17 @@ interface DataType {
                 is Char    -> x.code.toDouble()
                 is String  -> x.toDouble()
                 else       -> null
+            }
+            
+            override fun coerce(x: Any?) = when (x) {
+                is Byte   -> x.toDouble()
+                is Short  -> x.toDouble()
+                is Int    -> x.toDouble()
+                is Long   -> x.toDouble()
+                is Float  -> x.toDouble()
+                is Double -> x
+                is Char   -> x.code.toDouble()
+                else      -> null
             }
             
             override fun default(script: Script) = 0.0
@@ -219,33 +258,41 @@ interface DataType {
         
         companion object {
             fun infer(script: Script, x: Any?) =
-                values().first { it.matches(script, x) != null }
+                values().first { it.filter(script, x) != null }
         }
         
-        override val iterableType: DataType? get() = null
-        
-        override fun matches(script: Script, x: Any?): Any? = x.takeIf { clazz.isInstance(x) }
-        
-        override fun iterable(script: Script, x: Any?): List<Any>? = null
+        override fun filter(script: Script, x: Any?): Any? =
+            super.filter(script, x) ?: x.takeIf { clazz.isInstance(x) }
         
         override fun toString() = name.lowercase()
     }
     
-    class Array(val subType: DataType, val initSize: Expr = (-1).toExpr()) : DataType {
+    class Array(val subType: DataType, val initSize: Expr? = null) : DataType {
         override val iterableType: DataType get() = subType
         
-        override fun matches(script: Script, x: Any?): Any? {
+        override fun filter(script: Script, x: Any?): Any? {
+            val match = super.filter(script, x)
+            
+            if (match != null) {
+                return match
+            }
+            
             if (x !is ArrayInstance) {
                 return null
             }
             
-            val initSize = script.visit(initSize).fromRef() as Int
+            val initSize = if (initSize != null) {
+                val value = script.visit(initSize).fromRef()
+                
+                Primitive.INT.coerce(value) as? Int ?: KBError.invalidArraySize()
+            }
+            else 0
             
             if (initSize > 0 && x.size != initSize) {
                 return null
             }
             
-            return x.takeIf { it.all { e -> subType.matches(script, e) != null } }
+            return x.takeIf { it.all { e -> subType.filter(script, e) != null } }
         }
         
         override fun cast(script: Script, x: Any?) = when (x) {
@@ -268,10 +315,16 @@ interface DataType {
         override fun iterable(script: Script, x: Any?) = cast(script, x)
         
         override fun default(script: Script): ArrayInstance {
-            return ArrayInstance(subType,
-                MutableList(script.visit(initSize).fromRef() as? Int ?: error("Invalid default array size!")) {
-                    subType.default(script) ?: error("No default for any array!")
-                })
+            val initSize = if (initSize != null) {
+                val value = script.visit(initSize).fromRef()
+                
+                Primitive.INT.coerce(value) as? Int ?: KBError.invalidArraySize()
+            }
+            else 0
+            
+            return ArrayInstance(subType, MutableList(initSize) {
+                subType.default(script) ?: error("No default for any array!")
+            })
         }
         
         override fun toString() = "$subType[]"
@@ -282,34 +335,37 @@ interface DataType {
         
         override val iterableType: DataType get() = subType
         
-        override fun matches(script: Script, x: Any?): Any? {
+        override fun filter(script: Script, x: Any?): Any? {
+            val match = super.filter(script, x)
+            
+            if (match != null) {
+                return match
+            }
+            
             if (x !is ArrayInstance) {
                 return null
             }
             
-            return x.takeIf { it.all { e -> subType.matches(script, e) != null } }
+            return x.takeIf { it.all { e -> subType.filter(script, e) != null } }
         }
-        
-        override fun cast(script: Script, x: Any?): Any? = null
-        
-        override fun iterable(script: Script, x: Any?): List<Any>? = null
         
         override fun default(script: Script) = arrayType.default(script)
         
         override fun toString() = "$subType*"
     }
     
-    class Data(private val name: Expr.Name) : DataType {
+    class Data(val name: Expr.Name) : DataType {
         override val iterableType: DataType get() = Primitive.ANY
         
-        override fun matches(script: Script, x: Any?): Any? = x.takeIf { it is DataInstance && it.name == name }
+        override fun filter(script: Script, x: Any?): Any? =
+            super.filter(script, x) ?: x.takeIf { it is DataInstance && it.name == name }
         
         override fun cast(script: Script, x: Any?): Any? = (x as? DataInstance)?.takeIf { it.name == name }
         
         override fun iterable(script: Script, x: Any?): List<Any>? = (x as? DataInstance)?.deref()
         
         override fun default(script: Script): Any {
-            val data = script.memory.getRef(name)?.fromRef() as Stmt.Data
+            val data = script.memory.getData(name) ?: KBError.undeclaredData(name, Location.none)
             
             val scope = Memory.Scope(name.value)
             
@@ -331,11 +387,11 @@ interface DataType {
     }
 }
 
-fun DataType.vararg() =
-    DataType.Vararg(this)
+val DataType.vararg
+    get() = DataType.Vararg(this)
 
-fun DataType.array() =
-    DataType.Array(this)
+val DataType.array
+    get() = DataType.Array(this)
 
-fun String.data() =
-    DataType.Data(toName())
+val String.data
+    get() = DataType.Data(lowercase().toName())
