@@ -112,11 +112,8 @@ class Memory {
         fun getData(name: Expr.Name) =
             getData(name.value)
         
-        private fun getData(name: String): Stmt.Data? {
-            val here = datas[name]
-            
-            return here ?: parent?.getData(name)
-        }
+        private fun getData(name: String): Stmt.Data? =
+            datas[name] ?: parent?.getData(name)
         
         override fun toString() = "Scope $id"
         
