@@ -367,7 +367,7 @@ interface DataType {
         override fun default(script: Script): Any {
             val data = script.memory.getData(name) ?: KBError.undeclaredData(name, Location.none)
             
-            val scope = Memory.Scope(name.value)
+            val scope = Memory.Scope(name.value, script.memory.peek())
             
             try {
                 script.memory.push(scope)
