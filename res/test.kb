@@ -13,8 +13,6 @@ data C
     var b as B
 end data
 
-var c as C
-
-c = { { "Hello", 69 }, { "World", 420 } }
+var c as C = { { "Hello", 69 }, { "World", 420 } }
 
 print(c & '\n')

@@ -81,6 +81,9 @@ class KBError(stage: String, message: String, location: Location) : RuntimeExcep
         fun undeclaredLabel(label: String, location: Location): Nothing =
             forScript("Label '$label' has not been declared in this scope", location)
         
+        fun emptyInstantiationTarget(location: Location):Nothing=
+            forScript("Cannot infer data for instantiation", location )
+        
         fun assignedNone(location: Location): Nothing =
             forScript("Cannot assign none to a variable", location)
         

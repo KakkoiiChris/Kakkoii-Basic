@@ -63,13 +63,18 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             KBError.alreadyDeclaredVariable(stmt.name, stmt.name.location)
         }
         
-        var value = visit(stmt.expr).fromRef()
+        var expr = stmt.expr
+        var type = stmt.type.value
+        
+        if (expr is Expr.Instantiate && expr.isInferred && type is DataType.Data) {
+            expr = expr.withTarget(type.name)
+        }
+        
+        var value = visit(expr).fromRef()
         
         if (value === Unit) {
             KBError.assignedNone(stmt.expr.location)
         }
-        
-        var type = stmt.type.value
         
         if (type === DataType.Inferred) {
             if (value === Empty) {
@@ -1690,6 +1695,10 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
     
     override fun visitInstantiateExpr(expr: Expr.Instantiate): Any {
+        if (expr.isInferred) {
+            KBError.emptyInstantiationTarget(expr.location)
+        }
+        
         val data = memory.getData(expr.target) ?: KBError.undeclaredData(expr.target, expr.target.location)
         
         val scope = Memory.Scope(data.name.value, memory.peek())
