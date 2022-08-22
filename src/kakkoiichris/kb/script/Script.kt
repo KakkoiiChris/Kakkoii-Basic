@@ -1464,15 +1464,23 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         return when (val target = visit(expr.target).fromRef()) {
             is ArrayInstance -> when (val index = DataType.Primitive.INT.coerce(visit(expr.index).fromRef())) {
                 is Int -> {
-                    val subExpr = visit(expr.expr).fromRef()
+                    val type = target.type
+                    var subExpr = expr.expr
                     
-                    if (target.type.filter(this, subExpr) == null) {
-                        KBError.mismatchedType(subExpr, target.type, expr.location)
+                    if (type is DataType.Data && subExpr is Expr.Instantiate && subExpr.isInferred) {
+                        subExpr = subExpr.withTarget(type.name)
                     }
                     
-                    target[index] = subExpr
+                    val result = visit(subExpr).fromRef()
+                    val value = type.coerce(result) ?: TODO("COERCE ARRAY INDEX")
                     
-                    subExpr
+                    if (target.type.filter(this, value) == null) {
+                        KBError.mismatchedType(value, target.type, expr.location)
+                    }
+                    
+                    target[index] = value
+                    
+                    value
                 }
                 
                 else   -> KBError.invalidIndex(DataType.infer(this, target), DataType.infer(this, index), expr.index.location)
@@ -1482,12 +1490,20 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 is Char   -> {
                     val ref = target[index.toString()] ?: KBError.noMember(target.name, index.toString(), expr.index.location)
                     
-                    val subExpr = visit(expr.expr).fromRef()
+                    val type = ref.type
+                    var subExpr = expr.expr
                     
-                    when (ref.put(this, subExpr)) {
-                        true  -> subExpr
+                    if (type is DataType.Data && subExpr is Expr.Instantiate && subExpr.isInferred) {
+                        subExpr = subExpr.withTarget(type.name)
+                    }
+                    
+                    val result = visit(subExpr).fromRef()
+                    val value = type.coerce(result) ?: TODO("COERCE DATA INDEX CHAR")
+                    
+                    when (ref.put(this, value)) {
+                        true  -> value
                         
-                        false -> KBError.mismatchedType(subExpr, ref.type, expr.location)
+                        false -> KBError.mismatchedType(value, ref.type, expr.location)
                         
                         null  -> KBError.reassignedConstant(expr.index.location)
                     }
@@ -1496,12 +1512,20 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 is String -> {
                     val ref = target[index] ?: KBError.noMember(target.name, index, expr.index.location)
                     
-                    val subExpr = visit(expr.expr).fromRef()
+                    val type = ref.type
+                    var subExpr = expr.expr
                     
-                    when (ref.put(this, subExpr)) {
-                        true  -> subExpr
+                    if (type is DataType.Data && subExpr is Expr.Instantiate && subExpr.isInferred) {
+                        subExpr = subExpr.withTarget(type.name)
+                    }
+                    
+                    val result = visit(subExpr).fromRef()
+                    val value = type.coerce(result) ?: TODO("COERCE DATA INDEX STRING")
+                    
+                    when (ref.put(this, value)) {
+                        true  -> value
                         
-                        false -> KBError.mismatchedType(subExpr, ref.type, expr.location)
+                        false -> KBError.mismatchedType(value, ref.type, expr.location)
                         
                         null  -> KBError.reassignedConstant(expr.index.location)
                     }

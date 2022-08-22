@@ -42,13 +42,15 @@ interface DataType {
     
     fun cast(script: Script, x: Any?): Any? = null
     
-    fun coerce(x: Any?): Any? = null
+    fun coerce(x: Any?): Any? = x
     
     fun iterable(script: Script, x: Any?): List<Any>? = null
     
     fun default(script: Script): Any? = null
     
     object Inferred : DataType {
+        override fun coerce(x: Any?) = null
+        
         override fun filter(script: Script, x: Any?) = x
     }
     
@@ -361,6 +363,8 @@ interface DataType {
             super.filter(script, x) ?: x.takeIf { it is DataInstance && it.name == name }
         
         override fun cast(script: Script, x: Any?): Any? = (x as? DataInstance)?.takeIf { it.name == name }
+    
+        override fun coerce(x: Any?) = x.takeIf { it is DataInstance && it.name == name }
         
         override fun iterable(script: Script, x: Any?): List<Any>? = (x as? DataInstance)?.deref()
         

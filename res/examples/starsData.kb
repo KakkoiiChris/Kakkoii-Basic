@@ -11,7 +11,7 @@ data Star
     var x as double,
     var y as double,
     var z as double
-end
+end data
 
 let stars as Star[STAR_COUNT]
 
@@ -21,7 +21,7 @@ for i = 0 to #stars
         (random() * HEIGHT) - HEIGHT / 2,
         random() * WIDTH
     }
-end
+end for
 
 var paused = false
 
@@ -43,7 +43,7 @@ while windowIsOpen()
 			star.x = (random() * WIDTH) - WIDTH / 2
 			star.y = (random() * HEIGHT) - HEIGHT / 2
 			star.z = WIDTH as double
-		end
+		end if
 	
 		let x = star.x
 		let y = star.y
@@ -62,8 +62,8 @@ while windowIsOpen()
 		
 		if not paused
 			star.z -= STAR_SPEED
-		end
-	end
+		end if
+	end for
     
 	translate(-WIDTH / 2, -HEIGHT / 2)
 	
@@ -73,13 +73,13 @@ while windowIsOpen()
 	
 	if keyIsDown(VK_SPACE)
 		paused = not paused
-	end
+	end if
 	
 	if keyIsDown(VK_ESCAPE)
 		closeWindow()
-	end
+	end if
 	
 	poll()
-end
+end while
 
 closeWindow()

@@ -67,7 +67,7 @@ while windowIsOpen()
             end for
         end for
         
-        a <=> b
+        a $ b
     end if
 	
 	flip()

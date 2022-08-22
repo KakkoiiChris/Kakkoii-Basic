@@ -1,18 +1,83 @@
-data A
-    var s as string,
-    var n as int
+let WIDTH  = 400
+let HEIGHT = 400
+
+let STAR_COUNT = 400
+let STAR_SIZE  = 8
+let STAR_SPEED = 5.0
+
+let FRAME_RATE = 1.0 / 60.0
+
+data Star
+    var x as double,
+    var y as double,
+    var z as double
 end data
 
-data B
-    var s as string,
-    var n as double
-end data
+let stars as Star[STAR_COUNT]
 
-data C
-    var a as A,
-    var b as B
-end data
+for i = 0 to #stars
+	stars[i] = {
+        (random() * WIDTH)  - WIDTH  / 2,
+        (random() * HEIGHT) - HEIGHT / 2,
+        random() * WIDTH
+    }
+end for
 
-var c as C = { { "Hello", 69 }, { "World", 420 } }
+var paused = false
 
-print(c & '\n')
+createWindow(WIDTH, HEIGHT, "Starfield")
+
+openWindow()
+
+setColor(0)
+clear()
+
+while windowIsOpen()
+	setColor(0.0, 0.4)
+	clear()
+	
+	translate(WIDTH / 2, HEIGHT / 2)
+    
+	for star in stars
+		if star.z < 1.0
+			star.x = (random() * WIDTH) - WIDTH / 2
+			star.y = (random() * HEIGHT) - HEIGHT / 2
+			star.z = WIDTH
+		end if
+	
+		let each x, y, z = star
+		
+		let sx = map(x / z, 0.0, 1.0, 0.0, WIDTH)
+		let sy = map(y / z, 0.0, 1.0, 0.0, HEIGHT)
+		
+		let r = map(z, 0.0, WIDTH, 16.0, 0.0)
+		
+		let hue = map(z, 0.0, WIDTH, 0.0, 1.0)
+		
+		setColor(hsbToColor(hue, 1.0, 1.0))
+		
+		fillOval(sx as int, sy as int, r as int, r as int)
+		
+		if not paused
+			star.z -= STAR_SPEED
+		end if
+	end for
+    
+	translate(-WIDTH / 2, -HEIGHT / 2)
+	
+	flip()
+	
+	sleep(FRAME_RATE)
+	
+	if keyIsDown(VK_SPACE)
+		paused = not paused
+	end if
+	
+	if keyIsDown(VK_ESCAPE)
+		closeWindow()
+	end if
+	
+	poll()
+end while
+
+closeWindow()

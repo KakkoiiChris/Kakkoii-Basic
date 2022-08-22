@@ -793,9 +793,7 @@ class Parser(private val lexer: Lexer) {
                         mustSkip(RightBrace)
                     }
                     
-                    Expr.Instantiate(op.location,
-                        expr as? Expr.Name ?: KBError.invalidInstantiationTarget(expr.location),
-                        elements)
+                    Expr.Instantiate(op.location, expr as? Expr.Name ?: KBError.invalidInstantiationTarget(expr.location), elements)
                 }
                 
                 else       -> KBError.failure("Broken postfix operator '${op.type}'!", op.location)
