@@ -40,7 +40,7 @@ class KBError(stage: String, message: String, location: Location) : RuntimeExcep
             forParser("Data type beginning with type '$type' is invalid", location)
         
         fun invalidForLoop(location: Location): Nothing =
-            forParser("For loop is invalid; expected '$Each', '$To', or '$In'", location)
+            forParser("For loop is invalid; expected '$EACH', '$TO', or '$IN'", location)
         
         fun invalidInstantiationTarget(location: Location): Nothing =
             forParser("Instantiate left operand must be a variable name", location)
@@ -78,9 +78,6 @@ class KBError(stage: String, message: String, location: Location) : RuntimeExcep
         fun undeclaredSub(name: Expr.Name, location: Location): Nothing =
             forScript("Sub '$name' has not been declared in this scope", location)
         
-        fun undeclaredLabel(label: String, location: Location): Nothing =
-            forScript("Label '$label' has not been declared in this scope", location)
-        
         fun emptyInstantiationTarget(location: Location): Nothing =
             forScript("Cannot infer data for instantiation", location)
         
@@ -104,6 +101,9 @@ class KBError(stage: String, message: String, location: Location) : RuntimeExcep
         
         fun mismatchedBuiltinType(name: Expr.Name, type: DataType, location: Location): Nothing =
             forScript("Sub builtin '$name' must yield a value of type '$type'", location)
+        
+        fun mismatchedArraySize(location: Location): Nothing =
+            forScript("Assigned array size does not match declared array size", location)
         
         fun noDefaultValue(type: DataType, location: Location): Nothing =
             forScript("No default value for data type '$type'", location)

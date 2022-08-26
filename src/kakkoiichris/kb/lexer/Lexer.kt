@@ -62,7 +62,7 @@ class Lexer(private val source: Source) : Iterator<Token> {
             }
         }
         
-        return Token(here(), Token.Type.EndOfFile)
+        return Token(here(), Token.Type.END_OF_FILE)
     }
     
     private fun peek(offset: Int = 0) =
@@ -261,7 +261,7 @@ class Lexer(private val source: Source) : Iterator<Token> {
             else                            -> KBError.failure("UNEXPECTED NUMBER FORMAT")
         }
         
-        return Token(location, Token.Type.Value, number)
+        return Token(location, Token.Type.VALUE, number)
     }
     
     private fun word(): Token {
@@ -283,10 +283,10 @@ class Lexer(private val source: Source) : Iterator<Token> {
         val literal = literals[result]
         
         if (literal != null) {
-            return Token(location, Token.Type.Value, literal)
+            return Token(location, Token.Type.VALUE, literal)
         }
         
-        return Token(location, Token.Type.Word, result)
+        return Token(location, Token.Type.WORD, result)
     }
     
     private fun unicode(size: Int): Char {
@@ -345,7 +345,7 @@ class Lexer(private val source: Source) : Iterator<Token> {
         
         mustSkip('\'')
         
-        return Token(location, Token.Type.Value, result)
+        return Token(location, Token.Type.VALUE, result)
     }
     
     private fun string(): Token {
@@ -364,7 +364,7 @@ class Lexer(private val source: Source) : Iterator<Token> {
             }
         }
         
-        return Token(location, Token.Type.Value, result)
+        return Token(location, Token.Type.VALUE, result)
     }
     
     private fun label(): Token {
@@ -378,7 +378,7 @@ class Lexer(private val source: Source) : Iterator<Token> {
             }
         }
         
-        return Token(location, Token.Type.Label, result)
+        return Token(location, Token.Type.LABEL, result)
     }
     
     private fun symbol(): Token {
@@ -386,78 +386,78 @@ class Lexer(private val source: Source) : Iterator<Token> {
         
         val op = when {
             skip('=') -> when {
-                skip('=') -> Token.Type.DoubleEqual
+                skip('=') -> Token.Type.DOUBLE_EQUAL
                 
-                else      -> Token.Type.EqualSign
+                else      -> Token.Type.EQUAL_SIGN
             }
             
             skip('+') -> when {
-                skip('=') -> Token.Type.PlusEqual
+                skip('=') -> Token.Type.PLUS_EQUAL
                 
-                else      -> Token.Type.Plus
+                else      -> Token.Type.PLUS
             }
             
             skip('-') -> when {
-                skip('=') -> Token.Type.MinusEqual
+                skip('=') -> Token.Type.DASH_EQUAL
                 
-                else      -> Token.Type.Minus
+                else      -> Token.Type.DASH
             }
             
             skip('*') -> when {
-                skip('=') -> Token.Type.StarEqual
+                skip('=') -> Token.Type.STAR_EQUAL
                 
-                else      -> Token.Type.Star
+                else      -> Token.Type.STAR
             }
             
             skip('/') -> when {
-                skip('=') -> Token.Type.SlashEqual
+                skip('=') -> Token.Type.SLASH_EQUAL
                 
-                else      -> Token.Type.Slash
+                else      -> Token.Type.SLASH
             }
             
             skip('%') -> when {
-                skip('=') -> Token.Type.PercentEqual
+                skip('=') -> Token.Type.PERCENT_EQUAL
                 
-                else      -> Token.Type.Percent
+                else      -> Token.Type.PERCENT
             }
             
             skip('<') -> when {
-                skip('>') -> Token.Type.LessGreater
+                skip('>') -> Token.Type.LESS_GREATER
                 
-                skip('=') -> Token.Type.LessEqualSign
+                skip('=') -> Token.Type.LESS_EQUAL_SIGN
                 
-                else      -> Token.Type.LessSign
+                else      -> Token.Type.LESS_SIGN
             }
             
             skip('>') -> when {
-                skip('=') -> Token.Type.GreaterEqualSign
+                skip('=') -> Token.Type.GREATER_EQUAL_SIGN
                 
-                else      -> Token.Type.GreaterSign
+                else      -> Token.Type.GREATER_SIGN
             }
             
-            skip('$') -> Token.Type.Dollar
+            skip('$') -> Token.Type.DOLLAR
             
-            skip('&') -> Token.Type.Ampersand
+            skip('&') -> Token.Type.AMPERSAND
             
-            skip('#') -> Token.Type.Pound
+            skip('#') -> Token.Type.POUND
             
-            skip('.') -> Token.Type.Dot
+            skip('.') -> Token.Type.DOT
             
-            skip(':') -> Token.Type.Colon
+            skip(':') -> Token.Type.COLON
             
-            skip('(') -> Token.Type.LeftParen
+            skip('(') -> Token.Type.LEFT_PAREN
             
-            skip(')') -> Token.Type.RightParen
+            skip(')') -> Token.Type.RIGHT_PAREN
             
-            skip('[') -> Token.Type.LeftSquare
+            skip('[') -> Token.Type.LEFT_SQUARE
             
-            skip(']') -> Token.Type.RightSquare
+            skip(']') -> Token.Type.RIGHT_SQUARE
             
-            skip('{') -> Token.Type.LeftBrace
+            skip('{') -> Token.Type.LEFT_BRACE
             
-            skip('}') -> Token.Type.RightBrace
+            skip('}') -> Token.Type.RIGHT_BRACE
             
-            skip(',') -> Token.Type.Comma
+            skip(',') -> Token.Type.COMMA
             
             else      -> KBError.illegalCharacter(peek(), here())
         }

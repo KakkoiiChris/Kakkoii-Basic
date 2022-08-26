@@ -325,11 +325,30 @@ interface DataType {
             else 0
             
             return ArrayInstance(subType, MutableList(initSize) {
-                subType.default(script) ?: error("No default for any array!")
+                subType.default(script) ?: KBError.noDefaultValue(DataType.Primitive.ANY.array, Location.none)
             })
         }
         
         override fun toString() = "$subType[]"
+        
+        fun mismatchedSize(script: Script, x: Any?): Boolean {
+            if (x !is ArrayInstance) {
+                return false
+            }
+            
+            val initSize = if (initSize != null) {
+                val value = script.visit(initSize).fromRef()
+                
+                Primitive.INT.coerce(value) as? Int ?: KBError.invalidArraySize()
+            }
+            else 0
+            
+            if (initSize > 0 && x.size != initSize) {
+                return true
+            }
+            
+            return false
+        }
     }
     
     class Vararg(private val subType: DataType) : DataType {
@@ -356,6 +375,8 @@ interface DataType {
         override fun toString() = "$subType*"
     }
     
+    class Named(val name: Expr.Name) : DataType
+    
     class Data(val name: Expr.Name) : DataType {
         override val iterableType: DataType get() = Primitive.ANY
         
@@ -363,7 +384,7 @@ interface DataType {
             super.filter(script, x) ?: x.takeIf { it is DataInstance && it.name == name }
         
         override fun cast(script: Script, x: Any?): Any? = (x as? DataInstance)?.takeIf { it.name == name }
-    
+        
         override fun coerce(x: Any?) = x.takeIf { it is DataInstance && it.name == name }
         
         override fun iterable(script: Script, x: Any?): List<Any>? = (x as? DataInstance)?.deref()

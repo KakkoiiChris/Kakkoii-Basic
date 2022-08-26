@@ -4,7 +4,7 @@ import kakkoiichris.kb.lexer.Location
 import kakkoiichris.kb.script.DataType
 import kakkoiichris.kb.script.Memory
 
-sealed class Stmt(val location: Location, val label: String) {
+sealed class Stmt(val location: Location) {
     open val detail get() = ""
     
     abstract fun <X> accept(visitor: Visitor<X>): X
@@ -30,7 +30,7 @@ sealed class Stmt(val location: Location, val label: String) {
         fun visitSwitchStmt(stmt: Switch): X
         
         fun visitWhileStmt(stmt: While): X
-    
+        
         fun visitUntilStmt(stmt: Until): X
         
         fun visitForCounterStmt(stmt: ForCounter): X
@@ -51,27 +51,26 @@ sealed class Stmt(val location: Location, val label: String) {
         
         fun visitYieldStmt(stmt: Yield): X
         
-        fun visitGotoStmt(stmt: Goto): X
+        fun visitTypeStmt(stmt: Type): X
         
         fun visitExpressionStmt(stmt: Expression): X
     }
     
     override fun toString() = trace
     
-    object None : Stmt(Location.none, "") {
+    object None : Stmt(Location.none) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitNoneStmt(this)
     }
     
     class Decl(
         location: Location,
-        label: String,
         val constant: Boolean,
         val name: Expr.Name,
         val type: Expr.Type,
         val expr: Expr,
     ) :
-        Stmt(location, label) {
+        Stmt(location) {
         val isVararg get() = type.value is DataType.Vararg
         
         override val detail get() = " $name"
@@ -80,44 +79,43 @@ sealed class Stmt(val location: Location, val label: String) {
             visitor.visitDeclStmt(this)
         
         fun withExpr(expr: Expr) =
-            Decl(location, label, constant, name, type, expr)
+            Decl(location, constant, name, type, expr)
         
         fun withValue(x: Any) =
-            Decl(location, label, constant, name, type, x.toExpr())
+            Decl(location, constant, name, type, x.toExpr())
     }
     
     class DeclEach(
         location: Location,
-        label: String,
         val constant: Boolean,
         val pairs: List<Pair<Expr.Name, Expr.Type>>,
         val expr: Expr,
-    ) : Stmt(location, label) {
+    ) : Stmt(location) {
         override val detail get() = " ${pairs.map { (name, _) -> name }.joinToString(separator = ", ")}"
         
         fun withValue(x: Any) =
-            DeclEach(location, label, constant, pairs, x.toExpr())
+            DeclEach(location, constant, pairs, x.toExpr())
         
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitDeclEachStmt(this)
     }
     
-    class Block(location: Location, val stmts: List<Stmt>) : Stmt(location, "") {
+    class Block(location: Location, val stmts: List<Stmt>) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitBlockStmt(this)
     }
     
-    class Do(location: Location, label: String, val body: Block) : Stmt(location, label) {
+    class Do(location: Location, val label: String, val body: Block) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitDoStmt(this)
     }
     
-    class If(location: Location, label: String, val branches: List<Pair<Expr, Block>>, val elze: Stmt) : Stmt(location, label) {
+    class If(location: Location, val branches: List<Pair<Expr, Block>>, val elze: Stmt) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitIfStmt(this)
     }
     
-    class Switch(location: Location, label: String, val subject: Expr, val cases: List<Case>) : Stmt(location, label) {
+    class Switch(location: Location, val subject: Expr, val cases: List<Case>) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitSwitchStmt(this)
         
@@ -130,41 +128,41 @@ sealed class Stmt(val location: Location, val label: String) {
         }
     }
     
-    class While(location: Location, label: String, val test: Expr, val body: Block) : Stmt(location, label) {
+    class While(location: Location, val label: String, val test: Expr, val body: Block) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitWhileStmt(this)
     }
     
-    class Until(location: Location, label: String, val test: Expr, val body: Block) : Stmt(location, label) {
+    class Until(location: Location, val label: String, val test: Expr, val body: Block) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitUntilStmt(this)
     }
     
-    class ForCounter(location: Location, label: String, val decl: Decl, val to: Expr, val step: Expr, val body: Block) :
-        Stmt(location, label) {
+    class ForCounter(location: Location, val label: String, val decl: Decl, val to: Expr, val step: Expr, val body: Block) :
+        Stmt(location) {
         override val detail get() = decl.detail
         
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitForCounterStmt(this)
     }
     
-    class ForIterate(location: Location, label: String, val decl: Decl, val iterable: Expr, val body: Block) :
-        Stmt(location, label) {
+    class ForIterate(location: Location, val label: String, val decl: Decl, val iterable: Expr, val body: Block) :
+        Stmt(location) {
         override val detail get() = decl.detail
         
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitForIterateStmt(this)
     }
     
-    class ForIterateEach(location: Location, label: String, val decl: DeclEach, val iterable: Expr, val body: Block) :
-        Stmt(location, label) {
+    class ForIterateEach(location: Location, val label: String, val decl: DeclEach, val iterable: Expr, val body: Block) :
+        Stmt(location) {
         override val detail get() = decl.detail
         
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitForIterateEachStmt(this)
     }
     
-    class Data(location: Location, label: String, val name: Expr.Name, val decls: List<Decl>) : Stmt(location, label) {
+    class Data(location: Location, val name: Expr.Name, val decls: List<Decl>) : Stmt(location) {
         override val detail get() = " $name"
         
         override fun <X> accept(visitor: Visitor<X>): X =
@@ -173,55 +171,54 @@ sealed class Stmt(val location: Location, val label: String) {
     
     class Sub(
         location: Location,
-        label: String,
         val name: Expr.Name,
         val params: List<Decl>,
         val type: Expr.Type,
         val body: Block,
-    ) : Stmt(location, label) {
+    ) : Stmt(location) {
         val signature
             get() = params.joinToString(prefix = "$name(", separator = ",", postfix = ")") {
                 it.type.value.toString()
             }
         
+        val isLinked = body.stmts.isEmpty()
+        
         var scope = Memory.Scope("")
-    
+        
         override val detail get() = " $signature"
         
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitSubStmt(this)
     }
     
-    class Break(location: Location, label: String, val destination: String) : Stmt(location, label) {
+    class Break(location: Location, val destination: String) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitBreakStmt(this)
     }
     
-    class Next(location: Location, label: String, val pointer: Expr.Name) : Stmt(location, label) {
+    class Next(location: Location, val pointer: Expr.Name) : Stmt(location) {
         override val detail get() = " $pointer"
-    
+        
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitNextStmt(this)
     }
     
-    class Return(location: Location, label: String) : Stmt(location, label) {
+    class Return(location: Location) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitReturnStmt(this)
     }
     
-    class Yield(location: Location, label: String, val value: Expr) : Stmt(location, label) {
+    class Yield(location: Location, val value: Expr) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitYieldStmt(this)
     }
     
-    class Goto(location: Location, label: String, val destination: String) : Stmt(location, label) {
-        override val detail get() = " $destination"
-        
+    class Type(location: Location, val full: Expr.Type, val alias: Expr.Name) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
-            visitor.visitGotoStmt(this)
+            visitor.visitTypeStmt(this)
     }
     
-    class Expression(label: String, val expr: Expr) : Stmt(expr.location, label) {
+    class Expression(val expr: Expr) : Stmt(expr.location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitExpressionStmt(this)
     }

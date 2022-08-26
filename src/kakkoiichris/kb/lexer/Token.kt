@@ -1,112 +1,112 @@
 package kakkoiichris.kb.lexer
 
 data class Token(val location: Location, val type: Type, val value: Any = Unit) {
-    enum class Type(val symbol: kotlin.String) {
+    enum class Type(val symbol: String) {
         // Keywords
-        Let("let"),
-        Var("var"),
-        Each("each"),
-        Do("do"),
-        If("if"),
-        Elif("elif"),
-        Else("else"),
-        Switch("switch"),
-        Case("case"),
-        While("while"),
-        Until("until"),
-        For("for"),
-        To("to"),
-        Step("step"),
-        In("in"),
-        Data("data"),
-        Sub("sub"),
-        Break("break"),
-        Next("next"),
-        Return("return"),
-        Yield("yield"),
-        Goto("goto"),
-        End("end"),
+        LET("let"),
+        VAR("var"),
+        EACH("each"),
+        DO("do"),
+        IF("if"),
+        ELIF("elif"),
+        ELSE("else"),
+        SWITCH("switch"),
+        CASE("case"),
+        WHILE("while"),
+        UNTIL("until"),
+        FOR("for"),
+        TO("to"),
+        STEP("step"),
+        IN("in"),
+        DATA("data"),
+        SUB("sub"),
+        BREAK("break"),
+        NEXT("next"),
+        RETURN("return"),
+        YIELD("yield"),
+        TYPE("type"),
+        END("end"),
         
         // Types
-        None("none"),
-        Bool("bool"),
-        Byte("byte"),
-        Short("short"),
-        Int("int"),
-        Long("long"),
-        Float("float"),
-        Double("double"),
-        Char("char"),
-        String("string"),
-        Any("any"),
+        NONE("none"),
+        BOOL("bool"),
+        BYTE("byte"),
+        SHORT("short"),
+        INT("int"),
+        LONG("long"),
+        FLOAT("float"),
+        DOUBLE("double"),
+        CHAR("char"),
+        STRING("string"),
+        ANY("any"),
         
         // Assignment
-        EqualSign("="),
-        PlusEqual("+="),
-        MinusEqual("-="),
-        StarEqual("*="),
-        SlashEqual("/="),
-        PercentEqual("%="),
-        Dollar("$"),
+        EQUAL_SIGN("="),
+        PLUS_EQUAL("+="),
+        DASH_EQUAL("-="),
+        STAR_EQUAL("*="),
+        SLASH_EQUAL("/="),
+        PERCENT_EQUAL("%="),
+        DOLLAR("$"),
         
         // Disjunction
-        Or("or"),
+        OR("or"),
         
         // Conjunction
-        And("and"),
+        AND("and"),
         
         // Equality
-        DoubleEqual("=="),
-        LessGreater("<>"),
+        DOUBLE_EQUAL("=="),
+        LESS_GREATER("<>"),
         
         // Comparison
-        LessSign("<"),
-        LessEqualSign("<="),
-        GreaterSign(">"),
-        GreaterEqualSign(">="),
+        LESS_SIGN("<"),
+        LESS_EQUAL_SIGN("<="),
+        GREATER_SIGN(">"),
+        GREATER_EQUAL_SIGN(">="),
         
         // Type Check
-        Is("is"),
+        IS("is"),
         
         // Concatenate
-        Ampersand("&"),
+        AMPERSAND("&"),
         
         // Additive
-        Plus("+"),
-        Minus("-"),
+        PLUS("+"),
+        DASH("-"),
         
         // Multiplicative
-        Star("*"),
-        Slash("/"),
-        Percent("%"),
+        STAR("*"),
+        SLASH("/"),
+        PERCENT("%"),
         
         // Type Cast
-        As("as"),
+        AS("as"),
         
         // Prefix
-        Not("not"),
-        Pound("#"),
+        NOT("not"),
+        POUND("#"),
         
         // Pipeline
-        Colon(":"),
+        COLON(":"),
         
         // Postfix
-        Dot("."),
+        DOT("."),
         
         // Terminals
-        Value("V"),
-        Word("N"),
-        Label("@"),
+        VALUE("V"),
+        WORD("N"),
+        LABEL("@"),
         
         // Delimiters
-        LeftParen("("),
-        RightParen(")"),
-        LeftSquare("["),
-        RightSquare("]"),
-        LeftBrace("{"),
-        RightBrace("}"),
-        Comma(","),
-        EndOfFile("0");
+        LEFT_PAREN("("),
+        RIGHT_PAREN(")"),
+        LEFT_SQUARE("["),
+        RIGHT_SQUARE("]"),
+        LEFT_BRACE("{"),
+        RIGHT_BRACE("}"),
+        COMMA(","),
+        END_OF_FILE("0");
         
         override fun toString() = symbol
     }

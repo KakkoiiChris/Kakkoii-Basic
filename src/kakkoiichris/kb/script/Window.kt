@@ -41,7 +41,7 @@ class Window(width: Int, height: Int, title: String) : KeyListener, MouseListene
         frame.setLocationRelativeTo(null)
         frame.addWindowListener(object : WindowAdapter() {
             override fun windowClosing(e: WindowEvent) {
-                frame.isVisible = false
+                close()
             }
         })
         

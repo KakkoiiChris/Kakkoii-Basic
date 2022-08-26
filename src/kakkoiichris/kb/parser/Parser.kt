@@ -58,68 +58,84 @@ class Parser(private val lexer: Lexer) {
     }
     
     private fun isEndOfFile() =
-        match(EndOfFile)
+        match(END_OF_FILE)
     
     private fun stmt(): Stmt {
-        val label = if (match(Label)) {
+        val label = if (match(LABEL)) {
             val token = currentToken
             
-            mustSkip(Label)
+            mustSkip(LABEL)
             
             token.value as String
         }
         else ""
         
+        if (label.isNotEmpty()) {
+            return when {
+                match(DO)    -> doStmt(label)
+                
+                match(WHILE) -> whileStmt(label)
+                
+                match(UNTIL) -> untilStmt(label)
+                
+                match(FOR)   -> forStmt(label)
+                
+                else         -> TODO("STATEMENT ${currentToken.type} CAN'T HAVE LABEL")
+            }
+        }
+        
         return when {
-            matchAny(Let, Var) -> declStmt(label)
+            matchAny(LET, VAR) -> declStmt()
             
-            match(Do)          -> doStmt(label)
+            match(DO)          -> doStmt(label)
             
-            match(If)          -> ifStmt(label)
+            match(IF)          -> ifStmt()
             
-            match(Switch)      -> switchStmt(label)
+            match(SWITCH)      -> switchStmt()
             
-            match(While)       -> whileStmt(label)
+            match(WHILE)       -> whileStmt(label)
             
-            match(For)         -> forStmt(label)
+            match(UNTIL)       -> untilStmt(label)
             
-            match(Data)        -> dataStmt(label)
+            match(FOR)         -> forStmt(label)
             
-            match(Sub)         -> subStmt(label)
+            match(DATA)        -> dataStmt()
             
-            match(Break)       -> breakStmt(label)
+            match(SUB)         -> subStmt()
             
-            match(Next)        -> nextStmt(label)
+            match(BREAK)       -> breakStmt()
             
-            match(Return)      -> returnStmt(label)
+            match(NEXT)        -> nextStmt()
             
-            match(Yield)       -> yieldStmt(label)
+            match(RETURN)      -> returnStmt()
             
-            match(Goto)        -> gotoStmt(label)
+            match(YIELD)       -> yieldStmt()
             
-            else               -> expressionStmt(label)
+            match(TYPE)        -> typeStmt()
+            
+            else               -> expressionStmt()
         }
     }
     
-    private fun declStmt(label: String): Stmt {
+    private fun declStmt(): Stmt {
         val location = here()
         
-        val constant = skip(Let)
+        val constant = skip(LET)
         
         if (!constant) {
-            mustSkip(Var)
+            mustSkip(VAR)
         }
         
-        val each = skip(Each)
+        val each = skip(EACH)
         
         val pairs = mutableListOf<Pair<Expr.Name, Expr.Type>>()
         
         if (each) {
             do {
-                pairs += if (!match(Comma)) {
+                pairs += if (!match(COMMA)) {
                     val name = name()
                     
-                    val type = if (skip(As)) type() else Expr.Type.none
+                    val type = if (skip(AS)) type() else Expr.Type.none
                     
                     name to type
                 }
@@ -127,25 +143,25 @@ class Parser(private val lexer: Lexer) {
                     Expr.Name.none to Expr.Type.none
                 }
             }
-            while (skip(Comma))
+            while (skip(COMMA))
         }
         else {
             val name = name()
             
-            val type = if (skip(As)) type() else Expr.Type.none
+            val type = if (skip(AS)) type() else Expr.Type.none
             
             pairs += name to type
         }
         
-        val expr = if (skip(EqualSign)) expr() else Expr.Empty
+        val expr = if (skip(EQUAL_SIGN)) expr() else Expr.Empty
         
         if (each) {
-            return Stmt.DeclEach(location, label, constant, pairs, expr)
+            return Stmt.DeclEach(location, constant, pairs, expr)
         }
         
         val (name, type) = pairs[0]
         
-        return Stmt.Decl(location, label, constant, name, type, expr)
+        return Stmt.Decl(location, constant, name, type, expr)
     }
     
     private fun block(vararg ends: Token.Type): Stmt.Block {
@@ -163,44 +179,44 @@ class Parser(private val lexer: Lexer) {
     private fun doStmt(label: String): Stmt.Do {
         val location = here()
         
-        mustSkip(Do)
+        mustSkip(DO)
         
-        val body = block(End)
+        val body = block(END)
         
-        mustSkip(End)
-        mustSkip(Do)
+        mustSkip(END)
+        mustSkip(DO)
         
         return Stmt.Do(location, label, body)
     }
     
-    private fun ifStmt(label: String): Stmt.If {
+    private fun ifStmt(): Stmt.If {
         val location = here()
         
-        mustSkip(If)
+        mustSkip(IF)
         
         val branches = mutableListOf<Pair<Expr, Stmt.Block>>()
         
         do {
             val test = expr()
             
-            val body = block(Elif, Else, End)
+            val body = block(ELIF, ELSE, END)
             
             branches += test to body
         }
-        while (skip(Elif))
+        while (skip(ELIF))
         
-        val elze = if (skip(Else)) block(End) else Stmt.None
+        val elze = if (skip(ELSE)) block(END) else Stmt.None
         
-        mustSkip(End)
-        mustSkip(If)
+        mustSkip(END)
+        mustSkip(IF)
         
-        return Stmt.If(location, label, branches, elze)
+        return Stmt.If(location, branches, elze)
     }
     
-    private fun switchStmt(label: String): Stmt.Switch {
+    private fun switchStmt(): Stmt.Switch {
         val location = here()
         
-        mustSkip(Switch)
+        mustSkip(SWITCH)
         
         val subject = expr()
         
@@ -208,16 +224,16 @@ class Parser(private val lexer: Lexer) {
         
         var elze: Stmt.Switch.Case.Else? = null
         
-        while (!skip(End)) {
+        while (!skip(END)) {
             val caseLoc = here()
             
-            mustSkip(Case)
+            mustSkip(CASE)
             
             when {
-                skip(Else) -> if (elze == null) {
-                    val block = block(End)
+                skip(ELSE) -> if (elze == null) {
+                    val block = block(END)
                     
-                    mustSkip(End)
+                    mustSkip(END)
                     
                     elze = Stmt.Switch.Case.Else(caseLoc, block)
                 }
@@ -225,13 +241,13 @@ class Parser(private val lexer: Lexer) {
                     KBError.duplicateElseCase(here())
                 }
                 
-                skip(Is)   -> {
+                skip(IS)   -> {
                     val type = type()
                     
-                    val block = block(End)
+                    val block = block(END)
                     
-                    mustSkip(End)
-                    mustSkip(Case)
+                    mustSkip(END)
+                    mustSkip(CASE)
                     
                     cases += Stmt.Switch.Case.Type(caseLoc, type, block)
                 }
@@ -242,57 +258,72 @@ class Parser(private val lexer: Lexer) {
                     do {
                         values += value()
                     }
-                    while (skip(Comma))
+                    while (skip(COMMA))
                     
-                    val block = block(End)
+                    val block = block(END)
                     
-                    mustSkip(End)
-                    mustSkip(Case)
+                    mustSkip(END)
+                    mustSkip(CASE)
                     
                     cases += Stmt.Switch.Case.Values(caseLoc, values, block)
                 }
             }
         }
         
-        mustSkip(Switch)
+        mustSkip(SWITCH)
         
         if (elze != null) {
             cases += elze
         }
         
-        return Stmt.Switch(location, label, subject, cases)
+        return Stmt.Switch(location, subject, cases)
     }
     
     private fun whileStmt(label: String): Stmt.While {
         val location = here()
         
-        mustSkip(While)
+        mustSkip(WHILE)
         
         val test = expr()
         
-        val body = block(End)
+        val body = block(END)
         
-        mustSkip(End)
-        mustSkip(While)
+        mustSkip(END)
+        mustSkip(WHILE)
         
         return Stmt.While(location, label, test, body)
+    }
+    
+    private fun untilStmt(label: String): Stmt.Until {
+        val location = here()
+        
+        mustSkip(UNTIL)
+        
+        val test = expr()
+        
+        val body = block(END)
+        
+        mustSkip(END)
+        mustSkip(UNTIL)
+        
+        return Stmt.Until(location, label, test, body)
     }
     
     private fun forStmt(label: String): Stmt {
         val location = here()
         
-        mustSkip(For)
+        mustSkip(FOR)
         
-        val each = skip(Each)
+        val each = skip(EACH)
         
         val pairs = mutableListOf<Pair<Expr.Name, Expr.Type>>()
         
         if (each) {
             do {
-                pairs += if (!match(Comma)) {
+                pairs += if (!match(COMMA)) {
                     val name = name()
                     
-                    val type = if (skip(As)) type() else Expr.Type.none
+                    val type = if (skip(AS)) type() else Expr.Type.none
                     
                     name to type
                 }
@@ -300,208 +331,210 @@ class Parser(private val lexer: Lexer) {
                     Expr.Name.none to Expr.Type.none
                 }
             }
-            while (skip(Comma))
+            while (skip(COMMA))
         }
         else {
             val name = name()
             
-            val type = if (skip(As)) type() else Expr.Type.none
+            val type = if (skip(AS)) type() else Expr.Type.none
             
             pairs += name to type
         }
         
         return when {
-            each                    -> {
-                mustSkip(In)
+            each                     -> {
+                mustSkip(IN)
                 
-                val decl = Stmt.DeclEach(pairs[0].first.location, "", false, pairs, Expr.Empty)
+                val decl = Stmt.DeclEach(pairs[0].first.location, false, pairs, Expr.Empty)
                 
                 val iterable = expr()
                 
-                val body = block(End)
+                val body = block(END)
                 
-                mustSkip(End)
-                mustSkip(For)
+                mustSkip(END)
+                mustSkip(FOR)
                 
                 Stmt.ForIterateEach(location, label, decl, iterable, body)
             }
             
-            skip(In)                -> {
+            skip(IN)                 -> {
                 val (name, type) = pairs[0]
                 
-                val decl = Stmt.Decl(name.location, "", false, name, type, Expr.Empty)
+                val decl = Stmt.Decl(name.location, false, name, type, Expr.Empty)
                 
                 val iterable = expr()
                 
-                val body = block(End)
+                val body = block(END)
                 
-                mustSkip(End)
-                mustSkip(For)
+                mustSkip(END)
+                mustSkip(FOR)
                 
                 Stmt.ForIterate(location, label, decl, iterable, body)
             }
             
-            matchAny(EqualSign, To) -> {
-                val start = if (skip(EqualSign)) expr() else Expr.Empty
+            matchAny(EQUAL_SIGN, TO) -> {
+                val start = if (skip(EQUAL_SIGN)) expr() else Expr.Empty
                 
                 val (name, type) = pairs[0]
                 
-                val decl = Stmt.Decl(name.location, "", false, name, type, start)
+                val decl = Stmt.Decl(name.location, false, name, type, start)
                 
-                mustSkip(To)
+                mustSkip(TO)
                 
                 val to = expr()
                 
-                val step = if (skip(Step)) expr() else 1.toExpr()
+                val step = if (skip(STEP)) expr() else 1.toExpr()
                 
-                val body = block(End)
+                val body = block(END)
                 
-                mustSkip(End)
-                mustSkip(For)
+                mustSkip(END)
+                mustSkip(FOR)
                 
                 Stmt.ForCounter(location, label, decl, to, step, body)
             }
             
-            else                    -> KBError.invalidForLoop(here())
+            else                     -> KBError.invalidForLoop(here())
         }
     }
     
-    private fun dataStmt(label: String): Stmt.Data {
+    private fun dataStmt(): Stmt.Data {
         val location = here()
         
-        mustSkip(Data)
+        mustSkip(DATA)
         
         val name = name()
         
         val decls = mutableListOf<Stmt.Decl>()
         
-        if (!skip(End)) {
+        if (!skip(END)) {
             do {
                 val declLoc = here()
                 
-                val constant = skip(Let)
+                val constant = skip(LET)
                 
                 if (!constant) {
-                    mustSkip(Var)
+                    mustSkip(VAR)
                 }
                 
                 val declName = name()
                 
-                val type = if (skip(As)) type() else Expr.Type(declName.location, DataType.Inferred)
+                val type = if (skip(AS)) type() else Expr.Type(declName.location, DataType.Inferred)
                 
-                val expr = if (skip(EqualSign)) expr() else Expr.Empty
+                val expr = if (skip(EQUAL_SIGN)) expr() else Expr.Empty
                 
-                decls += Stmt.Decl(declLoc, label, constant, declName, type, expr)
+                decls += Stmt.Decl(declLoc, constant, declName, type, expr)
             }
-            while (skip(Comma))
+            while (skip(COMMA))
             
-            mustSkip(End)
-            mustSkip(Data)
+            mustSkip(END)
+            mustSkip(DATA)
         }
         
-        return Stmt.Data(location, label, name, decls)
+        return Stmt.Data(location, name, decls)
     }
     
-    private fun subStmt(label: String): Stmt.Sub {
+    private fun subStmt(): Stmt.Sub {
         val location = here()
         
-        mustSkip(Sub)
+        mustSkip(SUB)
         
         val name = name()
         
         val params = mutableListOf<Stmt.Decl>()
         
-        if (skip(LeftParen) && !skip(RightParen)) {
+        if (skip(LEFT_PAREN) && !skip(RIGHT_PAREN)) {
             do {
                 val paramName = name()
                 
-                mustSkip(As)
+                mustSkip(AS)
                 
                 val paramType = type()
                 
-                params += Stmt.Decl(name.location, "", false, paramName, paramType, Expr.Empty)
+                params += Stmt.Decl(name.location, false, paramName, paramType, Expr.Empty)
             }
-            while (skip(Comma))
+            while (skip(COMMA))
             
-            mustSkip(RightParen)
+            mustSkip(RIGHT_PAREN)
         }
         
-        val type = if (skip(As)) type() else DataType.Primitive.NONE.toType()
+        val type = if (skip(AS)) type() else DataType.Primitive.NONE.toType()
         
-        val body = block(End)
+        val body = block(END)
         
-        mustSkip(End)
-        mustSkip(Sub)
+        mustSkip(END)
+        mustSkip(SUB)
         
-        return Stmt.Sub(location, label, name, params, type, body)
+        return Stmt.Sub(location, name, params, type, body)
     }
     
-    private fun breakStmt(label: String): Stmt.Break {
+    private fun breakStmt(): Stmt.Break {
         val location = here()
         
-        mustSkip(Break)
+        mustSkip(BREAK)
         
-        val destination = if (match(Label)) {
+        val destination = if (match(LABEL)) {
             val token = currentToken.value as String
             
-            mustSkip(Label)
+            mustSkip(LABEL)
             
             token
         }
         else ""
         
-        return Stmt.Break(location, label, destination)
+        return Stmt.Break(location, destination)
     }
     
-    private fun nextStmt(label: String): Stmt.Next {
+    private fun nextStmt(): Stmt.Next {
         val location = here()
         
-        mustSkip(Next)
+        mustSkip(NEXT)
         
         val pointer = name()
         
-        return Stmt.Next(location, label, pointer)
+        return Stmt.Next(location, pointer)
     }
     
-    private fun returnStmt(label: String): Stmt.Return {
+    private fun returnStmt(): Stmt.Return {
         val location = here()
         
-        mustSkip(Return)
+        mustSkip(RETURN)
         
-        return Stmt.Return(location, label)
+        return Stmt.Return(location)
     }
     
-    private fun yieldStmt(label: String): Stmt.Yield {
+    private fun yieldStmt(): Stmt.Yield {
         val location = here()
         
-        mustSkip(Yield)
+        mustSkip(YIELD)
         
         val expr = expr()
         
-        return Stmt.Yield(location, label, expr)
+        return Stmt.Yield(location, expr)
     }
     
-    private fun gotoStmt(label: String): Stmt.Goto {
+    private fun typeStmt(): Stmt.Type {
         val location = here()
         
-        mustSkip(Goto)
+        mustSkip(TYPE)
         
-        val destination = currentToken
+        val full = type()
         
-        mustSkip(Label)
+        mustSkip(AS)
         
-        return Stmt.Goto(location, label, destination.value as String)
+        val alias = name()
+        
+        return Stmt.Type(location, full, alias)
     }
     
-    private fun expressionStmt(label: String) =
-        Stmt.Expression(label, expr())
+    private fun expressionStmt() =
+        Stmt.Expression(expr())
     
     private fun expr() = assign()
     
     private fun assign(): Expr {
         val expr = disjunction()
         
-        return if (matchAny(EqualSign, PlusEqual, MinusEqual, StarEqual, SlashEqual, PercentEqual, Dollar)) {
+        return if (matchAny(EQUAL_SIGN, PLUS_EQUAL, DASH_EQUAL, STAR_EQUAL, SLASH_EQUAL, PERCENT_EQUAL, DOLLAR)) {
             val op = currentToken
             
             mustSkip(op.type)
@@ -509,23 +542,23 @@ class Parser(private val lexer: Lexer) {
             fun desugar(newOp: Expr.Binary.Operator) =
                 Expr.Binary(
                     op.location,
-                    Expr.Binary.Operator.Assign,
+                    Expr.Binary.Operator.ASSIGN,
                     expr,
                     Expr.Binary(op.location, newOp, expr, disjunction())
                 )
             
             when (op.type) {
-                PlusEqual    -> desugar(Expr.Binary.Operator.Add)
+                PLUS_EQUAL    -> desugar(Expr.Binary.Operator.ADD)
                 
-                MinusEqual   -> desugar(Expr.Binary.Operator.Subtract)
+                DASH_EQUAL    -> desugar(Expr.Binary.Operator.SUBTRACT)
                 
-                StarEqual    -> desugar(Expr.Binary.Operator.Multiply)
+                STAR_EQUAL    -> desugar(Expr.Binary.Operator.MULTIPLY)
                 
-                SlashEqual   -> desugar(Expr.Binary.Operator.Divide)
+                SLASH_EQUAL   -> desugar(Expr.Binary.Operator.DIVIDE)
                 
-                PercentEqual -> desugar(Expr.Binary.Operator.Modulus)
+                PERCENT_EQUAL -> desugar(Expr.Binary.Operator.MODULUS)
                 
-                else         -> Expr.Binary(op.location, Expr.Binary.Operator[op.type], expr, disjunction())
+                else          -> Expr.Binary(op.location, Expr.Binary.Operator[op.type], expr, disjunction())
             }
         }
         else {
@@ -536,7 +569,7 @@ class Parser(private val lexer: Lexer) {
     private fun disjunction(): Expr {
         var expr = conjunction()
         
-        while (match(Or)) {
+        while (match(OR)) {
             val op = currentToken
             
             mustSkip(op.type)
@@ -550,7 +583,7 @@ class Parser(private val lexer: Lexer) {
     private fun conjunction(): Expr {
         var expr = equality()
         
-        while (match(And)) {
+        while (match(AND)) {
             val op = currentToken
             
             mustSkip(op.type)
@@ -564,7 +597,7 @@ class Parser(private val lexer: Lexer) {
     private fun equality(): Expr {
         var expr = comparison()
         
-        while (matchAny(DoubleEqual, LessGreater)) {
+        while (matchAny(DOUBLE_EQUAL, LESS_GREATER)) {
             val op = currentToken
             
             mustSkip(op.type)
@@ -578,7 +611,7 @@ class Parser(private val lexer: Lexer) {
     private fun comparison(): Expr {
         var expr = typeCheck()
         
-        while (matchAny(LessSign, LessEqualSign, GreaterSign, GreaterEqualSign)) {
+        while (matchAny(LESS_SIGN, LESS_EQUAL_SIGN, GREATER_SIGN, GREATER_EQUAL_SIGN)) {
             val op = currentToken
             
             mustSkip(op.type)
@@ -592,7 +625,7 @@ class Parser(private val lexer: Lexer) {
     private fun typeCheck(): Expr {
         var expr = concat()
         
-        while (match(Is)) {
+        while (match(IS)) {
             val op = currentToken
             
             mustSkip(op.type)
@@ -606,7 +639,7 @@ class Parser(private val lexer: Lexer) {
     private fun concat(): Expr {
         var expr = additive()
         
-        while (match(Ampersand)) {
+        while (match(AMPERSAND)) {
             val op = currentToken
             
             mustSkip(op.type)
@@ -620,7 +653,7 @@ class Parser(private val lexer: Lexer) {
     private fun additive(): Expr {
         var expr = multiplicative()
         
-        while (matchAny(Plus, Minus)) {
+        while (matchAny(PLUS, DASH)) {
             val op = currentToken
             
             mustSkip(op.type)
@@ -634,7 +667,7 @@ class Parser(private val lexer: Lexer) {
     private fun multiplicative(): Expr {
         var expr = typeCast()
         
-        while (matchAny(Star, Slash, Percent)) {
+        while (matchAny(STAR, SLASH, PERCENT)) {
             val op = currentToken
             
             mustSkip(op.type)
@@ -648,7 +681,7 @@ class Parser(private val lexer: Lexer) {
     private fun typeCast(): Expr {
         var expr = prefix()
         
-        while (match(As)) {
+        while (match(AS)) {
             val op = currentToken
             
             mustSkip(op.type)
@@ -660,7 +693,7 @@ class Parser(private val lexer: Lexer) {
     }
     
     private fun prefix(): Expr {
-        return if (matchAny(Minus, Not, Pound)) {
+        return if (matchAny(DASH, NOT, POUND)) {
             val op = currentToken
             
             mustSkip(op.type)
@@ -675,7 +708,7 @@ class Parser(private val lexer: Lexer) {
     private fun pipeline(): Expr {
         var expr = postfix()
         
-        while (matchAny(Colon)) {
+        while (matchAny(COLON)) {
             val op = currentToken
             
             mustSkip(op.type)
@@ -703,23 +736,23 @@ class Parser(private val lexer: Lexer) {
     private fun postfix(): Expr {
         var expr = terminal()
         
-        while (matchAny(Dot, LeftSquare, LeftParen, LeftBrace)) {
+        while (matchAny(DOT, LEFT_SQUARE, LEFT_PAREN, LEFT_BRACE)) {
             val op = currentToken
             
             mustSkip(op.type)
             
             expr = when (op.type) {
-                Dot        -> Expr.GetMember(op.location, expr, name())
+                DOT         -> Expr.GetMember(op.location, expr, name())
                 
-                LeftSquare -> {
+                LEFT_SQUARE -> {
                     val indices = mutableListOf<Expr>()
                     
                     do {
                         indices += expr()
                     }
-                    while (skip(Comma))
+                    while (skip(COMMA))
                     
-                    mustSkip(RightSquare)
+                    mustSkip(RIGHT_SQUARE)
                     
                     var subExpr = expr
                     
@@ -727,7 +760,7 @@ class Parser(private val lexer: Lexer) {
                         subExpr = Expr.GetIndex(index.location, subExpr, index)
                     }
                     
-                    if (matchAny(EqualSign, PlusEqual, MinusEqual, StarEqual, SlashEqual, PercentEqual)) {
+                    if (matchAny(EQUAL_SIGN, PLUS_EQUAL, DASH_EQUAL, STAR_EQUAL, SLASH_EQUAL, PERCENT_EQUAL)) {
                         val subOp = currentToken
                         
                         mustSkip(subOp.type)
@@ -747,56 +780,56 @@ class Parser(private val lexer: Lexer) {
                         }
                         
                         subExpr = when (subOp.type) {
-                            PlusEqual    -> desugar(Expr.Binary.Operator.Add)
+                            PLUS_EQUAL    -> desugar(Expr.Binary.Operator.ADD)
                             
-                            MinusEqual   -> desugar(Expr.Binary.Operator.Subtract)
+                            DASH_EQUAL    -> desugar(Expr.Binary.Operator.SUBTRACT)
                             
-                            StarEqual    -> desugar(Expr.Binary.Operator.Multiply)
+                            STAR_EQUAL    -> desugar(Expr.Binary.Operator.MULTIPLY)
                             
-                            SlashEqual   -> desugar(Expr.Binary.Operator.Divide)
+                            SLASH_EQUAL   -> desugar(Expr.Binary.Operator.DIVIDE)
                             
-                            PercentEqual -> desugar(Expr.Binary.Operator.Modulus)
+                            PERCENT_EQUAL -> desugar(Expr.Binary.Operator.MODULUS)
                             
-                            else         -> Expr.SetIndex(location, target, index, expr())
+                            else          -> Expr.SetIndex(location, target, index, expr())
                         }
                     }
                     
                     subExpr
                 }
                 
-                LeftParen  -> {
+                LEFT_PAREN  -> {
                     val name = expr as? Expr.Name ?: KBError.invalidInvocationTarget(expr.location)
                     
                     val args = mutableListOf<Expr>()
                     
-                    if (!skip(RightParen)) {
+                    if (!skip(RIGHT_PAREN)) {
                         do {
-                            args += if (match(Comma)) Expr.Empty else expr()
+                            args += if (match(COMMA)) Expr.Empty else expr()
                         }
-                        while (skip(Comma))
+                        while (skip(COMMA))
                         
-                        mustSkip(RightParen)
+                        mustSkip(RIGHT_PAREN)
                     }
                     
                     Expr.Invoke(op.location, name, args)
                 }
                 
-                LeftBrace  -> {
+                LEFT_BRACE  -> {
                     val elements = mutableListOf<Expr>()
                     
-                    if (!skip(RightBrace)) {
+                    if (!skip(RIGHT_BRACE)) {
                         do {
-                            elements += if (match(Comma)) Expr.Empty else expr()
+                            elements += if (match(COMMA)) Expr.Empty else expr()
                         }
-                        while (skip(Comma))
+                        while (skip(COMMA))
                         
-                        mustSkip(RightBrace)
+                        mustSkip(RIGHT_BRACE)
                     }
                     
                     Expr.Instantiate(op.location, expr as? Expr.Name ?: KBError.invalidInstantiationTarget(expr.location), elements)
                 }
                 
-                else       -> KBError.failure("Broken postfix operator '${op.type}'!", op.location)
+                else        -> KBError.failure("Broken postfix operator '${op.type}'!", op.location)
             }
         }
         
@@ -805,24 +838,24 @@ class Parser(private val lexer: Lexer) {
     
     private fun terminal(): Expr {
         return when {
-            match(Value)      -> value()
+            match(VALUE)       -> value()
             
-            match(Word)       -> name()
+            match(WORD)        -> name()
             
-            match(LeftSquare) -> array()
+            match(LEFT_SQUARE) -> array()
             
-            match(LeftBrace)  -> data()
+            match(LEFT_BRACE)  -> data()
             
-            match(LeftParen)  -> nested()
+            match(LEFT_PAREN)  -> nested()
             
-            else              -> KBError.invalidTerminal(currentToken.type, here())
+            else               -> KBError.invalidTerminal(currentToken.type, here())
         }
     }
     
     private fun value(): Expr.Value {
         val token = currentToken
         
-        mustSkip(Value)
+        mustSkip(VALUE)
         
         return Expr.Value(token.location, token.value)
     }
@@ -830,7 +863,7 @@ class Parser(private val lexer: Lexer) {
     private fun name(): Expr.Name {
         val token = currentToken
         
-        mustSkip(Word)
+        mustSkip(WORD)
         
         return Expr.Name(token.location, token.value as String)
     }
@@ -838,8 +871,8 @@ class Parser(private val lexer: Lexer) {
     private fun type(): Expr.Type {
         val location = here()
         
-        var type = if (match(Word)) {
-            DataType.Data(name())
+        var type = if (match(WORD)) {
+            DataType.Named(name())
         }
         else {
             val token = currentToken
@@ -860,19 +893,19 @@ class Parser(private val lexer: Lexer) {
             primitive
         }
         
-        while (skip(LeftSquare)) {
+        while (skip(LEFT_SQUARE)) {
             when {
-                skip(RightSquare) -> type = DataType.Array(type)
+                skip(RIGHT_SQUARE) -> type = DataType.Array(type)
                 
-                else              -> {
+                else               -> {
                     do {
-                        val initSize = if (!matchAny(Comma, RightSquare)) expr() else null
+                        val initSize = if (!matchAny(COMMA, RIGHT_SQUARE)) expr() else null
                         
                         type = DataType.Array(type, initSize)
                     }
-                    while (skip(Comma))
+                    while (skip(COMMA))
                     
-                    mustSkip(RightSquare)
+                    mustSkip(RIGHT_SQUARE)
                 }
             }
         }
@@ -895,7 +928,7 @@ class Parser(private val lexer: Lexer) {
             }
         }
         
-        if (skip(Star)) {
+        if (skip(STAR)) {
             type = DataType.Vararg(type)
         }
         
@@ -905,17 +938,17 @@ class Parser(private val lexer: Lexer) {
     private fun array(): Expr.Array {
         val location = here()
         
-        mustSkip(LeftSquare)
+        mustSkip(LEFT_SQUARE)
         
         val elements = mutableListOf<Expr>()
         
-        if (!skip(RightSquare)) {
+        if (!skip(RIGHT_SQUARE)) {
             do {
                 elements += expr()
             }
-            while (skip(Comma))
+            while (skip(COMMA))
             
-            mustSkip(RightSquare)
+            mustSkip(RIGHT_SQUARE)
         }
         
         return Expr.Array(location, elements)
@@ -924,30 +957,30 @@ class Parser(private val lexer: Lexer) {
     private fun data(): Expr.Instantiate {
         val location = here()
         
-        mustSkip(LeftBrace)
+        mustSkip(LEFT_BRACE)
         
         val elements = mutableListOf<Expr>()
         
-        if (!skip(RightBrace)) {
+        if (!skip(RIGHT_BRACE)) {
             do {
-                if (!match(Comma)) {
+                if (!match(COMMA)) {
                     elements += expr()
                 }
             }
-            while (skip(Comma))
+            while (skip(COMMA))
             
-            mustSkip(RightBrace)
+            mustSkip(RIGHT_BRACE)
         }
         
         return Expr.Instantiate(location, Expr.Name.none, elements)
     }
     
     private fun nested(): Expr {
-        mustSkip(LeftParen)
+        mustSkip(LEFT_PAREN)
         
         val expr = expr()
         
-        mustSkip(RightParen)
+        mustSkip(RIGHT_PAREN)
         
         return expr
     }

@@ -11,10 +11,11 @@ import kakkoiichris.kb.util.Source
 class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<Any> {
     val memory = Memory()
     
-    private val core = Memory.Scope("core")
-    private val global = Memory.Scope("global", core)
+    private val global = Memory.Scope("global")
     
     private val library = StandardLibrary()
+    
+    private val aliases = mutableMapOf<String, DataType>()
     
     fun run() {
         val coreSource = Source.readLocal("/core.kb")
@@ -22,18 +23,11 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         val coreStmts = coreSource.compile()
         
         try {
-            memory.push(core)
+            memory.push(global)
             
             for (stmt in coreStmts) {
                 visit(stmt)
             }
-        }
-        finally {
-            memory.pop()
-        }
-        
-        try {
-            memory.push(global)
             
             for (stmt in stmts) {
                 visit(stmt)
@@ -64,7 +58,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         }
         
         var expr = stmt.expr
-        var type = stmt.type.value
+        var type = visit(stmt.type) as DataType
         
         if (expr is Expr.Instantiate && expr.isInferred && type is DataType.Data) {
             expr = expr.withTarget(type.name)
@@ -91,6 +85,10 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         value = type.coerce(value) ?: value
         
         if (type.filter(this, value) == null) {
+            if (type is DataType.Array && type.mismatchedSize(this, value)) {
+                KBError.mismatchedArraySize(stmt.expr.location)
+            }
+            
             KBError.mismatchedType(value, type, stmt.location)
         }
         
@@ -143,24 +141,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         try {
             memory.push()
             
-            var i = 0
-            
-            while (i < stmt.stmts.size) {
-                val subStmt = stmt.stmts[i]
-                
-                try {
-                    visit(subStmt)
-                    
-                    i++
-                }
-                catch (r: Redirect.Goto) {
-                    i = stmt.stmts
-                        .withIndex()
-                        .filter { (_, s) -> s.label == r.destination }
-                        .map { (i, _) -> i }
-                        .firstOrNull()
-                        ?: KBError.undeclaredLabel(r.destination, r.origin)
-                }
+            for (subStmt in stmt.stmts) {
+                visit(subStmt)
             }
         }
         finally {
@@ -180,26 +162,19 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
     
     override fun visitIfStmt(stmt: Stmt.If) {
-        try {
-            for ((test, body) in stmt.branches) {
-                val testValue = visit(test).fromRef()
-                
-                testValue as? Boolean ?: KBError.invalidTestExpression(testValue, test.location)
-                
-                if (testValue) {
-                    visit(body)
-                    
-                    return
-                }
-            }
+        for ((test, body) in stmt.branches) {
+            val testValue = visit(test).fromRef()
             
-            visit(stmt.elze)
-        }
-        catch (r: Redirect.Break) {
-            if (!(r.label.isEmptyValue() || r.label == stmt.label)) {
-                throw r
+            testValue as? Boolean ?: KBError.invalidTestExpression(testValue, test.location)
+            
+            if (testValue) {
+                visit(body)
+                
+                return
             }
         }
+        
+        visit(stmt.elze)
     }
     
     override fun visitSwitchStmt(stmt: Stmt.Switch) {
@@ -218,7 +193,9 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 }
                 
                 is Stmt.Switch.Case.Type   -> {
-                    case.type.value.filter(this, subject) ?: continue
+                    val type = visit(case.type) as DataType
+                    
+                    type.filter(this, subject) ?: continue
                     
                     visit(case.block)
                     
@@ -270,7 +247,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             
             testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.location)
             
-            if (!testValue) break
+            if (testValue) break
         }
     }
     
@@ -282,14 +259,14 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             
             val pointer = stmt.decl.name
             
-            val test = Expr.Binary(stmt.to.location, Expr.Binary.Operator.Less, pointer, stmt.to)
+            val test = Expr.Binary(stmt.to.location, Expr.Binary.Operator.LESS, pointer, stmt.to)
             
             val increment =
                 Expr.Binary(
                     stmt.step.location,
-                    Expr.Binary.Operator.Assign,
+                    Expr.Binary.Operator.ASSIGN,
                     pointer,
-                    Expr.Binary(stmt.step.location, Expr.Binary.Operator.Add, pointer, stmt.step)
+                    Expr.Binary(stmt.step.location, Expr.Binary.Operator.ADD, pointer, stmt.step)
                 )
             
             do {
@@ -414,8 +391,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         throw Redirect.Yield(stmt.location, value)
     }
     
-    override fun visitGotoStmt(stmt: Stmt.Goto) {
-        throw Redirect.Goto(stmt.location, stmt.destination)
+    override fun visitTypeStmt(stmt: Stmt.Type) {
+        aliases[stmt.alias.value] = stmt.full.value
     }
     
     override fun visitExpressionStmt(stmt: Stmt.Expression) {
@@ -431,8 +408,15 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     override fun visitNameExpr(expr: Expr.Name) =
         memory.getRef(expr) ?: KBError.undeclaredVariable(expr, expr.location)
     
-    override fun visitTypeExpr(expr: Expr.Type) =
-        expr.value
+    override fun visitTypeExpr(expr: Expr.Type): Any {
+        var type = expr.value
+        
+        if (type is DataType.Named) {
+            type = aliases[type.name.value] ?: DataType.Data(type.name)
+        }
+        
+        return type
+    }
     
     override fun visitArrayExpr(expr: Expr.Array): Any {
         val elements = mutableListOf<Any>()
@@ -448,7 +432,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     
     override fun visitUnaryExpr(expr: Expr.Unary): Any {
         return when (expr.op) {
-            Expr.Unary.Operator.Negate -> when (val e = visit(expr.expr).fromRef()) {
+            Expr.Unary.Operator.NEGATE -> when (val e = visit(expr.expr).fromRef()) {
                 is Byte          -> (-e).toByte()
                 
                 is Short         -> (-e).toShort()
@@ -470,9 +454,9 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else             -> KBError.invalidUnaryOperand(e, expr.op, expr.expr.location)
             }
             
-            Expr.Unary.Operator.Not    -> visit(expr.expr).fromRef().isEmptyValue()
+            Expr.Unary.Operator.NOT    -> visit(expr.expr).fromRef().isEmptyValue()
             
-            Expr.Unary.Operator.Length -> when (val e = visit(expr.expr).fromRef()) {
+            Expr.Unary.Operator.LENGTH -> when (val e = visit(expr.expr).fromRef()) {
                 is String        -> e.length
                 
                 is ArrayInstance -> e.size
@@ -486,26 +470,34 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     
     override fun visitBinaryExpr(expr: Expr.Binary): Any {
         return when (expr.op) {
-            Expr.Binary.Operator.Assign       -> when (val l = visit(expr.left)) {
+            Expr.Binary.Operator.ASSIGN        -> when (val l = visit(expr.left)) {
                 is Memory.Scope.Reference -> {
+                    val type = l.type
+                    
                     var right = expr.right
                     
-                    if (l.type is DataType.Data && right is Expr.Instantiate && right.isInferred) {
-                        right = right.withTarget(l.type.name)
+                    if (type is DataType.Data && right is Expr.Instantiate && right.isInferred) {
+                        right = right.withTarget(type.name)
                     }
                     
                     var r = visit(right).fromRef()
                     
                     if (r === Empty) {
-                        r = l.type.default(this) ?: KBError.noDefaultValue(l.type, expr.left.location)
+                        r = type.default(this) ?: KBError.noDefaultValue(type, expr.left.location)
                     }
                     
-                    r = l.type.coerce(r) ?: r
+                    r = type.coerce(r) ?: r
                     
                     when (l.put(this, r)) {
                         true  -> r
                         
-                        false -> KBError.mismatchedType(r, l.type, expr.location)
+                        false -> {
+                            if (type is DataType.Array && type.mismatchedSize(this, r)) {
+                                KBError.mismatchedArraySize(expr.right.location)
+                            }
+                            
+                            KBError.mismatchedType(r, type, expr.location)
+                        }
                         
                         null  -> KBError.reassignedConstant(expr.location)
                     }
@@ -514,7 +506,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else                      -> KBError.assignedToValue(expr.left.location)
             }
             
-            Expr.Binary.Operator.Swap         -> {
+            Expr.Binary.Operator.SWAP          -> {
                 val l = visit(expr.left) as? Memory.Scope.Reference ?: KBError.assignedToValue(expr.left.location)
                 val r = visit(expr.right) as? Memory.Scope.Reference ?: KBError.assignedToValue(expr.right.location)
                 
@@ -538,7 +530,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 }
             }
             
-            Expr.Binary.Operator.Or           -> {
+            Expr.Binary.Operator.OR            -> {
                 val l = visit(expr.left).fromRef()
                 
                 l as? Boolean ?: KBError.invalidLeftOperand(l, expr.op, expr.left.location)
@@ -552,7 +544,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 return r
             }
             
-            Expr.Binary.Operator.And          -> {
+            Expr.Binary.Operator.AND           -> {
                 val l = visit(expr.left).fromRef()
                 
                 l as? Boolean ?: KBError.invalidLeftOperand(l, expr.op, expr.left.location)
@@ -566,7 +558,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 return r
             }
             
-            Expr.Binary.Operator.Equal        -> when (val l = visit(expr.left).fromRef()) {
+            Expr.Binary.Operator.EQUAL         -> when (val l = visit(expr.left).fromRef()) {
                 is Boolean       -> when (val r = visit(expr.right).fromRef()) {
                     is Boolean -> l == r
                     Empty      -> l.isEmptyValue()
@@ -666,7 +658,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else             -> false
             }
             
-            Expr.Binary.Operator.NotEqual     -> when (val l = visit(expr.left).fromRef()) {
+            Expr.Binary.Operator.NOT_EQUAL     -> when (val l = visit(expr.left).fromRef()) {
                 is Boolean       -> when (val r = visit(expr.right).fromRef()) {
                     is Boolean -> l != r
                     Empty      -> !l.isEmptyValue()
@@ -766,7 +758,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else             -> true
             }
             
-            Expr.Binary.Operator.Less         -> when (val l = visit(expr.left).fromRef()) {
+            Expr.Binary.Operator.LESS          -> when (val l = visit(expr.left).fromRef()) {
                 is Byte   -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l < r
                     is Short  -> l < r
@@ -840,7 +832,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
-            Expr.Binary.Operator.LessEqual    -> when (val l = visit(expr.left).fromRef()) {
+            Expr.Binary.Operator.LESS_EQUAL    -> when (val l = visit(expr.left).fromRef()) {
                 is Byte   -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l <= r
                     is Short  -> l <= r
@@ -914,7 +906,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
-            Expr.Binary.Operator.Greater      -> when (val l = visit(expr.left).fromRef()) {
+            Expr.Binary.Operator.GREATER       -> when (val l = visit(expr.left).fromRef()) {
                 is Byte   -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l > r
                     is Short  -> l > r
@@ -988,7 +980,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
-            Expr.Binary.Operator.GreaterEqual -> when (val l = visit(expr.left).fromRef()) {
+            Expr.Binary.Operator.GREATER_EQUAL -> when (val l = visit(expr.left).fromRef()) {
                 is Byte   -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> l >= r
                     is Short  -> l >= r
@@ -1062,7 +1054,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
-            Expr.Binary.Operator.Is           -> {
+            Expr.Binary.Operator.IS            -> {
                 val value = visit(expr.left).fromRef()
                 
                 val type = visit(expr.right).fromRef() as DataType
@@ -1070,14 +1062,14 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 type.filter(this, value) != null
             }
             
-            Expr.Binary.Operator.Concat       -> {
+            Expr.Binary.Operator.CONCAT        -> {
                 val l = visit(expr.left).fromRef()
                 val r = visit(expr.right).fromRef()
                 
                 "$l$r"
             }
             
-            Expr.Binary.Operator.Add          -> when (val l = visit(expr.left).fromRef()) {
+            Expr.Binary.Operator.ADD           -> when (val l = visit(expr.left).fromRef()) {
                 is Byte         -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> (l + r).toByte()
                     is Short  -> (l + r).toShort()
@@ -1148,7 +1140,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
-            Expr.Binary.Operator.Subtract     -> when (val l = visit(expr.left).fromRef()) {
+            Expr.Binary.Operator.SUBTRACT      -> when (val l = visit(expr.left).fromRef()) {
                 is Byte         -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> (l - r).toByte()
                     is Short  -> (l - r).toShort()
@@ -1214,7 +1206,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
-            Expr.Binary.Operator.Multiply     -> when (val l = visit(expr.left).fromRef()) {
+            Expr.Binary.Operator.MULTIPLY      -> when (val l = visit(expr.left).fromRef()) {
                 is Byte         -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> (l * r).toByte()
                     is Short  -> (l * r).toShort()
@@ -1280,7 +1272,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
-            Expr.Binary.Operator.Divide       -> when (val l = visit(expr.left).fromRef()) {
+            Expr.Binary.Operator.DIVIDE        -> when (val l = visit(expr.left).fromRef()) {
                 is Byte         -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> (l / r).toByte()
                     is Short  -> (l / r).toShort()
@@ -1346,7 +1338,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
-            Expr.Binary.Operator.Modulus      -> when (val l = visit(expr.left).fromRef()) {
+            Expr.Binary.Operator.MODULUS       -> when (val l = visit(expr.left).fromRef()) {
                 is Byte         -> when (val r = visit(expr.right).fromRef()) {
                     is Byte   -> (l % r).toByte()
                     is Short  -> (l % r).toShort()
@@ -1412,7 +1404,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
             
-            Expr.Binary.Operator.As           -> {
+            Expr.Binary.Operator.AS            -> {
                 val value = visit(expr.left).fromRef()
                 
                 val type = visit(expr.right).fromRef() as DataType
@@ -1420,7 +1412,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 type.cast(this, value) ?: KBError.invalidCast(value, type, expr.location)
             }
             
-            Expr.Binary.Operator.Dot          -> when (val l = visit(expr.left).fromRef()) {
+            Expr.Binary.Operator.DOT           -> when (val l = visit(expr.left).fromRef()) {
                 is DataInstance -> when (val r = expr.right) {
                     is Expr.Name -> l[r] ?: KBError.noMember(l.name, r.value, expr.right.location)
                     
@@ -1431,8 +1423,6 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             }
         }
     }
-    
-    //fun getString
     
     override fun visitGetIndexExpr(expr: Expr.GetIndex): Any {
         return when (val target = visit(expr.target).fromRef()) {
@@ -1560,94 +1550,33 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         KBError.nonAccessedType(DataType.infer(this, target), expr.location)
     }
     
+    fun getString(x: Any) =
+        (invoke("getstring", x) ?: x.toString()) as? String ?: TODO("GETSTRING IS NOT A STRING")
+    
+    fun invoke(name: String, vararg arguments: Any): Any? {
+        val invoke = Expr.Invoke(Location.none, name.toName(), arguments.map(Any::toExpr))
+        
+        val (value, result) = performInvoke(invoke)
+        
+        return when (result) {
+            InvokeResult.SUCCESS -> value.fromRef()
+            
+            else                 -> null
+        }
+    }
+    
     override fun visitInvokeExpr(expr: Expr.Invoke): Any {
-        val subs = memory.getSubs(expr.name) ?: KBError.undeclaredSub(expr.name, expr.name.location)
+        val (value, result) = performInvoke(expr)
         
-        val args = expr.args
-        
-        val positionValid = mutableListOf<Pair<Stmt.Sub, List<Stmt.Decl>>>()
-        
-        for (sub in subs) {
-            val resolved = resolvePosition(sub.params, args) ?: continue
+        return when (result) {
+            InvokeResult.SUCCESS         -> value
             
-            positionValid += sub to resolved
-        }
-        
-        if (positionValid.isEmpty()) {
-            KBError.unresolvedPositions(expr.name, expr.location)
-        }
-        
-        val typeValid = mutableListOf<Pair<Stmt.Sub, List<Stmt.Decl>>>()
-        
-        for ((sub, decls) in positionValid) {
-            val resolved = resolveType(decls) ?: continue
+            InvokeResult.FAIL_UNDECLARED -> KBError.undeclaredSub(expr.name, expr.location)
             
-            typeValid += sub to resolved
-        }
-        
-        if (typeValid.isEmpty()) {
-            KBError.unresolvedTypes(expr.name, expr.location)
-        }
-        
-        val (sub, decls) = if (typeValid.size == 1)
-            typeValid[0]
-        else
-            typeValid.minByOrNull { (_, decls) -> decls.size }!!
-        
-        
-        val type = visit(sub.type).fromRef() as DataType
-        
-        val scope = Memory.Scope(sub.name.value, sub.scope)
-        
-        val ref: Memory.Scope.Reference
-        
-        try {
-            memory.push(scope)
+            InvokeResult.FAIL_POSITIONS  -> KBError.unresolvedPositions(expr.name, expr.location)
             
-            for (decl in decls) {
-                visit(decl)
-            }
-            
-            memory.newRef(
-                false,
-                sub.name,
-                sub.type.value,
-                sub.type.value.default(this) ?: KBError.noDefaultValue(sub.type.value, sub.name.location)
-            )
-            
-            ref = memory.getRef(sub.name)!!
-            
-            if (sub.body.stmts.isNotEmpty()) {
-                try {
-                    visit(sub.body)
-                }
-                catch (r: Redirect.Yield) {
-                    return type.filter(this, r.value) ?: KBError.mismatchedReturnType(sub.name, type, r.origin)
-                }
-                catch (r: Redirect.Return) {
-                    return ref.value
-                }
-            }
-            else {
-                val subArgs = mutableListOf<Any>()
-                
-                for (name in decls.map { it.name }) {
-                    subArgs += memory.getRef(name)!!.fromRef()
-                }
-                
-                val builtin = library[sub] ?: KBError.noBuiltin(sub.name, sub.location)
-                
-                val result = builtin(this, subArgs) ?: KBError.mismatchedBuiltinType(sub.name, type, sub.location)
-                
-                return type.filter(this, result) ?: KBError.mismatchedReturnType(sub.name, type, Location.none)
-            }
+            InvokeResult.FAIL_TYPES      -> KBError.unresolvedTypes(expr.name, expr.location)
         }
-        finally {
-            memory.pop()
-        }
-        
-        return type.filter(this, ref.value) ?: KBError.noYield(sub.name, expr.name.location)
-        
     }
     
     private fun resolvePosition(params: List<Stmt.Decl>, args: List<Expr>): List<Stmt.Decl>? {
@@ -1702,14 +1631,116 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         for (i in params.indices) {
             val decl = params[i]
             
+            val type = visit(decl.type) as DataType
             val value = visit(decl.expr).fromRef()
             
-            val finalValue = decl.type.value.filter(this, decl.type.value.coerce(value) ?: value) ?: return null
+            val finalValue = type.filter(this, type.coerce(value) ?: value) ?: return null
             
             exprs[i] = finalValue.toExpr()
         }
         
         return params.mapIndexed { i, decl -> decl.withExpr(exprs[i]) }
+    }
+    
+    private enum class InvokeResult {
+        SUCCESS,
+        FAIL_UNDECLARED,
+        FAIL_POSITIONS,
+        FAIL_TYPES
+    }
+    
+    private fun performInvoke(expr: Expr.Invoke): Pair<Any, InvokeResult> {
+        val subs = memory.getSubs(expr.name) ?: return Unit to InvokeResult.FAIL_UNDECLARED
+        
+        val args = expr.args
+        
+        val positionValid = mutableListOf<Pair<Stmt.Sub, List<Stmt.Decl>>>()
+        
+        for (sub in subs) {
+            val resolved = resolvePosition(sub.params, args) ?: continue
+            
+            positionValid += sub to resolved
+        }
+        
+        if (positionValid.isEmpty()) {
+            return Unit to InvokeResult.FAIL_POSITIONS
+        }
+        
+        val typeValid = mutableListOf<Pair<Stmt.Sub, List<Stmt.Decl>>>()
+        
+        for ((sub, decls) in positionValid) {
+            val resolved = resolveType(decls) ?: continue
+            
+            typeValid += sub to resolved
+        }
+        
+        if (typeValid.isEmpty()) {
+            return Unit to InvokeResult.FAIL_TYPES
+        }
+        
+        val (sub, decls) = if (typeValid.size == 1)
+            typeValid[0]
+        else
+            typeValid.minByOrNull { (_, decls) -> decls.size }!!
+        
+        
+        val type = visit(sub.type).fromRef() as DataType
+        
+        val scope = Memory.Scope(sub.name.value, sub.scope)
+        
+        val ref: Memory.Scope.Reference
+        
+        try {
+            memory.push(scope)
+            
+            for (decl in decls) {
+                visit(decl)
+            }
+            
+            memory.newRef(
+                false,
+                sub.name,
+                type,
+                type.default(this) ?: Unit//KBError.noDefaultValue(sub.type.value, sub.name.location)
+            )
+            
+            ref = memory.getRef(sub.name)!!
+            
+            if (sub.isLinked) {
+                val subArgs = mutableListOf<Any>()
+                
+                for (name in decls.map { it.name }) {
+                    subArgs += memory.getRef(name)!!.fromRef()
+                }
+                
+                val builtin = library[sub] ?: KBError.noBuiltin(sub.name, sub.location)
+                
+                val builtinValue = builtin(this, subArgs) ?: KBError.mismatchedBuiltinType(sub.name, type, sub.location)
+                
+                val value = type.filter(this, builtinValue) ?: KBError.mismatchedReturnType(sub.name, type, Location.none)
+                
+                return value to InvokeResult.SUCCESS
+            }
+            
+            try {
+                visit(sub.body)
+            }
+            catch (r: Redirect.Yield) {
+                val value = type.filter(this, r.value) ?: KBError.mismatchedReturnType(sub.name, type, r.origin)
+                
+                return value to InvokeResult.SUCCESS
+            }
+            catch (r: Redirect.Return) {
+                return ref.value to InvokeResult.SUCCESS
+            }
+        }
+        finally {
+            memory.pop()
+        }
+        
+        val value = type.filter(this, ref.value) ?: KBError.noYield(sub.name, expr.name.location)
+        
+        return value to InvokeResult.SUCCESS
     }
     
     fun instantiate(name: String, vararg elements: Any): DataInstance {
@@ -1736,7 +1767,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 if (i in expr.elements.indices) {
                     var element = expr.elements[i]
                     
-                    val declType = decl.type.value
+                    val declType = visit(decl.type)
                     
                     if (declType is DataType.Data && element is Expr.Instantiate && element.isInferred) {
                         element = element.withTarget(declType.name)

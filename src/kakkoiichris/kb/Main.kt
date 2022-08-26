@@ -17,11 +17,13 @@ fun main(args: Array<String>) {
 }
 
 private fun repl() {
-    println("""
+    println(
+        """
         KakkoiiBasic REPL
         Copyright ${Typography.copyright} 2021, KakkoiiChris
     
-    """.trimIndent())
+    """.trimIndent()
+    )
     
     print("> ")
     

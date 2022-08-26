@@ -1,0 +1,83 @@
+let width  = 800
+let height = 600
+
+let size = 16
+var x = 0.0
+var y = 0.0
+var vx = 1.0
+var vy = 1.0
+
+sub run
+    createWindow(width, height, "Hello")
+    
+    openWindow()
+    
+    let fps = 144.0
+    let npu = 1E9 / fps
+    
+    var then = nanoseconds()
+    
+    var delta = 0.0
+    var timer = 0.0
+    
+    var updates = 0
+    var frames  = 0
+    
+    while windowIsOpen()
+        let now = nanoseconds()
+        let elapsed = (now - then) / npu
+        then = now
+        
+        delta += elapsed
+        timer += elapsed
+        
+        var updated = false
+        
+        while delta >= 1
+            update(delta)
+            updates += 1
+            delta   -= 1
+            updated = true
+        end while
+        
+        if updated
+            render()
+            frames += 1
+        end if
+        
+        flip()
+        
+        if timer >= fps
+            print(updates, " U, ", frames, " F\n")
+            
+            updates = 0
+            frames  = 0
+            
+            timer -= fps
+        end if
+    end while
+end sub
+
+sub update(delta as double)
+    x += vx * delta
+    y += vy * delta
+    
+    if x <= 0 or x > width - size
+        vx *= -1
+    end if
+    
+    if y <= 0 or y > height - size
+        vy *= -1
+    end if
+end sub
+
+sub render()
+    setColor(0)
+    clear()
+    setColor(255, 0, 0)
+    fillRect(x as int, y as int, size, size)
+end sub
+
+run()
+
+print("Goodbye~\n")

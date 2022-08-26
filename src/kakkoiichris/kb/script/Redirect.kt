@@ -11,6 +11,4 @@ sealed class Redirect(val origin: Location) : Throwable() {
     class Return(origin: Location) : Redirect(origin)
     
     class Yield(origin: Location, val value: Any) : Redirect(origin)
-    
-    class Goto(origin: Location, val destination: String) : Redirect(origin)
 }

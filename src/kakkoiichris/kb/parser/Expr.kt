@@ -89,9 +89,9 @@ sealed class Expr(val location: Location) {
     
     class Unary(location: Location, val op: Operator, val expr: Expr) : Expr(location) {
         enum class Operator(private val type: Token.Type) {
-            Negate(Token.Type.Minus),
-            Not(Token.Type.Not),
-            Length(Token.Type.Pound);
+            NEGATE(Token.Type.DASH),
+            NOT(Token.Type.NOT),
+            LENGTH(Token.Type.POUND);
             
             companion object {
                 operator fun get(type: Token.Type) =
@@ -107,25 +107,25 @@ sealed class Expr(val location: Location) {
     
     class Binary(location: Location, val op: Operator, val left: Expr, val right: Expr) : Expr(location) {
         enum class Operator(private val type: Token.Type) {
-            Assign(Token.Type.EqualSign),
-            Swap(Token.Type.Dollar),
-            Or(Token.Type.Or),
-            And(Token.Type.And),
-            Equal(Token.Type.DoubleEqual),
-            NotEqual(Token.Type.LessGreater),
-            Less(Token.Type.LessSign),
-            LessEqual(Token.Type.LessEqualSign),
-            Greater(Token.Type.GreaterSign),
-            GreaterEqual(Token.Type.GreaterEqualSign),
-            Is(Token.Type.Is),
-            Concat(Token.Type.Ampersand),
-            Add(Token.Type.Plus),
-            Subtract(Token.Type.Minus),
-            Multiply(Token.Type.Star),
-            Divide(Token.Type.Slash),
-            Modulus(Token.Type.Percent),
-            As(Token.Type.As),
-            Dot(Token.Type.Dot);
+            ASSIGN(Token.Type.EQUAL_SIGN),
+            SWAP(Token.Type.DOLLAR),
+            OR(Token.Type.OR),
+            AND(Token.Type.AND),
+            EQUAL(Token.Type.DOUBLE_EQUAL),
+            NOT_EQUAL(Token.Type.LESS_GREATER),
+            LESS(Token.Type.LESS_SIGN),
+            LESS_EQUAL(Token.Type.LESS_EQUAL_SIGN),
+            GREATER(Token.Type.GREATER_SIGN),
+            GREATER_EQUAL(Token.Type.GREATER_EQUAL_SIGN),
+            IS(Token.Type.IS),
+            CONCAT(Token.Type.AMPERSAND),
+            ADD(Token.Type.PLUS),
+            SUBTRACT(Token.Type.DASH),
+            MULTIPLY(Token.Type.STAR),
+            DIVIDE(Token.Type.SLASH),
+            MODULUS(Token.Type.PERCENT),
+            AS(Token.Type.AS),
+            DOT(Token.Type.DOT);
             
             companion object {
                 operator fun get(type: Token.Type) =
