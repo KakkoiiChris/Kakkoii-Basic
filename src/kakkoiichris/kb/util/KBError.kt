@@ -63,11 +63,14 @@ class KBError(stage: String, message: String, location: Location) : RuntimeExcep
         fun alreadyDeclaredVariable(name: Expr.Name, location: Location): Nothing =
             forScript("Variable '$name' has already been declared in this scope", location)
         
-        fun alreadyDeclaredData(name: Expr.Name, location: Location): Nothing =
+        fun redeclaredData(name: Expr.Name, location: Location): Nothing =
             forScript("Data '$name' has already been declared in this scope", location)
         
-        fun alreadyDeclaredSub(signature: String, location: Location): Nothing =
+        fun redeclaredSub(signature: String, location: Location): Nothing =
             forScript("Sub '$signature' has already been declared in this scope", location)
+        
+        fun redeclaredAlias(name: Expr.Name, location: Location): Nothing =
+            forScript("Type alias '$name' has already been declared in this scope", location)
         
         fun undeclaredVariable(name: Expr.Name, location: Location): Nothing =
             forScript("Variable '$name' has not been declared in this scope", location)

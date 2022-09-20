@@ -872,7 +872,7 @@ class Parser(private val lexer: Lexer) {
         val location = here()
         
         var type = if (match(WORD)) {
-            DataType.Named(name())
+            DataType.Data(name())
         }
         else {
             val token = currentToken

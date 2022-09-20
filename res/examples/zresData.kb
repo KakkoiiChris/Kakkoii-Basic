@@ -11,9 +11,7 @@ data Sphere
     var dy as double
 end data
 
-type Sphere[100] as Spheres
-
-let spheres as Spheres
+let spheres as Sphere[100]
 
 let radius = 16
 
@@ -39,7 +37,7 @@ while windowIsOpen()
     
 		setColor(random(), random(), random())
         
-		fillOval(x as int, y as int, radius * 2, radius * 2)
+		fillOval(x, y, radius * 2, radius * 2)
         
         sphere.x += dx
 		sphere.y += dy

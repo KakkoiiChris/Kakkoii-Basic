@@ -34,6 +34,18 @@ interface DataType {
                 
                 else             -> Primitive.infer(script, x)
             }
+        
+        fun resolveAlias(script: Script, type: DataType): DataType {
+            if (type is Data) {
+                val alias = script.memory.getAlias(type.name)
+                
+                if (alias != null) {
+                    return alias
+                }
+            }
+            
+            return type
+        }
     }
     
     val iterableType: DataType? get() = null
@@ -374,8 +386,6 @@ interface DataType {
         
         override fun toString() = "$subType*"
     }
-    
-    class Named(val name: Expr.Name) : DataType
     
     class Data(val name: Expr.Name) : DataType {
         override val iterableType: DataType get() = Primitive.ANY

@@ -52,6 +52,12 @@ class Memory {
     fun getData(name: Expr.Name) =
         stack.peek()?.getData(name)
     
+    fun newAlias(name: String, type: DataType) =
+        stack.peek()?.newAlias(name, type) ?: error("NEW ALIAS: NO ACTIVE SCOPE")
+    
+    fun getAlias(name: Expr.Name) =
+        stack.peek()?.getAlias(name)
+    
     fun peek() =
         stack.peek()
     
@@ -61,6 +67,8 @@ class Memory {
         private val allSubs = mutableMapOf<String, Subs>()
         
         private val datas = mutableMapOf<String, Stmt.Data>()
+        
+        private val aliases = mutableMapOf<String, DataType>()
         
         fun hasRef(name: Expr.Name) =
             references.containsKey(name.value)
@@ -114,6 +122,22 @@ class Memory {
         
         private fun getData(name: String): Stmt.Data? =
             datas[name] ?: parent?.getData(name)
+        
+        fun newAlias(name: String, type: DataType) =
+            if (aliases[name] == null) {
+                aliases[name] = type
+                
+                true
+            }
+            else {
+                false
+            }
+        
+        fun getAlias(name: Expr.Name) =
+            getAlias(name.value)
+    
+        private fun getAlias(name: String): DataType? =
+            aliases[name] ?: parent?.getAlias(name)
         
         override fun toString() = "Scope $id"
         

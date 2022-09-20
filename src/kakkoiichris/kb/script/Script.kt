@@ -15,8 +15,6 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     
     private val library = StandardLibrary()
     
-    private val aliases = mutableMapOf<String, DataType>()
-    
     fun run() {
         val coreSource = Source.readLocal("/core.kb")
         
@@ -361,13 +359,13 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     
     override fun visitDataStmt(stmt: Stmt.Data) {
         if (!memory.newData(stmt)) {
-            KBError.alreadyDeclaredData(stmt.name, stmt.location)
+            KBError.redeclaredData(stmt.name, stmt.location)
         }
     }
     
     override fun visitSubStmt(stmt: Stmt.Sub) {
         if (!memory.newSub(stmt)) {
-            KBError.alreadyDeclaredSub(stmt.signature, stmt.location)
+            KBError.redeclaredSub(stmt.signature, stmt.location)
         }
         
         stmt.scope = memory.peek() ?: KBError.noScope(stmt.location)
@@ -392,7 +390,9 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
     
     override fun visitTypeStmt(stmt: Stmt.Type) {
-        aliases[stmt.alias.value] = stmt.full.value
+        if (!memory.newAlias(stmt.alias.value, stmt.type.value)) {
+            KBError.redeclaredAlias(stmt.alias, stmt.alias.location)
+        }
     }
     
     override fun visitExpressionStmt(stmt: Stmt.Expression) {
@@ -408,15 +408,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     override fun visitNameExpr(expr: Expr.Name) =
         memory.getRef(expr) ?: KBError.undeclaredVariable(expr, expr.location)
     
-    override fun visitTypeExpr(expr: Expr.Type): Any {
-        var type = expr.value
-        
-        if (type is DataType.Named) {
-            type = aliases[type.name.value] ?: DataType.Data(type.name)
-        }
-        
-        return type
-    }
+    override fun visitTypeExpr(expr: Expr.Type) =
+        DataType.resolveAlias(this, expr.value)
     
     override fun visitArrayExpr(expr: Expr.Array): Any {
         val elements = mutableListOf<Any>()

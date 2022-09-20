@@ -213,7 +213,7 @@ sealed class Stmt(val location: Location) {
             visitor.visitYieldStmt(this)
     }
     
-    class Type(location: Location, val full: Expr.Type, val alias: Expr.Name) : Stmt(location) {
+    class Type(location: Location, val type: Expr.Type, val alias: Expr.Name) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitTypeStmt(this)
     }

@@ -71,7 +71,7 @@ sub update(delta as double)
     end if
 end sub
 
-sub render()
+sub render
     setColor(0)
     clear()
     setColor(255, 0, 0)
