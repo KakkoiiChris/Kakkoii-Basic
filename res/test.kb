@@ -1,63 +1,7 @@
-var n1 = 1.0
-var n2 = 1.0
-var n3 = 1.0
-var m  = 1.0
-var a  = 1.0
-var b  = 1.0
+let x = [1, 2, 3, 4, 5]
 
-let s = ((PI * 2) / 256.0)
+sub getString(this as int[]) as string
+    yield concat("int array of size ", #this)
+end sub
 
-createWindow(400, 400, "Supershape")
-
-openWindow()
-
-while windowIsOpen()
-	setColor(51)
-	clear()
-	
-	setColor(255)
-	
-	translate(200, 200)
-	
-	for theta = 0.0 to PI * 2 step s
-		let la = pow(abs((1 / a) * cos(theta * m / 4)), n2)
-		let ra = pow(abs((1 / b) * sin(theta * m / 4)), n3)
-		
-		let radA = 1 / pow(la + ra, 1 / n1)
-		
-		let lb = pow(abs((1 / a) * cos((theta + s) * m / 4)), n2)
-		let rb = pow(abs((1 / b) * sin((theta + s) * m / 4)), n3)
-		
-		let radB = 1 / pow(lb + rb, 1 / n1)
-		
-		let x1 = radA * 100 * cos(theta)
-		let y1 = radA * 100 * sin(theta)
-		let x2 = radB * 100 * cos(theta + s)
-		let y2 = radB * 100 * sin(theta + s)
-		
-		drawLine(x1 as int, y1 as int, x2 as int, y2 as int)
-	end for
-	
-	translate(-200, -200)
-	
-	flip()
-	
-	if keyIsHeld(KEY_Q) n1 += 0.1 end if
-	if keyIsHeld(KEY_A) n1 -= 0.1 end if
-	if keyIsHeld(KEY_W) n2 += 0.1 end if
-	if keyIsHeld(KEY_S) n2 -= 0.1 end if
-	if keyIsHeld(KEY_E) n3 += 0.1 end if
-	if keyIsHeld(KEY_D) n3 -= 0.1 end if
-	if keyIsHeld(KEY_R) m += 0.1 end if
-	if keyIsHeld(KEY_F) m -= 0.1 end if
-	if keyIsHeld(KEY_T) a += 0.1 end if
-	if keyIsHeld(KEY_G) a -= 0.1 end if
-	if keyIsHeld(KEY_Y) b += 0.1 end if
-	if keyIsHeld(KEY_H) b -= 0.1 end if
-	
-	poll()
-	
-	sleep(1 / 60.0)
-end while
-
-closeWindow()
+print(x, '\n')

@@ -5,7 +5,7 @@ let STAR_COUNT = 400
 let STAR_SIZE  = 16.0
 let STAR_SPEED = 5.0
 
-let FRAME_RATE = 1.0 / 144.0
+let FRAME_RATE = 1.0 / 60.0
 
 data Star
     var x as double,

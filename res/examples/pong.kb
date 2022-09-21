@@ -9,69 +9,208 @@ data Vector
 end data
 
 sub add(this as Vector, that as Vector) as Vector
-    add = Vector { this.x + that.x, this.y + that.y }
+    add = { this.x + that.x, this.y + that.y }
+end sub
+
+sub multiply(this as Vector, that as Vector) as Vector
+    multiply = { this.x * that.x, this.y * that.y }
+end sub
+
+sub multiply(this as Vector, that as double) as Vector
+    multiply = { this.x * that, this.y * that }
 end sub
 
 let paddleWidth  = 10.0
 let paddleHeight = 80.0
-let paddleSpeed  =  5.0
+let paddleSpeed  = 10.0
 
 data Paddle
-    let pos as Vector,
+    var pos     as Vector,
     let upKey   as int,
     let downKey as int
 end data
 
-let ballRadius = 5.0
+sub newLeftPaddle as Paddle
+    newLeftPaddle = {
+        { paddleWidth * 2, height / 2.0 },
+        KEY_W,
+        KEY_S
+    }
+end sub
+
+sub newRightPaddle as Paddle
+    newRightPaddle = {
+        { width - (paddleWidth * 2), height / 2.0 },
+        KEY_UP,
+        KEY_DOWN
+    }
+end sub
+
+sub update(this as Paddle, delta as double)
+    if keyIsHeld(this.upKey)
+        this.pos.y -= paddleSpeed * delta
+    end if
+    
+    if keyIsHeld(this.downKey)
+        this.pos.y += paddleSpeed * delta
+    end if
+    
+    if this.pos.y < paddleHeight / 2
+        this.pos.y = paddleHeight / 2
+    else if this.pos.y > height - (paddleHeight / 2)
+        this.pos.y = height - (paddleHeight / 2)
+    end if
+end sub
+
+sub render(this as Paddle)
+    fillRect(
+        (this.pos.x - (paddleWidth / 2)) as int,
+        (this.pos.y - (paddleHeight / 2)) as int,
+        paddleWidth as int,
+        paddleHeight as int
+    )
+end sub
+
+sub reset(this as Paddle)
+    this.pos = { width - (paddleWidth * 2), height / 2.0 }
+end sub
+
+let ballRadius = 8.0
 let ballSpeed  = 4.0
 
 data Ball
-    var x  as double = (width  - ballRadius) / 2,
-    var y  as double = (height - ballRadius) / 2,
-    var vx as double,
-    var vy as double
+    var pos as Vector = {
+        (width  - ballRadius) / 2,
+        (height - ballRadius) / 2
+    },
+    var vel as Vector
 end data
 
-sub randomVector as double[]
+sub randomVector as Vector
     let angle = (random() * PI / 4) + PI / 8
     
-    randomVector = [
+    randomVector = {
         cos(angle) * ballSpeed,
         sin(angle) * ballSpeed
-    ]
+    }
     
     if random() > 0.5
-        randomVector[0] *= -1
+        randomVector.x *= -1
     end if
 end sub
 
 sub newBall as Ball
-    let v = randomVector()
-    
-    newBall.vx = v[0]
-    newBall.vy = v[1]
-end sub
-
-sub reset(this as Ball)
-    this.x = (width  - ballRadius) / 2
-    this.y = (height - ballRadius) / 2
-    
-    let v = randomVector()
-    
-    this.vx = v[0]
-    this.vy = v[1]
+    newBall.vel = randomVector()
 end sub
 
 sub update(this as Ball, delta as double)
+    this.pos += this.vel * delta
     
+    if this.pos.y < ballRadius
+        this.pos.y = ballRadius
+        this.vel.y *= -1
+    else if this.pos.y > height - ballRadius
+        this.pos.y = height - ballRadius - 0.5
+        this.vel.y *= -1
+    end if
+    
+    if this.pos.x < 0 or this.pos.x >= width
+        reset()
+    end if
 end sub
 
 sub render(this as Ball)
+    fillOval(
+        (this.pos.x - ballRadius) as int,
+        (this.pos.y - ballRadius) as int,
+        (ballRadius * 2) as int,
+        (ballRadius * 2) as int
+    )
+end sub
+
+sub reset(this as Ball)
+    this.pos = {
+        (width  - ballRadius) / 2,
+        (height - ballRadius) / 2
+    }
     
+    this.vel = randomVector()
+end sub
+
+let ball = newBall()
+let left = newLeftPaddle()
+let right = newRightPaddle()
+
+sub update(delta as double)
+    ball:update(delta)
+    left:update(delta)
+    right:update(delta)
+end sub
+
+sub render
+    setColor(0)
+    clear()
+    
+    setColor(255)
+    
+    ball:render()
+    left:render()
+    right:render()
+end sub
+
+sub reset
+    ball:reset()
+    left:reset()
+    right:reset()
 end sub
 
 sub main
+    createWindow(width, height, title)
     
+    openWindow()
+    
+    let npu = 1E9 / fps
+    
+    var then = nanoseconds()
+    
+    var delta = 0.0
+    var timer = 0.0
+    
+    var updates = 0
+    var frames  = 0
+    
+    while windowIsOpen()
+        let now = nanoseconds()
+        let elapsed = (now - then) / npu
+        then = now
+        
+        delta += elapsed
+        timer += elapsed
+        
+        var updated = false
+        
+        while delta >= 1
+            update(delta)
+            updates += 1
+            delta   -= 1
+            updated = true
+        end while
+        
+        if updated
+            render()
+            frames += 1
+            flip()
+        end if
+        
+        if timer >= fps
+            print(updates, " U, ", frames, " F\n")
+            
+            updates = 0
+            frames  = 0
+            
+            timer -= fps
+        end if
+    end while
 end sub
 
 main()

@@ -1,0 +1,93 @@
+let WIDTH  = 800
+let HEIGHT = 800
+
+let STAR_COUNT = 400
+let STAR_SIZE  = 32.0
+let STAR_SPEED = 10.0
+
+let FRAME_RATE = 1.0 / 60.0
+
+data Star
+    var x as double,
+    var y as double,
+    var z as double
+end data
+
+let stars as Star[STAR_COUNT]
+
+for i = 0 to #stars
+	stars[i] = {
+        (random() * WIDTH)  - WIDTH  / 2,
+        (random() * HEIGHT) - HEIGHT / 2,
+        random() * WIDTH
+    }
+end for
+
+var paused = false
+
+createWindow(WIDTH, HEIGHT, "Starfield")
+
+openWindow()
+
+setColor(0)
+clear()
+
+while windowIsOpen()
+	setColor(0.0, 0.4)
+	clear()
+	
+	translate(WIDTH / 2, HEIGHT / 2)
+    
+	for star in stars
+        let each x, y, z = star
+        
+		if z < 1.0
+			star.x = (random() * WIDTH) - WIDTH / 2
+			star.y = (random() * HEIGHT) - HEIGHT / 2
+			star.z = WIDTH as double
+		end if
+	
+		let sxa = map(x / z, 0.0, 1.0, 0.0, WIDTH as double)
+		let sya = map(y / z, 0.0, 1.0, 0.0, HEIGHT as double)
+        let sxb = map(x / (z + STAR_SPEED), 0.0, 1.0, 0.0, WIDTH as double)
+		let syb = map(y / (z + STAR_SPEED), 0.0, 1.0, 0.0, HEIGHT as double)
+		
+		let hue = map(z, 0.0, WIDTH as double, 0.0, 1.0)
+		
+		setColor(hsbToColor(hue, 1.0, 1.0))
+        
+        let r = map(z, 0.0, WIDTH as double, STAR_SIZE, 0.0)
+		let stroke = Stroke{
+        r as float,
+        STROKE_CAP_ROUND,
+        STROKE_JOIN_ROUND,
+        1F, [1F], 0F}
+        
+		setStroke(stroke)
+        
+		drawLine(sxa as int, sya as int, sxb as int, syb as int)
+		
+		if not paused
+            rem star.x += 5.0
+			star.z -= STAR_SPEED
+		end if
+	end for
+    
+	translate(-WIDTH / 2, -HEIGHT / 2)
+	
+	flip()
+	
+	sleep(FRAME_RATE)
+	
+	if keyIsDown(KEY_SPACE)
+		paused = not paused
+	end if
+	
+	if keyIsDown(KEY_ESCAPE)
+		closeWindow()
+	end if
+	
+	poll()
+end while
+
+closeWindow()

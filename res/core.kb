@@ -578,6 +578,14 @@ sub setFont(font as Font)
     setFont(font.name, font.style, font.size)
 end sub
 
+let STROKE_JOIN_MITER = 0
+let STROKE_JOIN_ROUND = 1
+let STROKE_JOIN_BEVEL = 2
+
+let STROKE_CAP_BUTT   = 0
+let STROKE_CAP_ROUND  = 1
+let STROKE_CAP_SQUARE = 2
+
 data Stroke
     var width      as float,
     var cap        as int,
