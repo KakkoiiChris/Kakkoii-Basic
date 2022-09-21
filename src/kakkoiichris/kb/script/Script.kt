@@ -1577,16 +1577,20 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             return null
         }
         
-        val exprs = MutableList<Expr>(params.size) { Expr.Empty }
+        val exprs = MutableList(params.size) { i -> params[i].expr }
         
         var p = 0
         
         for (i in exprs.indices) {
-            if (p in args.indices) {
-                if (!params[i].isVararg) {
-                    exprs[i] = args[p++]
-                }
+            if (p !in args.indices) continue
+            
+            if (params[i].isVararg) continue
+            
+            if (args[p] !is Expr.Empty) {
+                exprs[i] = args[p]
             }
+            
+            p++
         }
         
         if (p in args.indices) {

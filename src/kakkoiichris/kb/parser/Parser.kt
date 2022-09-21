@@ -473,7 +473,9 @@ class Parser(private val lexer: Lexer) {
                 
                 val paramType = type()
                 
-                params += Stmt.Decl(name.location, false, paramName, paramType, Expr.Empty)
+                val expr = if (skip(EQUAL_SIGN)) expr() else Expr.Empty
+                
+                params += Stmt.Decl(name.location, false, paramName, paramType, expr)
             }
             while (skip(COMMA))
             
