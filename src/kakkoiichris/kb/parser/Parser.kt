@@ -194,23 +194,46 @@ class Parser(private val lexer: Lexer) {
         
         mustSkip(IF)
         
-        val branches = mutableListOf<Pair<Expr, Stmt.Block>>()
+        val test = expr()
         
-        do {
-            val test = expr()
-            
-            val body = block(ELIF, ELSE, END)
-            
-            branches += test to body
+        val body = block(ELSE, END)
+        
+        val elze = if (skip(ELSE)) {
+            if (match(IF)) {
+                elseIfStmt()
+            }
+            else {
+                block(END)
+            }
         }
-        while (skip(ELIF))
-        
-        val elze = if (skip(ELSE)) block(END) else Stmt.None
+        else Stmt.None
         
         mustSkip(END)
         mustSkip(IF)
         
-        return Stmt.If(location, branches, elze)
+        return Stmt.If(location, test, body, elze)
+    }
+    
+    private fun elseIfStmt(): Stmt.If {
+        val location = here()
+        
+        mustSkip(IF)
+        
+        val test = expr()
+        
+        val body = block(ELSE, END)
+        
+        val elze = if (skip(ELSE)) {
+            if (match(IF)) {
+                elseIfStmt()
+            }
+            else {
+                block(END)
+            }
+        }
+        else Stmt.None
+        
+        return Stmt.If(location, test, body, elze)
     }
     
     private fun switchStmt(): Stmt.Switch {

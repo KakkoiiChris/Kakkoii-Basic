@@ -110,7 +110,7 @@ sealed class Stmt(val location: Location) {
             visitor.visitDoStmt(this)
     }
     
-    class If(location: Location, val branches: List<Pair<Expr, Block>>, val elze: Stmt) : Stmt(location) {
+    class If(location: Location, val test:Expr, val body: Block, val elze: Stmt) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitIfStmt(this)
     }

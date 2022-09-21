@@ -160,16 +160,14 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
     
     override fun visitIfStmt(stmt: Stmt.If) {
-        for ((test, body) in stmt.branches) {
-            val testValue = visit(test).fromRef()
+        val testValue = visit(stmt.test).fromRef()
+        
+        testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.location)
+        
+        if (testValue) {
+            visit(stmt.body)
             
-            testValue as? Boolean ?: KBError.invalidTestExpression(testValue, test.location)
-            
-            if (testValue) {
-                visit(body)
-                
-                return
-            }
+            return
         }
         
         visit(stmt.elze)

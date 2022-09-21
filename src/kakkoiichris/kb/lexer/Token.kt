@@ -8,7 +8,6 @@ data class Token(val location: Location, val type: Type, val value: Any = Unit) 
         EACH("each"),
         DO("do"),
         IF("if"),
-        ELIF("elif"),
         ELSE("else"),
         SWITCH("switch"),
         CASE("case"),
