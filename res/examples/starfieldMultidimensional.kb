@@ -63,11 +63,11 @@ while windowIsOpen()
 	
 	sleep(FRAME_RATE)
 	
-	if keyIsDown(VK_SPACE)
+	if keyIsDown(KEY_SPACE)
 		paused = not paused
 	end if
 	
-	if keyIsDown(VK_ESCAPE)
+	if keyIsDown(KEY_ESCAPE)
 		closeWindow()
 	end if
 	

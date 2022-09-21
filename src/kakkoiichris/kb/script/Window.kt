@@ -16,8 +16,8 @@ class Window(width: Int, height: Int, title: String) : KeyListener, MouseListene
     
     private val transformStack = mutableListOf<AffineTransform>()
     
-    private val buffer: BufferStrategy
-    private val graphics: Graphics2D
+    private var buffer: BufferStrategy
+    private var graphics: Graphics2D
     
     private val keys = Array(256) { Toggle() }
     private val buttons = Array(4) { Toggle() }
@@ -190,8 +190,12 @@ class Window(width: Int, height: Int, title: String) : KeyListener, MouseListene
     fun drawImage(image: Int, dxa: Int, dya: Int, dxb: Int, dyb: Int, sxa: Int, sya: Int, sxb: Int, syb: Int) =
         graphics.drawImage(images[image], dxa, dya, dxb, dyb, sxa, sya, sxb, syb, null)
     
-    fun flip() =
+    fun flip() {
         buffer.show()
+        
+        buffer = canvas.bufferStrategy
+        graphics = buffer.drawGraphics as Graphics2D
+    }
     
     fun keyIsDown(keyCode: Int): Boolean {
         if (keyCode in keys.indices) {

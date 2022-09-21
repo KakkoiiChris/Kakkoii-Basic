@@ -42,18 +42,18 @@ while windowIsOpen()
 	
 	flip()
 	
-	if keyIsHeld(VK_Q) n1 += 0.01 end if
-	if keyIsHeld(VK_A) n1 -= 0.01 end if
-	if keyIsHeld(VK_W) n2 += 0.01 end if
-	if keyIsHeld(VK_S) n2 -= 0.01 end if
-	if keyIsHeld(VK_E) n3 += 0.01 end if
-	if keyIsHeld(VK_D) n3 -= 0.01 end if
-	if keyIsHeld(VK_R) m += 0.01 end if
-	if keyIsHeld(VK_F) m -= 0.01 end if
-	if keyIsHeld(VK_T) a += 0.01 end if
-	if keyIsHeld(VK_G) a -= 0.01 end if
-	if keyIsHeld(VK_Y) b += 0.01 end if
-	if keyIsHeld(VK_H) b -= 0.01 end if
+	if keyIsHeld(KEY_Q) n1 += 0.1 end if
+	if keyIsHeld(KEY_A) n1 -= 0.1 end if
+	if keyIsHeld(KEY_W) n2 += 0.1 end if
+	if keyIsHeld(KEY_S) n2 -= 0.1 end if
+	if keyIsHeld(KEY_E) n3 += 0.1 end if
+	if keyIsHeld(KEY_D) n3 -= 0.1 end if
+	if keyIsHeld(KEY_R) m += 0.1 end if
+	if keyIsHeld(KEY_F) m -= 0.1 end if
+	if keyIsHeld(KEY_T) a += 0.1 end if
+	if keyIsHeld(KEY_G) a -= 0.1 end if
+	if keyIsHeld(KEY_Y) b += 0.1 end if
+	if keyIsHeld(KEY_H) b -= 0.1 end if
 	
 	poll()
 	

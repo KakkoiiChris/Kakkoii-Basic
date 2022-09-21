@@ -13,14 +13,19 @@ while windowIsOpen()
 	setColor(255)
 	
 	translate(200, 200)
+    
+    let dt = (PI * 2) / 100.0
 	
-	for theta = 0.0 to PI * 2 step (PI * 2) / 100.0
+	for theta = 0.0 to PI * 2 step dt
 		let na = 2.0 / n
 		
-		let x = pow(abs(cos(theta)), na) * a * sign(cos(theta))
-		let y = pow(abs(sin(theta)), na) * b * sign(sin(theta))
+		let xa = pow(abs(cos(theta)), na) * a * sign(cos(theta))
+		let ya = pow(abs(sin(theta)), na) * b * sign(sin(theta))
+        
+        let xb = pow(abs(cos(theta+dt)), na) * a * sign(cos(theta+dt))
+		let yb = pow(abs(sin(theta+dt)), na) * b * sign(sin(theta+dt))
 		
-		fillOval(x as int, y as int, 2, 2)
+		drawLine(xa as int, ya as int, xb as int, yb as int)
 	end for
 	
 	translate(-200, -200)
