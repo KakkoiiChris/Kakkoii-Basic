@@ -113,6 +113,8 @@ class Parser(private val lexer: Lexer) {
             
             match(TYPE)        -> typeStmt()
             
+            match(ENUM)        -> enumStmt()
+            
             else               -> expressionStmt()
         }
     }
@@ -549,6 +551,38 @@ class Parser(private val lexer: Lexer) {
         val alias = name()
         
         return Stmt.Type(location, full, alias)
+    }
+    
+    private fun enumStmt(): Stmt.Enum {
+        val location = here()
+        
+        mustSkip(ENUM)
+        
+        val name = name()
+        
+        mustSkip(AS)
+        
+        val type = type()
+        
+        val start = if (skip(FOR)) expr() else Expr.Empty
+        
+        val step = if (skip(STEP)) expr() else Expr.Empty
+        
+        val entries = mutableListOf<Stmt.Enum.Entry>()
+        
+        do {
+            val entryName = name()
+            
+            val value = if (skip(EQUAL_SIGN)) expr() else Expr.Empty
+            
+            entries += Stmt.Enum.Entry(entryName.location, entryName, value)
+        }
+        while (skip(COMMA))
+        
+        mustSkip(END)
+        mustSkip(ENUM)
+        
+        return Stmt.Enum(location, name, type, start, step, entries)
     }
     
     private fun expressionStmt() =

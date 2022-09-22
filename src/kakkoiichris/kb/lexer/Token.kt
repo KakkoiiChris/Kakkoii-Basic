@@ -24,6 +24,7 @@ data class Token(val location: Location, val type: Type, val value: Any = Unit) 
         RETURN("return"),
         YIELD("yield"),
         TYPE("type"),
+        ENUM("enum"),
         END("end"),
         
         // Types

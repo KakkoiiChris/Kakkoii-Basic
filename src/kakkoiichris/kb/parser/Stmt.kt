@@ -53,6 +53,8 @@ sealed class Stmt(val location: Location) {
         
         fun visitTypeStmt(stmt: Type): X
         
+        fun visitEnumStmt(stmt: Enum): X
+        
         fun visitExpressionStmt(stmt: Expression): X
     }
     
@@ -110,7 +112,7 @@ sealed class Stmt(val location: Location) {
             visitor.visitDoStmt(this)
     }
     
-    class If(location: Location, val test:Expr, val body: Block, val elze: Stmt) : Stmt(location) {
+    class If(location: Location, val test: Expr, val body: Block, val elze: Stmt) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitIfStmt(this)
     }
@@ -216,6 +218,13 @@ sealed class Stmt(val location: Location) {
     class Type(location: Location, val type: Expr.Type, val alias: Expr.Name) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitTypeStmt(this)
+    }
+    
+    class Enum(location: Location, val name: Expr.Name, val subType: Expr.Type, val start: Expr, val step: Expr, val entries: List<Entry>) : Stmt(location) {
+        override fun <X> accept(visitor: Visitor<X>): X =
+            visitor.visitEnumStmt(this)
+        
+        class Entry(val location: Location, val name: Expr.Name, val value: Expr)
     }
     
     class Expression(val expr: Expr) : Stmt(expr.location) {
