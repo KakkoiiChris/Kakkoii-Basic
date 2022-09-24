@@ -118,6 +118,7 @@ sealed class Expr(val location: Location) {
             GREATER(Token.Type.GREATER_SIGN),
             GREATER_EQUAL(Token.Type.GREATER_EQUAL_SIGN),
             IS(Token.Type.IS),
+            IS_NOT(Token.Type.NOT),
             CONCAT(Token.Type.AMPERSAND),
             ADD(Token.Type.PLUS),
             SUBTRACT(Token.Type.DASH),

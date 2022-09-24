@@ -124,7 +124,7 @@ sealed class Stmt(val location: Location) {
         sealed class Case(val location: Location, val block: Block) {
             class Values(location: Location, val tests: List<Expr.Value>, block: Block) : Case(location, block)
             
-            class Type(location: Location, val type: Expr.Type, block: Block) : Case(location, block)
+            class Type(location: Location, val inverted: Boolean, val type: Expr.Type, block: Block) : Case(location, block)
             
             class Else(location: Location, block: Block) : Case(location, block)
         }

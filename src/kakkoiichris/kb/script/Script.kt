@@ -191,7 +191,9 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 is Stmt.Switch.Case.Type   -> {
                     val type = visit(case.type) as DataType
                     
-                    type.filter(this, subject) ?: continue
+                    if ((type.filter(this, subject) == null) xor case.inverted) {
+                        continue
+                    }
                     
                     visit(case.block)
                     
@@ -391,6 +393,9 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         if (!memory.newAlias(stmt.alias.value, stmt.type.value)) {
             KBError.redeclaredAlias(stmt.alias, stmt.alias.location)
         }
+    }
+    
+    override fun visitEnumStmt(stmt: Stmt.Enum) {
     }
     
     override fun visitExpressionStmt(stmt: Stmt.Expression) {
@@ -1051,6 +1056,14 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 val type = visit(expr.right).fromRef() as DataType
                 
                 type.filter(this, value) != null
+            }
+            
+            Expr.Binary.Operator.IS_NOT        -> {
+                val value = visit(expr.left).fromRef()
+                
+                val type = visit(expr.right).fromRef() as DataType
+                
+                type.filter(this, value) == null
             }
             
             Expr.Binary.Operator.CONCAT        -> {

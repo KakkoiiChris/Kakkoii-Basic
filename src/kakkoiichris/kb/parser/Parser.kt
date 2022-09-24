@@ -267,6 +267,8 @@ class Parser(private val lexer: Lexer) {
                 }
                 
                 skip(IS)   -> {
+                    val inverted = skip(NOT)
+                    
                     val type = type()
                     
                     val block = block(END)
@@ -274,7 +276,7 @@ class Parser(private val lexer: Lexer) {
                     mustSkip(END)
                     mustSkip(CASE)
                     
-                    cases += Stmt.Switch.Case.Type(caseLoc, type, block)
+                    cases += Stmt.Switch.Case.Type(caseLoc, inverted, type, block)
                 }
                 
                 else       -> {
@@ -689,7 +691,9 @@ class Parser(private val lexer: Lexer) {
             
             mustSkip(op.type)
             
-            expr = Expr.Binary(op.location, Expr.Binary.Operator[op.type], expr, type())
+            val opType = if (skip(NOT)) NOT else IS
+            
+            expr = Expr.Binary(op.location, Expr.Binary.Operator[opType], expr, type())
         }
         
         return expr
