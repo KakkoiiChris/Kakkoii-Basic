@@ -19,6 +19,7 @@ data class Token(val location: Location, val type: Type, val value: Any = Unit) 
         IN("in"),
         DATA("data"),
         SUB("sub"),
+        WITH("with"),
         BREAK("break"),
         NEXT("next"),
         RETURN("return"),

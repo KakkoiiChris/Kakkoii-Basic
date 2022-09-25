@@ -1,2 +1,5 @@
 sub product as int with a as int, b as int
+    yield a * b
 end sub
+
+print(product(5, 3), '\n')

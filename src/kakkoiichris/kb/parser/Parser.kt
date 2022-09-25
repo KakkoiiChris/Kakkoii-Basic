@@ -467,9 +467,11 @@ class Parser(private val lexer: Lexer) {
         
         val name = name()
         
+        val type = if (skip(AS)) type() else DataType.Primitive.NONE.toType()
+        
         val params = mutableListOf<Stmt.Decl>()
         
-        if (skip(LEFT_PAREN) && !skip(RIGHT_PAREN)) {
+        if (skip(WITH)) {
             do {
                 val paramName = name()
                 
@@ -482,18 +484,14 @@ class Parser(private val lexer: Lexer) {
                 params += Stmt.Decl(name.location, false, paramName, paramType, expr)
             }
             while (skip(COMMA))
-            
-            mustSkip(RIGHT_PAREN)
         }
-        
-        val type = if (skip(AS)) type() else DataType.Primitive.NONE.toType()
         
         val body = block(END)
         
         mustSkip(END)
         mustSkip(SUB)
         
-        return Stmt.Sub(location, name, params, type, body)
+        return Stmt.Sub(location, name, type, params, body)
     }
     
     private fun breakStmt(): Stmt.Break {

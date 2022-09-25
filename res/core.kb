@@ -1,18 +1,18 @@
 rem general
 
-sub print(args as any*) end sub
+sub print with args as any* end sub
 
-sub input(args as any*) as string end sub
+sub input as string with args as any* end sub
 
-sub read(path as string) as string end sub
+sub read as string with path as string end sub
 
-sub write(path as string, value as any) end sub
+sub write with path as string, value as any end sub
 
-sub concat(args as any*) as string end sub
+sub concat as string with args as any* end sub
 
-sub sleep(milliseconds as long) end sub
+sub sleep with milliseconds as long end sub
 
-sub sleep(seconds as double)
+sub sleep with seconds as double
     sleep((seconds * 1000) as long)
 end sub
 
@@ -24,11 +24,11 @@ sub seconds as double
     yield nanoseconds() / 1E9
 end sub
 
-sub typeOf(x as any) as string end sub
+sub typeOf as string with x as any end sub
 
-sub invoke(name as string, arguments as any*) as any end sub
+sub invoke as any with name as string, arguments as any* end sub
 
-sub exit(code as int) end sub
+sub exit with code as int end sub
 
 sub exit
     exit(0)
@@ -36,93 +36,93 @@ end sub
 
 rem char
 
-sub isAlpha(c as char) as bool end sub
+sub isAlpha as bool with c as char end sub
 
-sub isAlnum(c as char) as bool end sub
+sub isAlnum as bool with c as char end sub
 
-sub isDigit(c as char) as bool end sub
+sub isDigit as bool with c as char end sub
 
-sub isSpace(c as char) as bool end sub
+sub isSpace as bool with c as char end sub
 
-sub isVowel(c as char) as bool end sub
+sub isVowel as bool with c as char end sub
 
-sub isLower(c as char) as bool end sub
+sub isLower as bool with c as char end sub
 
-sub isUpper(c as char) as bool end sub
+sub isUpper as bool with c as char end sub
 
-sub toLower(c as char) as char end sub
+sub toLower as char with c as char end sub
 
-sub toUpper(c as char) as char end sub
+sub toUpper as char with c as char end sub
 
 rem string
 
-sub isBlank(s as string) as bool end sub
+sub isBlank as bool with s as string end sub
 
-sub isEmpty(s as string) as bool end sub
+sub isEmpty as bool with s as string end sub
 
-sub toLower(s as string) as string end sub
+sub toLower as string with s as string end sub
 
-sub toUpper(s as string) as string end sub
+sub toUpper as string with s as string end sub
 
-sub startsWith(s as string, prefix as string, ignoreCase as bool) as bool end sub
+sub startsWith as bool with s as string, prefix as string, ignoreCase as bool end sub
 
-sub startsWith(s as string, prefix as string) as bool
+sub startsWith as bool with s as string, prefix as string
     yield startsWith(s, prefix, false)
 end sub
 
-sub endsWith(s as string, suffix as string, ignoreCase as bool) as bool end sub
+sub endsWith as bool with s as string, suffix as string, ignoreCase as bool end sub
 
-sub endsWith(s as string, suffix as string) as bool
+sub endsWith as bool with s as string, suffix as string
     yield endsWith(s, suffix, false)
 end sub
 
-sub trim(s as string) as string end sub
+sub trim as string with s as string end sub
 
-sub trimStart(s as string) as string end sub
+sub trimStart as string with s as string end sub
 
-sub trimEnd(s as string) as string end sub
+sub trimEnd as string with s as string end sub
 
-sub substring(s as string, startIndex as int, endIndex as int) as string end sub
+sub substring as string with s as string, startIndex as int, endIndex as int end sub
 
-sub substring(s as string, startIndex as int) as string
+sub substring as string with s as string, startIndex as int
     yield substring(s, startIndex, #s)
 end sub
 
-sub split(s as string, regex as string) as string[] end sub
+sub split as string[] with s as string, regex as string end sub
 
-sub indexOf(s as string, c as char) as int end sub
+sub indexOf as int with s as string, c as char end sub
 
-sub indexOf(s as string, sequence as string) as int end sub
+sub indexOf as int with s as string, sequence as string end sub
 
-sub lastIndexOf(s as string, c as char) as int end sub
+sub lastIndexOf as int with s as string, c as char end sub
 
-sub lastIndexOf(s as string, sequence as string) as int end sub
+sub lastIndexOf as int with s as string, sequence as string end sub
 
-sub padstart(s as string, length as int, c as char) as string end sub
+sub padStart as string with s as string, length as int, c as char end sub
 
-sub padstart(s as string, length as int) as string
+sub padStart as string with s as string, length as int
     yield padStart(s, length, ' ')
 end sub
 
-sub padEnd(s as string, length as int, c as char) as string end sub
+sub padEnd as string with s as string, length as int, c as char end sub
 
-sub padEnd(s as string, length as int) as string
+sub padEnd as string with s as string, length as int
     yield padEnd(s, length, ' ')
 end sub
 
-sub replace(s as string, old as char, new as char) as string end sub
+sub replace as string with s as string, old as char, new as char end sub
 
-sub replace(s as string, old as string, new as string) as string end sub
+sub replace as string with s as string, old as string, new as string end sub
 
 rem arrays
 
-sub forEach(x as any[], action as string)
+sub forEach with x as any[], action as string
     for y in x
         invoke(action, y)
     end for
 end sub
 
-sub map(x as any[], transform as string) as any[]
+sub map as any[] with x as any[], transform as string
     let new as any[#x]
     
     for i = 0 to #x
@@ -138,187 +138,187 @@ let E =  2.718281828459045
 
 let PI = 3.141592653589793
 
-sub abs(n as double) as double end sub
+sub abs as double with n as double end sub
 
-sub abs(n as float) as float end sub
+sub abs as float with n as float end sub
 
-sub abs(n as int) as int end sub
+sub abs as int with n as int end sub
 
-sub abs(n as long) as long end sub
+sub abs as long with n as long end sub
 
-sub acos(n as double) as double end sub
+sub acos as double with n as double end sub
 
-sub acos(n as float) as float end sub
+sub acos as float with n as float end sub
 
-sub acosh(n as double) as double end sub
+sub acosh as double with n as double end sub
 
-sub acosh(n as float) as float end sub
+sub acosh as float with n as float end sub
 
-sub asin(n as double) as double end sub
+sub asin as double with n as double end sub
 
-sub asin(n as float) as float end sub
+sub asin as float with n as float end sub
 
-sub asinh(n as double) as double end sub
+sub asinh as double with n as double end sub
 
-sub asinh(n as float) as float end sub
+sub asinh as float with n as float end sub
 
-sub atan(n as double) as double end sub
+sub atan as double with n as double end sub
 
-sub atan(n as float) as float end sub
+sub atan as float with n as float end sub
 
-sub atan2(y as double, x as double) as double end sub
+sub atan2 as double with y as double, x as double end sub
 
-sub atan2(y as float, x as float) as float end sub
+sub atan2 as float with y as float, x as float end sub
 
-sub atanh(n as double) as double end sub
+sub atanh as double with n as double end sub
 
-sub atanh(n as float) as float end sub
+sub atanh as float with n as float end sub
 
-sub ceil(n as double) as double end sub
+sub ceil as double with n as double end sub
 
-sub ceil(n as float) as float end sub
+sub ceil as float with n as float end sub
 
-sub cos(n as double) as double end sub
+sub cos as double with n as double end sub
 
-sub cos(n as float) as float end sub
+sub cos as float with n as float end sub
 
-sub cosh(n as double) as double end sub
+sub cosh as double with n as double end sub
 
-sub cosh(n as float) as float end sub
+sub cosh as float with n as float end sub
 
-sub exp(n as double) as double end sub
+sub exp as double with n as double end sub
 
-sub exp(n as float) as float end sub
+sub exp as float with n as float end sub
 
-sub expm1(n as double) as double end sub
+sub expm1 as double with n as double end sub
 
-sub expm1(n as float) as float end sub
+sub expm1 as float with n as float end sub
 
-sub floor(n as double) as double end sub
+sub floor as double with n as double end sub
 
-sub floor(n as float) as float end sub
+sub floor as float with n as float end sub
 
-sub hypot(x as double, y as double) as double end sub
+sub hypot as double with x as double, y as double end sub
 
-sub hypot(x as float, y as double) as float end sub
+sub hypot as float with x as float, y as double end sub
 
-sub IEEErem(n as double, divisor as double) as double end sub
+sub IEEErem as double with n as double, divisor as double end sub
 
-sub IEEErem(n as float, divisor as float) as float end sub
+sub IEEErem as float with n as float, divisor as float end sub
 
-sub ln(n as double) as double end sub
+sub ln as double with n as double end sub
 
-sub ln(n as float) as float end sub
+sub ln as float with n as float end sub
 
-sub ln1p(n as double) as double end sub
+sub ln1p as double with n as double end sub
 
-sub ln1p(n as float) as float end sub
+sub ln1p as float with n as float end sub
 
-sub log(n as double, base as double) as double end sub
+sub log as double with n as double, base as double end sub
 
-sub log(n as float, base as double) as float end sub
+sub log as float with n as float, base as double end sub
 
-sub log10(n as double) as double end sub
+sub log10 as double with n as double end sub
 
-sub log10(n as float) as float end sub
+sub log10 as float with n as float end sub
 
-sub log2(n as double) as double end sub
+sub log2 as double with n as double end sub
 
-sub log2(n as float) as float end sub
+sub log2 as float with n as float end sub
 
-sub max(a as double, b as double) as double end sub
+sub max as double with a as double, b as double end sub
 
-sub max(a as float, b as float) as float end sub
+sub max as float with a as float, b as float end sub
 
-sub max(a as int, b as int) as int end sub
+sub max as int with a as int, b as int end sub
 
-sub max(a as long, b as long) as long end sub
+sub max as long with a as long, b as long end sub
 
-sub min(a as double, b as double) as double end sub
+sub min as double with a as double, b as double end sub
 
-sub min(a as float, b as float) as float end sub
+sub min as float with a as float, b as float end sub
 
-sub min(a as int, b as int) as int end sub
+sub min as int with a as int, b as int end sub
 
-sub min(a as long, b as long) as long end sub
+sub min as long with a as long, b as long end sub
 
-sub nextDown(n as double) as double end sub
+sub nextDown as double with n as double end sub
 
-sub nextDown(n as float) as float end sub
+sub nextDown as float with n as float end sub
 
-sub nextTowards(a as double, b as double) as double end sub
+sub nextTowards as double with a as double, b as double end sub
 
-sub nextTowards(a as float, b as double) as float end sub
+sub nextTowards as float with a as float, b as double end sub
 
-sub nextUp(n as double) as double end sub
+sub nextUp as double with n as double end sub
 
-sub nextUp(n as float) as float end sub
+sub nextUp as float with n as float end sub
 
-sub pow(b as double, e as double) as double end sub
+sub pow as double with b as double, e as double end sub
 
-sub pow(b as float, e as float) as float end sub
+sub pow as float with b as float, e as float end sub
 
-sub pow(b as double, e as int) as double end sub
+sub pow as double with b as double, e as int end sub
 
-sub pow(b as float, e as int) as float end sub
+sub pow as float with b as float, e as int end sub
 
 sub random as double end sub
 
-sub round(n as double) as double end sub
+sub round as double with n as double end sub
 
-sub round(n as float) as float end sub
+sub round as float with n as float end sub
 
-sub roundToInt(n as double) as int end sub
+sub roundToInt as int with n as double end sub
 
-sub roundToInt(n as float) as int end sub
+sub roundToInt as int with n as float end sub
 
-sub roundToLong(n as double) as long end sub
+sub roundToLong as long with n as double end sub
 
-sub roundToLong(n as float) as long end sub
+sub roundToLong as long with n as float end sub
 
-sub sign(n as double) as double end sub
+sub sign as double with n as double end sub
 
-sub sign(n as float) as float end sub
+sub sign as float with n as float end sub
 
-sub sign(n as int) as int end sub
+sub sign as int with n as int end sub
 
-sub sign(n as long) as int end sub
+sub sign as int with n as long end sub
 
-sub sin(n as double) as double end sub
+sub sin as double with n as double end sub
 
-sub sin(n as float) as float end sub
+sub sin as float with n as float end sub
 
-sub sinh(n as double) as double end sub
+sub sinh as double with n as double end sub
 
-sub sinh(n as float) as float end sub
+sub sinh as float with n as float end sub
 
-sub sqrt(n as double) as double end sub
+sub sqrt as double with n as double end sub
 
-sub sqrt(n as float) as float end sub
+sub sqrt as float with n as float end sub
 
-sub tan(n as double) as double end sub
+sub tan as double with n as double end sub
 
-sub tan(n as float) as float end sub
+sub tan as float with n as float end sub
 
-sub tanh(n as double) as double end sub
+sub tanh as double with n as double end sub
 
-sub tanh(n as float) as float end sub
+sub tanh as float with n as float end sub
 
-sub truncate(n as double) as double end sub
+sub truncate as double with n as double end sub
 
-sub truncate(n as float) as float end sub
+sub truncate as float with n as float end sub
 
-sub ulp(n as double) as double end sub
+sub ulp as double with n as double end sub
 
-sub ulp(n as float) as float end sub
+sub ulp as float with n as float end sub
 
-sub map(n as double, fromMin as double, fromMax as double, toMin as double, toMax as double) as double end sub
+sub map as double with n as double, fromMin as double, fromMax as double, toMin as double, toMax as double end sub
 
-sub map(n as float, fromMin as float, fromMax as float, toMin as float, toMax as float) as float end sub
+sub map as float with n as float, fromMin as float, fromMax as float, toMin as float, toMax as float end sub
 
-sub map(n as int, fromMin as int, fromMax as int, toMin as int, toMax as int) as int end sub
+sub map as int with n as int, fromMin as int, fromMax as int, toMin as int, toMax as int end sub
 
-sub map(n as long, fromMin as long, fromMax as long, toMin as long, toMax as long) as long end sub
+sub map as long with n as long, fromMin as long, fromMax as long, toMin as long, toMax as long end sub
 
 rem graphics
 
@@ -511,7 +511,7 @@ let KEY_ALT_GRAPH                 = 0xFF7E
 let KEY_BEGIN                     = 0xFF58
 let KEY_UNDEFINED                 = 0x0
 
-sub createWindow(width as int, height as int, title as string) end sub
+sub createWindow with width as int, height as int, title as string end sub
 
 sub openWindow end sub
 
@@ -528,41 +528,41 @@ end data
 
 sub getColor as Color end sub
 
-sub setColor(red as int, green as int, blue as int, alpha as int) end sub
+sub setColor with red as int, green as int, blue as int, alpha as int end sub
 
-sub setColor(red as int, green as int, blue as int)
+sub setColor with red as int, green as int, blue as int
     setColor(red, green, blue, 255)
 end sub
 
-sub setColor(value as int, alpha as int)
+sub setColor with value as int, alpha as int
     setColor(value, value, value, alpha)
 end sub
 
-sub setColor(value as int)
+sub setColor with value as int
     setColor(value, 255)
 end sub
 
-sub setColor(red as double, green as double, blue as double, alpha as double)
+sub setColor with red as double, green as double, blue as double, alpha as double
     setColor((red * 255) as int, (green * 255) as int, (blue * 255) as int, (alpha * 255) as int)
 end sub
 
-sub setColor(red as double, green as double, blue as double)
+sub setColor with red as double, green as double, blue as double
     setColor(red, green, blue, 1.0)
 end sub
 
-sub setColor(value as double, alpha as double)
+sub setColor with value as double, alpha as double
     setColor(value, value, value, alpha)
 end sub
 
-sub setColor(value as double)
+sub setColor with value as double
     setColor(value, 1.0)
 end sub
 
-sub setColor(color as Color)
+sub setColor with color as Color
     setColor(color.red, color.green, color.blue, color.alpha)
 end sub
 
-sub hsbToColor(h as double, s as double, b as double) as Color end sub
+sub hsbToColor as Color with h as double, s as double, b as double end sub
 
 data Font
     var name  as string,
@@ -572,9 +572,9 @@ end data
 
 sub getFont as Font end sub
 
-sub setFont(name as string, style as int, size  as int) end sub
+sub setFont with name as string, style as int, size  as int end sub
 
-sub setFont(font as Font)
+sub setFont with font as Font
     setFont(font.name, font.style, font.size)
 end sub
 
@@ -597,23 +597,23 @@ end data
 
 sub getStroke as Stroke end sub
 
-sub setStroke(width as float, cap as int, join as int, miterLimit as float, dash as float[], dashPhase as float) end sub
+sub setStroke with width as float, cap as int, join as int, miterLimit as float, dash as float[], dashPhase as float end sub
 
-sub setStroke(stroke as Stroke)
+sub setStroke with stroke as Stroke
     setStroke(stroke.width, stroke.cap, stroke.join, stroke.miterLimit, stroke.dash, stroke.dashPhase)
 end sub
 
-sub translate(x as int, y as int) end sub
+sub translate with x as int, y as int end sub
 
-sub translate(x as double, y as double) end sub
+sub translate with x as double, y as double end sub
 
-sub rotate(theta as double) end sub
+sub rotate with theta as double end sub
 
-sub rotate(theta as double, x as double, y as double) end sub
+sub rotate with theta as double, x as double, y as double end sub
 
-sub scale(x as double, y as double) end sub
+sub scale with x as double, y as double end sub
 
-sub shear(x as double, y as double) end sub
+sub shear with x as double, y as double end sub
 
 sub pushMatrix end sub
 
@@ -621,47 +621,47 @@ sub popMatrix end sub
 
 sub clear end sub
 
-sub drawLine(xa as int, ya as int, xb as int, yb as int) end sub
+sub drawLine with xa as int, ya as int, xb as int, yb as int end sub
 
-sub drawRect(x as int, y as int, width as int, height as int) end sub
+sub drawRect with x as int, y as int, width as int, height as int end sub
 
-sub fillRect(x as int, y as int, width as int, height as int) end sub
+sub fillRect with x as int, y as int, width as int, height as int end sub
 
-sub drawOval(x as int, y as int, width as int, height as int) end sub
+sub drawOval with x as int, y as int, width as int, height as int end sub
 
-sub fillOval(x as int, y as int, width as int, height as int) end sub
+sub fillOval with x as int, y as int, width as int, height as int end sub
 
-sub drawRoundRect(x as int, y as int, width as int, height as int, arcWidth as int, arcHeight as int) end sub
+sub drawRoundRect with x as int, y as int, width as int, height as int, arcWidth as int, arcHeight as int end sub
 
-sub fillRoundRect(x as int, y as int, width as int, height as int, arcWidth as int, arcHeight as int) end sub
+sub fillRoundRect with x as int, y as int, width as int, height as int, arcWidth as int, arcHeight as int end sub
 
-sub draw3DRect(x as int, y as int, width as int, height as int, raised as bool) end sub
+sub draw3DRect with x as int, y as int, width as int, height as int, raised as bool end sub
 
-sub fill3DRect(x as int, y as int, width as int, height as int, raised as bool) end sub
+sub fill3DRect with x as int, y as int, width as int, height as int, raised as bool end sub
 
-sub drawArc(x as int, y as int, width as int, height as int, startAngle as int, arcAngle as int) end sub
+sub drawArc with x as int, y as int, width as int, height as int, startAngle as int, arcAngle as int end sub
 
-sub fillArc(x as int, y as int, width as int, height as int, startAngle as int, arcAngle as int) end sub
+sub fillArc with x as int, y as int, width as int, height as int, startAngle as int, arcAngle as int end sub
 
-sub drawPolyline(xPoints as int[], yPoints as int[], nPoints as int) end sub
+sub drawPolyline with xPoints as int[], yPoints as int[], nPoints as int end sub
 
-sub drawPolyline(xPoints as int[], yPoints as int[])
+sub drawPolyline with xPoints as int[], yPoints as int[]
     drawPolyline(xPoints, yPoints, #xPoints)
 end sub
 
-sub drawPolygon(xPoints as int[], yPoints as int[], nPoints as int) end sub
+sub drawPolygon with xPoints as int[], yPoints as int[], nPoints as int end sub
 
-sub drawPolygon(xPoints as int[], yPoints as int[])
+sub drawPolygon with xPoints as int[], yPoints as int[]
     drawPolygon(xPoints, yPoints, #xPoints)
 end sub
 
-sub fillPolygon(xPoints as int[], yPoints as int[], nPoints as int) end sub
+sub fillPolygon with xPoints as int[], yPoints as int[], nPoints as int end sub
 
-sub fillPolygon(xPoints as int[], yPoints as int[])
+sub fillPolygon with xPoints as int[], yPoints as int[]
     fillPolygon(xPoints, yPoints, #xPoints)
 end sub
 
-sub drawString(s as string, x as int, y as int) end sub
+sub drawString with s as string, x as int, y as int end sub
 
 data Image
     let id     as int,
@@ -669,27 +669,27 @@ data Image
     let height as int
 end data
 
-sub loadImage(path as string) as Image end sub
+sub loadImage as Image with path as string end sub
 
-sub drawImage(image as Image, x as int, y as int) end sub
+sub drawImage with image as Image, x as int, y as int end sub
 
-sub drawImage(image as Image, x as int, y as int, width as int, height as int) end sub
+sub drawImage with image as Image, x as int, y as int, width as int, height as int end sub
 
-sub drawImage(image as Image, dxa as int, dya as int, dxb as int, dyb as int, sxa as int, sya as int, sxb as int, syb as int) end sub
+sub drawImage with image as Image, dxa as int, dya as int, dxb as int, dyb as int, sxa as int, sya as int, sxb as int, syb as int end sub
 
 sub flip end sub
 
-sub keyIsDown(code as int) as bool end sub
+sub keyIsDown as bool with code as int end sub
 
-sub keyIsHeld(code as int) as bool end sub
+sub keyIsHeld as bool with code as int end sub
 
-sub keyIsUp(code as int) as bool end sub
+sub keyIsUp as bool with code as int end sub
 
-sub buttonIsDown(code as int) as bool end sub
+sub buttonIsDown as bool with code as int end sub
 
-sub buttonIsHeld(code as int) as bool end sub
+sub buttonIsHeld as bool with code as int end sub
 
-sub buttonIsUp(code as int) as bool end sub
+sub buttonIsUp as bool with code as int end sub
 
 sub mouseX as int end sub
 

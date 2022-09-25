@@ -174,8 +174,8 @@ sealed class Stmt(val location: Location) {
     class Sub(
         location: Location,
         val name: Expr.Name,
-        val params: List<Decl>,
         val type: Expr.Type,
+        val params: List<Decl>,
         val body: Block,
     ) : Stmt(location) {
         val signature
