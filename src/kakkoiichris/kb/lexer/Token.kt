@@ -24,6 +24,7 @@ data class Token(val location: Location, val type: Type, val value: Any = Unit) 
         NEXT("next"),
         RETURN("return"),
         YIELD("yield"),
+        LABEL("label"),
         TYPE("type"),
         ENUM("enum"),
         END("end"),
@@ -97,7 +98,6 @@ data class Token(val location: Location, val type: Type, val value: Any = Unit) 
         // Terminals
         VALUE("V"),
         WORD("N"),
-        LABEL("@"),
         
         // Delimiters
         LEFT_PAREN("("),

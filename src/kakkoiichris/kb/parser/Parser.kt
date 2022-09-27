@@ -61,16 +61,9 @@ class Parser(private val lexer: Lexer) {
         match(END_OF_FILE)
     
     private fun stmt(): Stmt {
-        val label = if (match(LABEL)) {
-            val token = currentToken
-            
-            mustSkip(LABEL)
-            
-            token.value as String
-        }
-        else ""
+        val label = if (skip(LABEL)) name() else Expr.Name.none
         
-        if (label.isNotEmpty()) {
+        if (label.value.isNotEmpty()) {
             return when {
                 match(DO)    -> doStmt(label)
                 
@@ -178,7 +171,7 @@ class Parser(private val lexer: Lexer) {
         return Stmt.Block(location, stmts)
     }
     
-    private fun doStmt(label: String): Stmt.Do {
+    private fun doStmt(label: Expr.Name): Stmt.Do {
         val location = here()
         
         mustSkip(DO)
@@ -249,8 +242,8 @@ class Parser(private val lexer: Lexer) {
         
         var elze: Stmt.Switch.Case.Else? = null
         
-        while (!skip(END)) {
-            val caseLoc = here()
+        while (!match(END)) {
+            val caseLocation = here()
             
             mustSkip(CASE)
             
@@ -259,8 +252,9 @@ class Parser(private val lexer: Lexer) {
                     val block = block(END)
                     
                     mustSkip(END)
+                    mustSkip(CASE)
                     
-                    elze = Stmt.Switch.Case.Else(caseLoc, block)
+                    elze = Stmt.Switch.Case.Else(caseLocation, block)
                 }
                 else {
                     KBError.duplicateElseCase(here())
@@ -276,7 +270,7 @@ class Parser(private val lexer: Lexer) {
                     mustSkip(END)
                     mustSkip(CASE)
                     
-                    cases += Stmt.Switch.Case.Type(caseLoc, inverted, type, block)
+                    cases += Stmt.Switch.Case.Type(caseLocation, inverted, type, block)
                 }
                 
                 else       -> {
@@ -292,11 +286,12 @@ class Parser(private val lexer: Lexer) {
                     mustSkip(END)
                     mustSkip(CASE)
                     
-                    cases += Stmt.Switch.Case.Values(caseLoc, values, block)
+                    cases += Stmt.Switch.Case.Values(caseLocation, values, block)
                 }
             }
         }
         
+        mustSkip(END)
         mustSkip(SWITCH)
         
         if (elze != null) {
@@ -306,7 +301,7 @@ class Parser(private val lexer: Lexer) {
         return Stmt.Switch(location, subject, cases)
     }
     
-    private fun whileStmt(label: String): Stmt.While {
+    private fun whileStmt(label: Expr.Name): Stmt.While {
         val location = here()
         
         mustSkip(WHILE)
@@ -321,7 +316,7 @@ class Parser(private val lexer: Lexer) {
         return Stmt.While(location, label, test, body)
     }
     
-    private fun untilStmt(label: String): Stmt.Until {
+    private fun untilStmt(label: Expr.Name): Stmt.Until {
         val location = here()
         
         mustSkip(UNTIL)
@@ -336,7 +331,7 @@ class Parser(private val lexer: Lexer) {
         return Stmt.Until(location, label, test, body)
     }
     
-    private fun forStmt(label: String): Stmt {
+    private fun forStmt(label: Expr.Name): Stmt {
         val location = here()
         
         mustSkip(FOR)
@@ -499,14 +494,7 @@ class Parser(private val lexer: Lexer) {
         
         mustSkip(BREAK)
         
-        val destination = if (match(LABEL)) {
-            val token = currentToken.value as String
-            
-            mustSkip(LABEL)
-            
-            token
-        }
-        else ""
+        val destination = if (skip(TO)) name() else Expr.Name.none
         
         return Stmt.Break(location, destination)
     }
@@ -515,10 +503,10 @@ class Parser(private val lexer: Lexer) {
         val location = here()
         
         mustSkip(NEXT)
+    
+        val destination = if (skip(TO)) name() else Expr.Name.none
         
-        val pointer = name()
-        
-        return Stmt.Next(location, pointer)
+        return Stmt.Next(location, destination)
     }
     
     private fun returnStmt(): Stmt.Return {
