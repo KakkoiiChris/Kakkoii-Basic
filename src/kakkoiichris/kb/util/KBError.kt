@@ -56,6 +56,9 @@ class KBError(stage: String, message: String, location: Location) : RuntimeExcep
         
         fun invalidTokenType(invalid: Type, expected: Type, location: Location): Nothing =
             forParser("Token type '$invalid' is invalid; expected '$expected'", location)
+    
+        fun nonLabeledStatement(type: Type, location: Location):Nothing=
+            forParser("Statement beginning with '$type' cannot have a label", location)
         
         private fun forScript(message: String, location: Location): Nothing =
             throw KBError("Script", message, location)
@@ -135,6 +138,9 @@ class KBError(stage: String, message: String, location: Location) : RuntimeExcep
         fun noYield(name: Expr.Name, location: Location): Nothing =
             forScript("Sub '$name' must yield a value", location)
         
+        fun noSub(name:String):Nothing=
+            forScript("Sub '$name' not found for the given arguments", Location.none)
+        
         fun invalidUnaryOperand(operand: Any, operator: Expr.Unary.Operator, location: Location): Nothing =
             forScript("Operand '$operand' is invalid for unary '$operator' operator", location)
         
@@ -154,7 +160,7 @@ class KBError(stage: String, message: String, location: Location) : RuntimeExcep
             forScript("Value of type '$type' cannot be indexed by a value of type '$indexType'", location)
         
         fun invalidArraySize(): Nothing =
-            forScript("Array init size must be of type int or smaller", Location.none)
+            forScript("Initial array size must be of type int or smaller", Location.none)
         
         fun unresolvedPositions(name: Expr.Name, location: Location): Nothing =
             forScript("Can't resolve argument positions for sub '$name'", location)

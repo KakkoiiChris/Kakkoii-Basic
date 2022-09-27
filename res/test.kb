@@ -1,12 +1,11 @@
-let x = 0
+data X
+    var x as int
+end data
 
-switch x
-    case 0
-        print("ONE\n")
-        next
-    end case
-    
-    case else
-        print("ELSE\n")
-    end case
-end switch
+sub getString as bool with x as X
+    yield true
+end sub
+
+let x = X{}
+
+print(x, '\n')

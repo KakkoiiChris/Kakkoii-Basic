@@ -1491,7 +1491,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     }
                     
                     val result = visit(subExpr).fromRef()
-                    val value = type.coerce(result) ?: TODO("COERCE ARRAY INDEX")
+                    val value = type.coerce(result) ?: KBError.mismatchedType(result, type, subExpr.location)
                     
                     if (target.type.filter(this, value) == null) {
                         KBError.mismatchedType(value, target.type, expr.location)
@@ -1517,7 +1517,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     }
                     
                     val result = visit(subExpr).fromRef()
-                    val value = type.coerce(result) ?: TODO("COERCE DATA INDEX CHAR")
+                    val value = type.coerce(result) ?: KBError.mismatchedType(result, type, subExpr.location)
                     
                     when (ref.put(this, value)) {
                         true  -> value
@@ -1539,7 +1539,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     }
                     
                     val result = visit(subExpr).fromRef()
-                    val value = type.coerce(result) ?: TODO("COERCE DATA INDEX STRING")
+                    val value = type.coerce(result) ?: KBError.mismatchedType(result, type, subExpr.location)
                     
                     when (ref.put(this, value)) {
                         true  -> value
@@ -1579,9 +1579,6 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         KBError.nonAccessedType(DataType.infer(this, target), expr.location)
     }
     
-    fun getString(x: Any) =
-        (invoke("getstring", x) ?: x.toString()) as? String ?: TODO("GETSTRING IS NOT A STRING")
-    
     fun invoke(name: String, vararg arguments: Any): Any? {
         val invoke = Expr.Invoke(Location.none, name.toName(), arguments.map(Any::toExpr))
         
@@ -1593,6 +1590,9 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             else                 -> null
         }
     }
+    
+    fun getString(x: Any) =
+        (invoke("getstring", x) ?: x.toString()) as? String ?: KBError.mismatchedReturnType("getstring".toName(), DataType.Primitive.STRING, Location.none)
     
     override fun visitInvokeExpr(expr: Expr.Invoke): Any {
         val (value, result) = performInvoke(expr)
@@ -1673,13 +1673,6 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         }
         
         return params.mapIndexed { i, decl -> decl.withExpr(exprs[i]) }
-    }
-    
-    private enum class InvokeResult {
-        SUCCESS,
-        FAIL_UNDECLARED,
-        FAIL_POSITIONS,
-        FAIL_TYPES
     }
     
     private fun performInvoke(expr: Expr.Invoke): Pair<Any, InvokeResult> {
@@ -1817,5 +1810,12 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         }
         
         return DataInstance(data.name, scope)
+    }
+    
+    private enum class InvokeResult {
+        SUCCESS,
+        FAIL_UNDECLARED,
+        FAIL_POSITIONS,
+        FAIL_TYPES
     }
 }

@@ -3,6 +3,7 @@
 package kakkoiichris.kb.script
 
 import kakkoiichris.kb.parser.Stmt
+import kakkoiichris.kb.util.KBError
 import java.awt.Color
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -103,7 +104,7 @@ class StandardLibrary {
             name as String
             arguments as ArrayInstance
             
-            script.invoke(name, *arguments.toTypedArray()) ?: TODO("INVOKE SUB NOT FOUND")
+            script.invoke(name, *arguments.toTypedArray()) ?: KBError.noSub(name)
         }
         
         add("exit", DataType.Primitive.NONE, DataType.Primitive.INT) { _, args ->

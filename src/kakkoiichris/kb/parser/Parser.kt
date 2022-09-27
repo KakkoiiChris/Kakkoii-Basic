@@ -73,7 +73,7 @@ class Parser(private val lexer: Lexer) {
                 
                 match(FOR)   -> forStmt(label)
                 
-                else         -> TODO("STATEMENT ${currentToken.type} CAN'T HAVE LABEL")
+                else         -> KBError.nonLabeledStatement(currentToken.type, here())
             }
         }
         
