@@ -12,11 +12,13 @@ interface DataType {
         fun infer(script: Script, x: Any?): DataType =
             when (x) {
                 is ArrayInstance -> when {
-                    x.isEmpty()                                       -> Primitive.ANY.array
+                    x.isEmpty()                   -> Primitive.ANY.array
                     
-                    x.drop(1).all { x.first()::class.isInstance(it) } -> Array(infer(script, x[0]))
+                    x.isHomogenous(script)        -> Array(infer(script, x[0]))
                     
-                    else                                              -> Primitive.ANY.array
+                    x.all { it is ArrayInstance } -> Primitive.ANY.array.array
+                    
+                    else                          -> Primitive.ANY.array
                 }
                 
                 is DataInstance  -> Data(x.name)
@@ -24,16 +26,31 @@ interface DataType {
                 is List<*>       -> {
                     val xn = x.filterNotNull()
                     
-                    if (xn.isNotEmpty() && xn.drop(1).all { xn.first()::class.isInstance(it) }) {
-                        Array(infer(script, xn[0]))
-                    }
-                    else {
-                        Primitive.ANY.array
+                    when {
+                        xn.isEmpty()                   -> Primitive.ANY.array
+                        
+                        xn.isHomogenous(script)        -> Array(infer(script, xn[0]))
+                        
+                        xn.all { it is ArrayInstance } -> Primitive.ANY.array.array
+                        
+                        else                           -> Primitive.ANY.array
                     }
                 }
                 
                 else             -> Primitive.infer(script, x)
             }
+        
+        private fun List<*>.isHomogenous(script: Script): Boolean {
+            val firstType = infer(script, get(0))
+            
+            for (x in drop(1)) {
+                if (firstType.filter(script, x) == null) {
+                    return false
+                }
+            }
+            
+            return true
+        }
         
         fun resolveAlias(script: Script, type: DataType): DataType {
             if (type is Data) {

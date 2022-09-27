@@ -1,5 +1,5 @@
-sub product as int with a as int, b as int
-    yield a * b
-end sub
+data Vector var x as double, var y as double end data
 
-print(product(5, 3), '\n')
+var x = [[Vector{},[[[Vector {1, 2}], [Vector {3, 4}]]]]]
+
+print(typeOf(x))

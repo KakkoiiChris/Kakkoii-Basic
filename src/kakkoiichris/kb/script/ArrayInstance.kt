@@ -43,7 +43,10 @@ class ArrayInstance(val type: DataType, private val elements: MutableList<Any>) 
     }
     
     override fun toString() =
-        joinToString(prefix = "[ ", postfix = " ]")
+        if (isEmpty())
+            "[]"
+        else
+            joinToString(prefix = "[ ", postfix = " ]")
     
     override fun hashCode(): Int {
         var result = type.hashCode()
