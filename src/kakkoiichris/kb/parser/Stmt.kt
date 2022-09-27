@@ -107,7 +107,7 @@ sealed class Stmt(val location: Location) {
             visitor.visitBlockStmt(this)
     }
     
-    class Do(location: Location, val label: String, val body: Block) : Stmt(location) {
+    class Do(location: Location, val label: Expr.Name, val body: Block) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitDoStmt(this)
     }
@@ -130,17 +130,17 @@ sealed class Stmt(val location: Location) {
         }
     }
     
-    class While(location: Location, val label: String, val test: Expr, val body: Block) : Stmt(location) {
+    class While(location: Location, val label: Expr.Name, val test: Expr, val body: Block) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitWhileStmt(this)
     }
     
-    class Until(location: Location, val label: String, val test: Expr, val body: Block) : Stmt(location) {
+    class Until(location: Location, val label: Expr.Name, val test: Expr, val body: Block) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitUntilStmt(this)
     }
     
-    class ForCounter(location: Location, val label: String, val decl: Decl, val to: Expr, val step: Expr, val body: Block) :
+    class ForCounter(location: Location, val label: Expr.Name, val decl: Decl, val to: Expr, val step: Expr, val body: Block) :
         Stmt(location) {
         override val detail get() = decl.detail
         
@@ -148,7 +148,7 @@ sealed class Stmt(val location: Location) {
             visitor.visitForCounterStmt(this)
     }
     
-    class ForIterate(location: Location, val label: String, val decl: Decl, val iterable: Expr, val body: Block) :
+    class ForIterate(location: Location, val label: Expr.Name, val decl: Decl, val iterable: Expr, val body: Block) :
         Stmt(location) {
         override val detail get() = decl.detail
         
@@ -156,7 +156,7 @@ sealed class Stmt(val location: Location) {
             visitor.visitForIterateStmt(this)
     }
     
-    class ForIterateEach(location: Location, val label: String, val decl: DeclEach, val iterable: Expr, val body: Block) :
+    class ForIterateEach(location: Location, val label: Expr.Name, val decl: DeclEach, val iterable: Expr, val body: Block) :
         Stmt(location) {
         override val detail get() = decl.detail
         
@@ -193,13 +193,13 @@ sealed class Stmt(val location: Location) {
             visitor.visitSubStmt(this)
     }
     
-    class Break(location: Location, val destination: String) : Stmt(location) {
+    class Break(location: Location, val destination: Expr.Name) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitBreakStmt(this)
     }
     
-    class Next(location: Location, val pointer: Expr.Name) : Stmt(location) {
-        override val detail get() = " $pointer"
+    class Next(location: Location, val destination: Expr.Name) : Stmt(location) {
+        override val detail get() = " $destination"
         
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitNextStmt(this)

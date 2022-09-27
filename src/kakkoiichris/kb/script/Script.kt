@@ -153,7 +153,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             visit(stmt.body)
         }
         catch (r: Redirect.Break) {
-            if (!(r.label.isEmptyValue() || r.label == stmt.label)) {
+            if (!(r.label.value.isEmpty() || r.label == stmt.label)) {
                 throw r
             }
         }
@@ -177,30 +177,35 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         val subject = visit(stmt.subject).fromRef()
         
         for (case in stmt.cases) {
-            when (case) {
-                is Stmt.Switch.Case.Values -> {
-                    for (test in case.tests) {
-                        if (subject == test) {
-                            visit(case.block)
-                            
-                            return
+            try {
+                when (case) {
+                    is Stmt.Switch.Case.Values -> {
+                        for (test in case.tests) {
+                            if (subject == visit(test)) {
+                                visit(case.block)
+                                
+                                return
+                            }
                         }
                     }
-                }
-                
-                is Stmt.Switch.Case.Type   -> {
-                    val type = visit(case.type) as DataType
                     
-                    if ((type.filter(this, subject) == null) xor case.inverted) {
-                        continue
+                    is Stmt.Switch.Case.Type   -> {
+                        val type = visit(case.type) as DataType
+                        
+                        if ((type.filter(this, subject) == null) xor case.inverted) {
+                            continue
+                        }
+                        
+                        visit(case.block)
+                        
+                        return
                     }
                     
-                    visit(case.block)
-                    
-                    return
+                    is Stmt.Switch.Case.Else   -> visit(case.block)
                 }
-                
-                is Stmt.Switch.Case.Else   -> visit(case.block)
+            }
+            catch (r: Redirect.Next) {
+                continue
             }
         }
     }
@@ -217,9 +222,11 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 visit(stmt.body)
             }
             catch (r: Redirect.Break) {
-                if (!(r.label.isEmptyValue() || r.label == stmt.label)) {
+                if (!(r.label.value.isEmpty() || r.label == stmt.label)) {
                     throw r
                 }
+                
+                break
             }
             catch (r: Redirect.Next) {
                 continue
@@ -236,6 +243,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 if (!(r.label.isEmptyValue() || r.label == stmt.label)) {
                     throw r
                 }
+                
+                break
             }
             catch (r: Redirect.Next) {
                 continue
@@ -272,14 +281,18 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     visit(stmt.body)
                 }
                 catch (r: Redirect.Break) {
-                    if (!(r.label.isEmptyValue() || r.label == stmt.label)) {
+                    if (!(r.label.value.isEmpty() || r.label == stmt.label)) {
                         throw r
                     }
+                    
+                    break
                 }
                 catch (r: Redirect.Next) {
-                    if (!r.pointer.isEmptyValue() && r.pointer != stmt.decl.name) {
+                    if (!(r.label.value.isEmpty() || r.label == stmt.label)) {
                         throw r
                     }
+                    
+                    continue
                 }
                 
                 visit(increment)
@@ -310,11 +323,17 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     visit(stmt.body)
                 }
                 catch (r: Redirect.Break) {
-                    if (!(r.label.isEmptyValue() || r.label == stmt.label)) {
+                    if (!(r.label.value.isEmpty() || r.label == stmt.label)) {
                         throw r
                     }
+                    
+                    break
                 }
                 catch (r: Redirect.Next) {
+                    if (!(r.label.value.isEmpty() || r.label == stmt.label)) {
+                        throw r
+                    }
+                    
                     continue
                 }
             }
@@ -343,11 +362,17 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     visit(stmt.body)
                 }
                 catch (r: Redirect.Break) {
-                    if (!(r.label.isEmptyValue() || r.label == stmt.label)) {
+                    if (!(r.label.value.isEmpty() || r.label == stmt.label)) {
                         throw r
                     }
+                    
+                    break
                 }
                 catch (r: Redirect.Next) {
+                    if (!(r.label.value.isEmpty() || r.label == stmt.label)) {
+                        throw r
+                    }
+                    
                     continue
                 }
             }
@@ -376,7 +401,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
     
     override fun visitNextStmt(stmt: Stmt.Next) {
-        throw Redirect.Next(stmt.location, stmt.pointer)
+        throw Redirect.Next(stmt.location, stmt.destination)
     }
     
     override fun visitReturnStmt(stmt: Stmt.Return) {
