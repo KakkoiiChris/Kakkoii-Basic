@@ -56,8 +56,6 @@ class Lexer(private val source: Source) : Iterator<Token> {
                 
                 match('"')           -> string()
                 
-                match('@')           -> label()
-                
                 else                 -> symbol()
             }
         }
@@ -365,20 +363,6 @@ class Lexer(private val source: Source) : Iterator<Token> {
         }
         
         return Token(location, Token.Type.VALUE, result)
-    }
-    
-    private fun label(): Token {
-        val location = here()
-        
-        mustSkip('@')
-        
-        val result = buildString {
-            while (match(Char::isLetterOrDigit)) {
-                take()
-            }
-        }
-        
-        return Token(location, Token.Type.LABEL, result)
     }
     
     private fun symbol(): Token {

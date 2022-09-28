@@ -1,11 +1,71 @@
-data X
-    var x as int
+let fps = 60.0
+let wait = 1 / fps
+
+let width = 640
+let height = 480
+
+data Sphere
+    var x as double,
+    var y as double,
+    var dx as double,
+    var dy as double
 end data
 
-sub getString as bool with x as X
-    yield true
-end sub
+let spheres as Sphere[100]
 
-let x = X{}
+let radius = 16
 
-print(x, '\n')
+for i = 0 to #spheres
+	let x = (width / 2) - radius + (random() * 100) - 50
+	let y = (height / 2) - radius + (random() * 100) - 50
+	let dx = (random() * 2.0) - 1.0
+	let dy = (random() * 2.0) - 1.0
+    
+    spheres[i] = { x, y, dx, dy }
+end for
+
+createWindow(width, height, "Zen Rainbow Energy Spheres")
+
+openWindow()
+
+until not windowIsOpen()
+	setColor(0)
+	clear()
+	
+	for sphere in spheres
+        let each x, y, dx, dy = sphere
+    
+		setColor(random(), random(), random())
+        
+		fillOval(x as int, y as int, (radius * 2) as int, (radius * 2) as int)
+        
+        sphere.x += dx
+		sphere.y += dy
+		
+        if x < 0
+            sphere.x = 0
+            sphere.dx *= -1
+        end if
+        
+        if x >= width - radius * 2
+            sphere.x = width - radius * 2 - 0.5
+            sphere.dx *= -1
+        end if
+		
+        if y < 0
+            sphere.y = 0
+            sphere.dy *= -1
+        end if
+        
+        if y >= height - radius * 2
+            sphere.y = height - radius * 2 - 0.5
+            sphere.dy *= -1
+        end if
+	end for
+	
+	flip()
+    
+	sleep(wait)
+end until
+
+closeWindow()

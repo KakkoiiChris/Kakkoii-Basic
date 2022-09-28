@@ -11,15 +11,7 @@ interface DataType {
     companion object {
         fun infer(script: Script, x: Any?): DataType =
             when (x) {
-                is ArrayInstance -> when {
-                    x.isEmpty()                   -> Primitive.ANY.array
-                    
-                    x.isHomogenous(script)        -> Array(infer(script, x[0]))
-                    
-                    x.all { it is ArrayInstance } -> Primitive.ANY.array.array
-                    
-                    else                          -> Primitive.ANY.array
-                }
+                is ArrayInstance -> x.type.array
                 
                 is DataInstance  -> Data(x.name)
                 
