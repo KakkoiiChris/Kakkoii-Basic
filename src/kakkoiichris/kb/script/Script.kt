@@ -421,6 +421,10 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
     
     override fun visitEnumStmt(stmt: Stmt.Enum) {
+        val name = stmt.name.value
+        val entries = mutableListOf<EnumInstance.Entry>()
+        
+        //memory. EnumInstance(name, entries)
     }
     
     override fun visitExpressionStmt(stmt: Stmt.Expression) {
@@ -1577,6 +1581,11 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         }
         
         KBError.nonAccessedType(DataType.infer(this, target), expr.location)
+    }
+    
+    override fun visitGetEntryExpr(expr: Expr.GetEntry): Any {
+        //memory.get
+        return Unit
     }
     
     fun invoke(name: String, vararg arguments: Any): Any? {

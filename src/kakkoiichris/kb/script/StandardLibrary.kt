@@ -3,6 +3,7 @@
 package kakkoiichris.kb.script
 
 import kakkoiichris.kb.parser.Stmt
+import kakkoiichris.kb.script.DataType.Primitive.*
 import kakkoiichris.kb.util.KBError
 import java.awt.Color
 import java.nio.file.Files
@@ -28,7 +29,7 @@ class StandardLibrary {
     }
     
     private fun addGeneral() {
-        add("print", DataType.Primitive.NONE, DataType.Primitive.ANY.vararg) { script, args ->
+        add("print", NONE, ANY.vararg) { script, args ->
             val (subArgs) = args
             
             subArgs as ArrayInstance
@@ -38,7 +39,7 @@ class StandardLibrary {
             }
         }
         
-        add("input", DataType.Primitive.STRING, DataType.Primitive.ANY.vararg) { script, args ->
+        add("input", STRING, ANY.vararg) { script, args ->
             val (subArgs) = args
             
             subArgs as ArrayInstance
@@ -47,10 +48,10 @@ class StandardLibrary {
                 print(script.getString(arg))
             }
             
-            readLine() ?: ""
+            readln()
         }
         
-        add("read", DataType.Primitive.STRING, DataType.Primitive.STRING) { _, args ->
+        add("read", STRING, STRING) { _, args ->
             val (path) = args
             
             path as String
@@ -58,7 +59,7 @@ class StandardLibrary {
             Files.readString(Paths.get(path))
         }
         
-        add("write", DataType.Primitive.NONE, DataType.Primitive.STRING, DataType.Primitive.ANY) { _, args ->
+        add("write", NONE, STRING, ANY) { _, args ->
             val (path, data) = args
             
             path as String
@@ -68,7 +69,7 @@ class StandardLibrary {
             Unit
         }
         
-        add("concat", DataType.Primitive.STRING, DataType.Primitive.ANY.vararg) { script, args ->
+        add("concat", STRING, ANY.vararg) { script, args ->
             val (subArgs) = args
             
             subArgs as ArrayInstance
@@ -80,7 +81,7 @@ class StandardLibrary {
             }
         }
         
-        add("sleep", DataType.Primitive.NONE, DataType.Primitive.LONG) { _, args ->
+        add("sleep", NONE, LONG) { _, args ->
             val (milliseconds) = args
             
             milliseconds as Long
@@ -88,17 +89,17 @@ class StandardLibrary {
             Thread.sleep(milliseconds)
         }
         
-        add("milliseconds", DataType.Primitive.LONG) { _, _ -> System.currentTimeMillis() }
+        add("milliseconds", LONG) { _, _ -> System.currentTimeMillis() }
         
-        add("nanoseconds", DataType.Primitive.LONG) { _, _ -> System.nanoTime() }
+        add("nanoseconds", LONG) { _, _ -> System.nanoTime() }
         
-        add("typeof", DataType.Primitive.STRING, DataType.Primitive.ANY) { script, args ->
+        add("typeof", STRING, ANY) { script, args ->
             val (x) = args
             
             DataType.infer(script, x).toString()
         }
         
-        add("invoke", DataType.Primitive.ANY, DataType.Primitive.STRING, DataType.Primitive.ANY.vararg) { script, args ->
+        add("invoke", ANY, STRING, ANY.vararg) { script, args ->
             val (name, arguments) = args
             
             name as String
@@ -107,7 +108,7 @@ class StandardLibrary {
             script.invoke(name, *arguments.toTypedArray()) ?: KBError.noSub(name)
         }
         
-        add("exit", DataType.Primitive.NONE, DataType.Primitive.INT) { _, args ->
+        add("exit", NONE, INT) { _, args ->
             val (code) = args
             
             code as Int
@@ -117,7 +118,7 @@ class StandardLibrary {
     }
     
     private fun addChar() {
-        add("isAlpha", DataType.Primitive.BOOL, DataType.Primitive.CHAR) { _, args ->
+        add("isAlpha", BOOL, CHAR) { _, args ->
             val (c) = args
             
             c as Char
@@ -125,7 +126,7 @@ class StandardLibrary {
             c.isLetter()
         }
         
-        add("isAlnum", DataType.Primitive.BOOL, DataType.Primitive.CHAR) { _, args ->
+        add("isAlnum", BOOL, CHAR) { _, args ->
             val (c) = args
             
             c as Char
@@ -133,7 +134,7 @@ class StandardLibrary {
             c.isLetterOrDigit()
         }
         
-        add("isDigit", DataType.Primitive.BOOL, DataType.Primitive.CHAR) { _, args ->
+        add("isDigit", BOOL, CHAR) { _, args ->
             val (c) = args
             
             c as Char
@@ -141,7 +142,7 @@ class StandardLibrary {
             c.isDigit()
         }
         
-        add("isSpace", DataType.Primitive.BOOL, DataType.Primitive.CHAR) { _, args ->
+        add("isSpace", BOOL, CHAR) { _, args ->
             val (c) = args
             
             c as Char
@@ -149,7 +150,7 @@ class StandardLibrary {
             c.isWhitespace()
         }
         
-        add("isVowel", DataType.Primitive.BOOL, DataType.Primitive.CHAR) { _, args ->
+        add("isVowel", BOOL, CHAR) { _, args ->
             val (c) = args
             
             c as Char
@@ -157,7 +158,7 @@ class StandardLibrary {
             c in "AEIOUaeiou"
         }
         
-        add("isLower", DataType.Primitive.BOOL, DataType.Primitive.CHAR) { _, args ->
+        add("isLower", BOOL, CHAR) { _, args ->
             val (c) = args
             
             c as Char
@@ -165,7 +166,7 @@ class StandardLibrary {
             c.isLowerCase()
         }
         
-        add("isUpper", DataType.Primitive.BOOL, DataType.Primitive.CHAR) { _, args ->
+        add("isUpper", BOOL, CHAR) { _, args ->
             val (c) = args
             
             c as Char
@@ -173,7 +174,7 @@ class StandardLibrary {
             c.isUpperCase()
         }
         
-        add("toLower", DataType.Primitive.CHAR, DataType.Primitive.CHAR) { _, args ->
+        add("toLower", CHAR, CHAR) { _, args ->
             val (c) = args
             
             c as Char
@@ -181,7 +182,7 @@ class StandardLibrary {
             c.lowercase()
         }
         
-        add("toUpper", DataType.Primitive.CHAR, DataType.Primitive.CHAR) { _, args ->
+        add("toUpper", CHAR, CHAR) { _, args ->
             val (c) = args
             
             c as Char
@@ -191,7 +192,7 @@ class StandardLibrary {
     }
     
     private fun addString() {
-        add("isBlank", DataType.Primitive.BOOL, DataType.Primitive.STRING) { _, args ->
+        add("isBlank", BOOL, STRING) { _, args ->
             val (s) = args
             
             s as String
@@ -199,7 +200,7 @@ class StandardLibrary {
             s.isBlank()
         }
         
-        add("isEmpty", DataType.Primitive.BOOL, DataType.Primitive.STRING) { _, args ->
+        add("isEmpty", BOOL, STRING) { _, args ->
             val (s) = args
             
             s as String
@@ -207,7 +208,7 @@ class StandardLibrary {
             s.isBlank()
         }
         
-        add("toLower", DataType.Primitive.STRING, DataType.Primitive.STRING) { _, args ->
+        add("toLower", STRING, STRING) { _, args ->
             val (s) = args
             
             s as String
@@ -215,7 +216,7 @@ class StandardLibrary {
             s.lowercase()
         }
         
-        add("toUpper", DataType.Primitive.STRING, DataType.Primitive.STRING) { _, args ->
+        add("toUpper", STRING, STRING) { _, args ->
             val (s) = args
             
             s as String
@@ -225,10 +226,10 @@ class StandardLibrary {
         
         add(
             "startsWith",
-            DataType.Primitive.BOOL,
-            DataType.Primitive.STRING,
-            DataType.Primitive.STRING,
-            DataType.Primitive.BOOL
+            BOOL,
+            STRING,
+            STRING,
+            BOOL
         ) { _, args ->
             val (s, prefix, ignoreCase) = args
             
@@ -241,10 +242,10 @@ class StandardLibrary {
         
         add(
             "endsWith",
-            DataType.Primitive.BOOL,
-            DataType.Primitive.STRING,
-            DataType.Primitive.STRING,
-            DataType.Primitive.BOOL
+            BOOL,
+            STRING,
+            STRING,
+            BOOL
         ) { _, args ->
             val (s, suffix, ignoreCase) = args
             
@@ -255,7 +256,7 @@ class StandardLibrary {
             s.endsWith(suffix, ignoreCase)
         }
         
-        add("trim", DataType.Primitive.STRING, DataType.Primitive.STRING) { _, args ->
+        add("trim", STRING, STRING) { _, args ->
             val (s) = args
             
             s as String
@@ -263,7 +264,7 @@ class StandardLibrary {
             s.trim()
         }
         
-        add("trimStart", DataType.Primitive.STRING, DataType.Primitive.STRING) { _, args ->
+        add("trimStart", STRING, STRING) { _, args ->
             val (s) = args
             
             s as String
@@ -271,7 +272,7 @@ class StandardLibrary {
             s.trimStart()
         }
         
-        add("trimEnd", DataType.Primitive.STRING, DataType.Primitive.STRING) { _, args ->
+        add("trimEnd", STRING, STRING) { _, args ->
             val (s) = args
             
             s as String
@@ -281,10 +282,10 @@ class StandardLibrary {
         
         add(
             "substring",
-            DataType.Primitive.STRING,
-            DataType.Primitive.STRING,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            STRING,
+            STRING,
+            INT,
+            INT
         ) { _, args ->
             val (s, startIndex, endIndex) = args
             
@@ -297,9 +298,9 @@ class StandardLibrary {
         
         add(
             "split",
-            DataType.Primitive.STRING.array,
-            DataType.Primitive.STRING,
-            DataType.Primitive.STRING
+            STRING.array,
+            STRING,
+            STRING
         ) { _, args ->
             
             val (s, regex) = args
@@ -310,7 +311,7 @@ class StandardLibrary {
             s.split(regex.toRegex()).toTypedArray().toArrayInstance()
         }
         
-        add("indexOf", DataType.Primitive.INT, DataType.Primitive.STRING, DataType.Primitive.CHAR) { _, args ->
+        add("indexOf", INT, STRING, CHAR) { _, args ->
             val (s, c) = args
             
             s as String
@@ -319,7 +320,7 @@ class StandardLibrary {
             s.indexOf(c)
         }
         
-        add("indexOf", DataType.Primitive.INT, DataType.Primitive.STRING, DataType.Primitive.STRING) { _, args ->
+        add("indexOf", INT, STRING, STRING) { _, args ->
             val (s, sequence) = args
             
             s as String
@@ -328,7 +329,7 @@ class StandardLibrary {
             s.indexOf(sequence)
         }
         
-        add("lastIndexOf", DataType.Primitive.INT, DataType.Primitive.STRING, DataType.Primitive.CHAR) { _, args ->
+        add("lastIndexOf", INT, STRING, CHAR) { _, args ->
             val (s, c) = args
             
             s as String
@@ -337,7 +338,7 @@ class StandardLibrary {
             s.lastIndexOf(c)
         }
         
-        add("lastIndexOf", DataType.Primitive.INT, DataType.Primitive.STRING, DataType.Primitive.STRING) { _, args ->
+        add("lastIndexOf", INT, STRING, STRING) { _, args ->
             val (s, sequence) = args
             
             s as String
@@ -348,10 +349,10 @@ class StandardLibrary {
         
         add(
             "padStart",
-            DataType.Primitive.STRING,
-            DataType.Primitive.STRING,
-            DataType.Primitive.INT,
-            DataType.Primitive.CHAR
+            STRING,
+            STRING,
+            INT,
+            CHAR
         ) { _, args ->
             val (s, length, c) = args
             
@@ -364,10 +365,10 @@ class StandardLibrary {
         
         add(
             "padEnd",
-            DataType.Primitive.STRING,
-            DataType.Primitive.STRING,
-            DataType.Primitive.INT,
-            DataType.Primitive.CHAR
+            STRING,
+            STRING,
+            INT,
+            CHAR
         ) { _, args ->
             val (s, length, c) = args
             
@@ -380,10 +381,10 @@ class StandardLibrary {
         
         add(
             "replace",
-            DataType.Primitive.STRING,
-            DataType.Primitive.STRING,
-            DataType.Primitive.CHAR,
-            DataType.Primitive.CHAR
+            STRING,
+            STRING,
+            CHAR,
+            CHAR
         ) { _, args ->
             val (s, old, new) = args
             
@@ -396,10 +397,10 @@ class StandardLibrary {
         
         add(
             "replace",
-            DataType.Primitive.STRING,
-            DataType.Primitive.STRING,
-            DataType.Primitive.STRING,
-            DataType.Primitive.STRING
+            STRING,
+            STRING,
+            STRING,
+            STRING
         ) { _, args ->
             val (s, old, new) = args
             
@@ -412,7 +413,7 @@ class StandardLibrary {
     }
     
     private fun addMath() {
-        add("abs", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("abs", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -420,7 +421,7 @@ class StandardLibrary {
             abs(n)
         }
         
-        add("abs", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("abs", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -428,7 +429,7 @@ class StandardLibrary {
             abs(n)
         }
         
-        add("abs", DataType.Primitive.INT, DataType.Primitive.INT) { _, args ->
+        add("abs", INT, INT) { _, args ->
             val (n) = args
             
             n as Int
@@ -436,7 +437,7 @@ class StandardLibrary {
             abs(n)
         }
         
-        add("abs", DataType.Primitive.LONG, DataType.Primitive.LONG) { _, args ->
+        add("abs", LONG, LONG) { _, args ->
             val (n) = args
             
             n as Long
@@ -444,7 +445,7 @@ class StandardLibrary {
             abs(n)
         }
         
-        add("acos", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("acos", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -452,7 +453,7 @@ class StandardLibrary {
             acos(n)
         }
         
-        add("acos", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("acos", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -460,7 +461,7 @@ class StandardLibrary {
             acos(n)
         }
         
-        add("acosh", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("acosh", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -468,7 +469,7 @@ class StandardLibrary {
             acosh(n)
         }
         
-        add("acosh", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("acosh", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -476,7 +477,7 @@ class StandardLibrary {
             acosh(n)
         }
         
-        add("asin", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("asin", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -484,7 +485,7 @@ class StandardLibrary {
             asin(n)
         }
         
-        add("asin", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("asin", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -492,7 +493,7 @@ class StandardLibrary {
             asin(n)
         }
         
-        add("asinh", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("asinh", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -500,7 +501,7 @@ class StandardLibrary {
             asinh(n)
         }
         
-        add("asinh", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("asinh", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -508,7 +509,7 @@ class StandardLibrary {
             asinh(n)
         }
         
-        add("atan", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("atan", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -516,7 +517,7 @@ class StandardLibrary {
             atan(n)
         }
         
-        add("atan", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("atan", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -526,7 +527,7 @@ class StandardLibrary {
         
         add(
             "atan2",
-            DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE
+            DOUBLE, DOUBLE, DOUBLE
         ) { _, args ->
             val (y, x) = args
             
@@ -536,7 +537,7 @@ class StandardLibrary {
             atan2(y, x)
         }
         
-        add("atan2", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("atan2", FLOAT, FLOAT, FLOAT) { _, args ->
             val (y, x) = args
             
             y as Float
@@ -545,7 +546,7 @@ class StandardLibrary {
             atan2(y, x)
         }
         
-        add("atanh", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("atanh", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -553,7 +554,7 @@ class StandardLibrary {
             atanh(n)
         }
         
-        add("atanh", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("atanh", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -561,7 +562,7 @@ class StandardLibrary {
             atanh(n)
         }
         
-        add("ceil", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("ceil", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -569,7 +570,7 @@ class StandardLibrary {
             ceil(n)
         }
         
-        add("ceil", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("ceil", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -577,7 +578,7 @@ class StandardLibrary {
             ceil(n)
         }
         
-        add("cos", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("cos", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -585,7 +586,7 @@ class StandardLibrary {
             cos(n)
         }
         
-        add("cos", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("cos", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -593,7 +594,7 @@ class StandardLibrary {
             cos(n)
         }
         
-        add("cosh", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("cosh", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -601,7 +602,7 @@ class StandardLibrary {
             cosh(n)
         }
         
-        add("cosh", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("cosh", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -609,7 +610,7 @@ class StandardLibrary {
             cosh(n)
         }
         
-        add("exp", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("exp", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -617,7 +618,7 @@ class StandardLibrary {
             exp(n)
         }
         
-        add("exp", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("exp", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -625,7 +626,7 @@ class StandardLibrary {
             exp(n)
         }
         
-        add("expm1", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("expm1", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -633,7 +634,7 @@ class StandardLibrary {
             expm1(n)
         }
         
-        add("expm1", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("expm1", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -641,7 +642,7 @@ class StandardLibrary {
             expm1(n)
         }
         
-        add("floor", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("floor", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -649,7 +650,7 @@ class StandardLibrary {
             floor(n)
         }
         
-        add("floor", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("floor", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -659,7 +660,7 @@ class StandardLibrary {
         
         add(
             "hypot",
-            DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE
+            DOUBLE, DOUBLE, DOUBLE
         ) { _, args ->
             val (x, y) = args
             
@@ -669,7 +670,7 @@ class StandardLibrary {
             hypot(x, y)
         }
         
-        add("hypot", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("hypot", FLOAT, FLOAT, FLOAT) { _, args ->
             val (x, y) = args
             
             x as Float
@@ -678,7 +679,7 @@ class StandardLibrary {
             hypot(x, y)
         }
         
-        add("IEEErem", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("IEEErem", DOUBLE, DOUBLE, DOUBLE) { _, args ->
             val (n, divisor) = args
             
             n as Double
@@ -687,7 +688,7 @@ class StandardLibrary {
             n.IEEErem(divisor)
         }
         
-        add("IEEErem", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("IEEErem", FLOAT, FLOAT, FLOAT) { _, args ->
             val (n, divisor) = args
             
             n as Float
@@ -696,7 +697,7 @@ class StandardLibrary {
             n.IEEErem(divisor)
         }
         
-        add("ln", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("ln", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -704,7 +705,7 @@ class StandardLibrary {
             ln(n)
         }
         
-        add("ln", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("ln", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -712,7 +713,7 @@ class StandardLibrary {
             ln(n)
         }
         
-        add("ln1p", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("ln1p", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -720,7 +721,7 @@ class StandardLibrary {
             ln1p(n)
         }
         
-        add("ln1p", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("ln1p", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -730,7 +731,7 @@ class StandardLibrary {
         
         add(
             "log",
-            DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE
+            DOUBLE, DOUBLE, DOUBLE
         ) { _, args ->
             val (n, base) = args
             
@@ -740,7 +741,7 @@ class StandardLibrary {
             log(n, base)
         }
         
-        add("log", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("log", FLOAT, FLOAT, FLOAT) { _, args ->
             val (n, base) = args
             
             n as Float
@@ -749,7 +750,7 @@ class StandardLibrary {
             log(n, base)
         }
         
-        add("log10", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("log10", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -757,7 +758,7 @@ class StandardLibrary {
             log10(n)
         }
         
-        add("log10", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("log10", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -765,7 +766,7 @@ class StandardLibrary {
             log10(n)
         }
         
-        add("log2", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("log2", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -773,7 +774,7 @@ class StandardLibrary {
             log2(n)
         }
         
-        add("log2", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("log2", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -781,7 +782,7 @@ class StandardLibrary {
             log2(n)
         }
         
-        add("max", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("max", DOUBLE, DOUBLE, DOUBLE) { _, args ->
             val (a, b) = args
             
             a as Double
@@ -790,7 +791,7 @@ class StandardLibrary {
             max(a, b)
         }
         
-        add("max", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("max", FLOAT, FLOAT, FLOAT) { _, args ->
             val (a, b) = args
             
             a as Float
@@ -799,7 +800,7 @@ class StandardLibrary {
             max(a, b)
         }
         
-        add("max", DataType.Primitive.INT, DataType.Primitive.INT, DataType.Primitive.INT) { _, args ->
+        add("max", INT, INT, INT) { _, args ->
             val (a, b) = args
             
             a as Int
@@ -808,7 +809,7 @@ class StandardLibrary {
             max(a, b)
         }
         
-        add("max", DataType.Primitive.LONG, DataType.Primitive.LONG, DataType.Primitive.LONG) { _, args ->
+        add("max", LONG, LONG, LONG) { _, args ->
             val (a, b) = args
             
             a as Long
@@ -817,7 +818,7 @@ class StandardLibrary {
             max(a, b)
         }
         
-        add("min", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("min", DOUBLE, DOUBLE, DOUBLE) { _, args ->
             val (a, b) = args
             
             a as Double
@@ -826,7 +827,7 @@ class StandardLibrary {
             min(a, b)
         }
         
-        add("min", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("min", FLOAT, FLOAT, FLOAT) { _, args ->
             val (a, b) = args
             
             a as Float
@@ -835,7 +836,7 @@ class StandardLibrary {
             min(a, b)
         }
         
-        add("min", DataType.Primitive.INT, DataType.Primitive.INT, DataType.Primitive.INT) { _, args ->
+        add("min", INT, INT, INT) { _, args ->
             val (a, b) = args
             
             a as Int
@@ -844,7 +845,7 @@ class StandardLibrary {
             min(a, b)
         }
         
-        add("min", DataType.Primitive.LONG, DataType.Primitive.LONG, DataType.Primitive.LONG) { _, args ->
+        add("min", LONG, LONG, LONG) { _, args ->
             val (a, b) = args
             
             a as Long
@@ -853,7 +854,7 @@ class StandardLibrary {
             min(a, b)
         }
         
-        add("nextdown", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("nextdown", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -861,7 +862,7 @@ class StandardLibrary {
             n.nextDown()
         }
         
-        add("nextdown", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("nextdown", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -871,7 +872,7 @@ class StandardLibrary {
         
         add(
             "nexttowards",
-            DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE
+            DOUBLE, DOUBLE, DOUBLE
         ) { _, args ->
             val (a, b) = args
             
@@ -883,7 +884,7 @@ class StandardLibrary {
         
         add(
             "nexttowards",
-            DataType.Primitive.FLOAT, DataType.Primitive.FLOAT, DataType.Primitive.FLOAT
+            FLOAT, FLOAT, FLOAT
         ) { _, args ->
             val (a, b) = args
             
@@ -893,7 +894,7 @@ class StandardLibrary {
             a.nextTowards(b)
         }
         
-        add("nextup", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("nextup", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -901,7 +902,7 @@ class StandardLibrary {
             n.nextUp()
         }
         
-        add("nextup", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("nextup", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -909,7 +910,7 @@ class StandardLibrary {
             n.nextUp()
         }
         
-        add("pow", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("pow", DOUBLE, DOUBLE, DOUBLE) { _, args ->
             val (b, e) = args
             
             b as Double
@@ -918,7 +919,7 @@ class StandardLibrary {
             b.pow(e)
         }
         
-        add("pow", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("pow", FLOAT, FLOAT, FLOAT) { _, args ->
             val (b, e) = args
             
             b as Float
@@ -927,7 +928,7 @@ class StandardLibrary {
             b.pow(e)
         }
         
-        add("pow", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE, DataType.Primitive.INT) { _, args ->
+        add("pow", DOUBLE, DOUBLE, INT) { _, args ->
             val (b, e) = args
             
             b as Double
@@ -936,7 +937,7 @@ class StandardLibrary {
             b.pow(e)
         }
         
-        add("pow", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT, DataType.Primitive.INT) { _, args ->
+        add("pow", FLOAT, FLOAT, INT) { _, args ->
             val (b, e) = args
             
             b as Float
@@ -945,9 +946,9 @@ class StandardLibrary {
             b.pow(e)
         }
         
-        add("random", DataType.Primitive.DOUBLE) { _, _ -> Math.random() }
+        add("random", DOUBLE) { _, _ -> Math.random() }
         
-        add("round", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("round", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -955,7 +956,7 @@ class StandardLibrary {
             round(n)
         }
         
-        add("round", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("round", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -963,7 +964,7 @@ class StandardLibrary {
             round(n)
         }
         
-        add("roundToInt", DataType.Primitive.INT, DataType.Primitive.DOUBLE) { _, args ->
+        add("roundToInt", INT, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -971,7 +972,7 @@ class StandardLibrary {
             n.roundToInt()
         }
         
-        add("roundToInt", DataType.Primitive.INT, DataType.Primitive.FLOAT) { _, args ->
+        add("roundToInt", INT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -979,7 +980,7 @@ class StandardLibrary {
             n.roundToInt()
         }
         
-        add("roundToLong", DataType.Primitive.LONG, DataType.Primitive.DOUBLE) { _, args ->
+        add("roundToLong", LONG, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -987,7 +988,7 @@ class StandardLibrary {
             n.roundToLong()
         }
         
-        add("roundToLong", DataType.Primitive.LONG, DataType.Primitive.FLOAT) { _, args ->
+        add("roundToLong", LONG, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -995,7 +996,7 @@ class StandardLibrary {
             n.roundToLong()
         }
         
-        add("sign", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("sign", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -1003,7 +1004,7 @@ class StandardLibrary {
             n.sign
         }
         
-        add("sign", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("sign", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -1011,7 +1012,7 @@ class StandardLibrary {
             n.sign
         }
         
-        add("sign", DataType.Primitive.INT, DataType.Primitive.INT) { _, args ->
+        add("sign", INT, INT) { _, args ->
             val (n) = args
             
             n as Int
@@ -1019,7 +1020,7 @@ class StandardLibrary {
             n.sign
         }
         
-        add("sign", DataType.Primitive.INT, DataType.Primitive.LONG) { _, args ->
+        add("sign", INT, LONG) { _, args ->
             val (n) = args
             
             n as Long
@@ -1027,7 +1028,7 @@ class StandardLibrary {
             n.sign
         }
         
-        add("sin", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("sin", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -1035,7 +1036,7 @@ class StandardLibrary {
             sin(n)
         }
         
-        add("sin", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("sin", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -1043,7 +1044,7 @@ class StandardLibrary {
             sin(n)
         }
         
-        add("sinh", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("sinh", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -1051,7 +1052,7 @@ class StandardLibrary {
             sinh(n)
         }
         
-        add("sinh", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("sinh", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -1059,7 +1060,7 @@ class StandardLibrary {
             sinh(n)
         }
         
-        add("sqrt", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("sqrt", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -1067,7 +1068,7 @@ class StandardLibrary {
             sqrt(n)
         }
         
-        add("sqrt", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("sqrt", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -1075,7 +1076,7 @@ class StandardLibrary {
             sqrt(n)
         }
         
-        add("tan", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("tan", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -1083,7 +1084,7 @@ class StandardLibrary {
             tan(n)
         }
         
-        add("tan", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("tan", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -1091,7 +1092,7 @@ class StandardLibrary {
             tan(n)
         }
         
-        add("tanh", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("tanh", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -1099,7 +1100,7 @@ class StandardLibrary {
             tanh(n)
         }
         
-        add("tanh", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("tanh", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -1107,7 +1108,7 @@ class StandardLibrary {
             tanh(n)
         }
         
-        add("truncate", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("truncate", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -1115,7 +1116,7 @@ class StandardLibrary {
             truncate(n)
         }
         
-        add("truncate", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("truncate", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -1123,7 +1124,7 @@ class StandardLibrary {
             truncate(n)
         }
         
-        add("ulp", DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("ulp", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
             
             n as Double
@@ -1131,7 +1132,7 @@ class StandardLibrary {
             n.ulp
         }
         
-        add("ulp", DataType.Primitive.FLOAT, DataType.Primitive.FLOAT) { _, args ->
+        add("ulp", FLOAT, FLOAT) { _, args ->
             val (n) = args
             
             n as Float
@@ -1141,12 +1142,12 @@ class StandardLibrary {
         
         add(
             "map",
-            DataType.Primitive.DOUBLE,
-            DataType.Primitive.DOUBLE,
-            DataType.Primitive.DOUBLE,
-            DataType.Primitive.DOUBLE,
-            DataType.Primitive.DOUBLE,
-            DataType.Primitive.DOUBLE
+            DOUBLE,
+            DOUBLE,
+            DOUBLE,
+            DOUBLE,
+            DOUBLE,
+            DOUBLE
         ) { _, args ->
             val (n, fromMin, fromMax, toMin, toMax) = args
             
@@ -1161,12 +1162,12 @@ class StandardLibrary {
         
         add(
             "map",
-            DataType.Primitive.FLOAT,
-            DataType.Primitive.FLOAT,
-            DataType.Primitive.FLOAT,
-            DataType.Primitive.FLOAT,
-            DataType.Primitive.FLOAT,
-            DataType.Primitive.FLOAT
+            FLOAT,
+            FLOAT,
+            FLOAT,
+            FLOAT,
+            FLOAT,
+            FLOAT
         ) { _, args ->
             val (n, fromMin, fromMax, toMin, toMax) = args
             
@@ -1181,12 +1182,12 @@ class StandardLibrary {
         
         add(
             "map",
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            INT,
+            INT,
+            INT,
+            INT,
+            INT,
+            INT
         ) { _, args ->
             val (n, fromMin, fromMax, toMin, toMax) = args
             
@@ -1201,12 +1202,12 @@ class StandardLibrary {
         
         add(
             "map",
-            DataType.Primitive.LONG,
-            DataType.Primitive.LONG,
-            DataType.Primitive.LONG,
-            DataType.Primitive.LONG,
-            DataType.Primitive.LONG,
-            DataType.Primitive.LONG
+            LONG,
+            LONG,
+            LONG,
+            LONG,
+            LONG,
+            LONG
         ) { _, args ->
             val (n, fromMin, fromMax, toMin, toMax) = args
             
@@ -1223,10 +1224,10 @@ class StandardLibrary {
     private fun addGraphics() {
         add(
             "createWindow",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.STRING
+            NONE,
+            INT,
+            INT,
+            STRING
         ) { _, args ->
             val (width, height, title) = args
             
@@ -1239,11 +1240,11 @@ class StandardLibrary {
             Unit
         }
         
-        add("openWindow", DataType.Primitive.NONE) { _, _ -> window.open() }
+        add("openWindow", NONE) { _, _ -> window.open() }
         
-        add("closeWindow", DataType.Primitive.NONE) { _, _ -> window.close() }
+        add("closeWindow", NONE) { _, _ -> window.close() }
         
-        add("windowIsOpen", DataType.Primitive.BOOL) { _, _ -> window.isOpen }
+        add("windowIsOpen", BOOL) { _, _ -> window.isOpen }
         
         add("getColor", "Color".data) { script, _ ->
             val color = window.getColor()
@@ -1253,11 +1254,11 @@ class StandardLibrary {
         
         add(
             "setColor",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            NONE,
+            INT,
+            INT,
+            INT,
+            INT
         ) { _, args ->
             val (red, green, blue, alpha) = args
             
@@ -1272,9 +1273,9 @@ class StandardLibrary {
         add(
             "hsbToColor",
             "Color".data,
-            DataType.Primitive.DOUBLE,
-            DataType.Primitive.DOUBLE,
-            DataType.Primitive.DOUBLE
+            DOUBLE,
+            DOUBLE,
+            DOUBLE
         ) { script, args ->
             val (h, s, b) = args
             
@@ -1295,10 +1296,10 @@ class StandardLibrary {
         
         add(
             "setFont",
-            DataType.Primitive.NONE,
-            DataType.Primitive.STRING,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            NONE,
+            STRING,
+            INT,
+            INT
         ) { _, args ->
             val (name, style, size) = args
             
@@ -1325,13 +1326,13 @@ class StandardLibrary {
         
         add(
             "setStroke",
-            DataType.Primitive.NONE,
-            DataType.Primitive.FLOAT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.FLOAT,
-            DataType.Primitive.FLOAT.array,
-            DataType.Primitive.FLOAT
+            NONE,
+            FLOAT,
+            INT,
+            INT,
+            FLOAT,
+            FLOAT.array,
+            FLOAT
         ) { _, args ->
             val (width, cap, join, miterLimit, dash, dashPhase) = args
             
@@ -1347,7 +1348,7 @@ class StandardLibrary {
             window.setStroke(width, cap, join, miterLimit, dashFA, dashPhase)
         }
         
-        add("translate", DataType.Primitive.NONE, DataType.Primitive.INT, DataType.Primitive.INT) { _, args ->
+        add("translate", NONE, INT, INT) { _, args ->
             val (x, y) = args
             
             x as Int
@@ -1356,7 +1357,7 @@ class StandardLibrary {
             window.translate(x, y)
         }
         
-        add("translate", DataType.Primitive.NONE, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("translate", NONE, DOUBLE, DOUBLE) { _, args ->
             val (x, y) = args
             
             x as Double
@@ -1365,7 +1366,7 @@ class StandardLibrary {
             window.translate(x, y)
         }
         
-        add("rotate", DataType.Primitive.NONE, DataType.Primitive.DOUBLE) { _, args ->
+        add("rotate", NONE, DOUBLE) { _, args ->
             val (theta) = args
             
             theta as Double
@@ -1375,10 +1376,10 @@ class StandardLibrary {
         
         add(
             "rotate",
-            DataType.Primitive.NONE,
-            DataType.Primitive.DOUBLE,
-            DataType.Primitive.DOUBLE,
-            DataType.Primitive.DOUBLE
+            NONE,
+            DOUBLE,
+            DOUBLE,
+            DOUBLE
         ) { _, args ->
             val (theta, x, y) = args
             
@@ -1389,7 +1390,7 @@ class StandardLibrary {
             window.rotate(theta, x, y)
         }
         
-        add("scale", DataType.Primitive.NONE, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("scale", NONE, DOUBLE, DOUBLE) { _, args ->
             val (x, y) = args
             
             x as Double
@@ -1398,7 +1399,7 @@ class StandardLibrary {
             window.scale(x, y)
         }
         
-        add("shear", DataType.Primitive.NONE, DataType.Primitive.DOUBLE, DataType.Primitive.DOUBLE) { _, args ->
+        add("shear", NONE, DOUBLE, DOUBLE) { _, args ->
             val (x, y) = args
             
             x as Double
@@ -1407,19 +1408,19 @@ class StandardLibrary {
             window.shear(x, y)
         }
         
-        add("pushMatrix", DataType.Primitive.NONE) { _, _ -> window.pushMatrix() }
+        add("pushMatrix", NONE) { _, _ -> window.pushMatrix() }
         
-        add("popMatrix", DataType.Primitive.NONE) { _, _ -> window.popMatrix() }
+        add("popMatrix", NONE) { _, _ -> window.popMatrix() }
         
-        add("clear", DataType.Primitive.NONE) { _, _ -> window.clear() }
+        add("clear", NONE) { _, _ -> window.clear() }
         
         add(
             "drawLine",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            NONE,
+            INT,
+            INT,
+            INT,
+            INT
         ) { _, args ->
             val (xa, ya, xb, yb) = args
             
@@ -1433,11 +1434,11 @@ class StandardLibrary {
         
         add(
             "drawRect",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            NONE,
+            INT,
+            INT,
+            INT,
+            INT
         ) { _, args ->
             val (x, y, width, height) = args
             
@@ -1451,11 +1452,11 @@ class StandardLibrary {
         
         add(
             "fillRect",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            NONE,
+            INT,
+            INT,
+            INT,
+            INT
         ) { _, args ->
             val (x, y, width, height) = args
             
@@ -1469,11 +1470,11 @@ class StandardLibrary {
         
         add(
             "drawOval",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            NONE,
+            INT,
+            INT,
+            INT,
+            INT
         ) { _, args ->
             val (x, y, width, height) = args
             
@@ -1487,11 +1488,11 @@ class StandardLibrary {
         
         add(
             "fillOval",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            NONE,
+            INT,
+            INT,
+            INT,
+            INT
         ) { _, args ->
             val (x, y, width, height) = args
             
@@ -1505,13 +1506,13 @@ class StandardLibrary {
         
         add(
             "drawRoundRect",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            NONE,
+            INT,
+            INT,
+            INT,
+            INT,
+            INT,
+            INT
         ) { _, args ->
             val (x, y, width, height, arcWidth, arcHeight) = args
             
@@ -1527,13 +1528,13 @@ class StandardLibrary {
         
         add(
             "fillRoundRect",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            NONE,
+            INT,
+            INT,
+            INT,
+            INT,
+            INT,
+            INT
         ) { _, args ->
             val (x, y, width, height, arcWidth, arcHeight) = args
             
@@ -1549,12 +1550,12 @@ class StandardLibrary {
         
         add(
             "draw3DRect",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.BOOL
+            NONE,
+            INT,
+            INT,
+            INT,
+            INT,
+            BOOL
         ) { _, args ->
             val (x, y, width, height, raised) = args
             
@@ -1569,12 +1570,12 @@ class StandardLibrary {
         
         add(
             "fill3DRect",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.BOOL
+            NONE,
+            INT,
+            INT,
+            INT,
+            INT,
+            BOOL
         ) { _, args ->
             val (x, y, width, height, raised) = args
             
@@ -1589,13 +1590,13 @@ class StandardLibrary {
         
         add(
             "drawArc",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            NONE,
+            INT,
+            INT,
+            INT,
+            INT,
+            INT,
+            INT
         ) { _, args ->
             val (x, y, width, height, startAngle, arcAngle) = args
             
@@ -1611,13 +1612,13 @@ class StandardLibrary {
         
         add(
             "fillArc",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            NONE,
+            INT,
+            INT,
+            INT,
+            INT,
+            INT,
+            INT
         ) { _, args ->
             val (x, y, width, height, startAngle, arcAngle) = args
             
@@ -1633,10 +1634,10 @@ class StandardLibrary {
         
         add(
             "drawPolyline",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT.array,
-            DataType.Primitive.INT.array,
-            DataType.Primitive.INT
+            NONE,
+            INT.array,
+            INT.array,
+            INT
         ) { _, args ->
             val (xPoints, yPoints, nPoints) = args
             
@@ -1652,10 +1653,10 @@ class StandardLibrary {
         
         add(
             "drawPolygon",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT.array,
-            DataType.Primitive.INT.array,
-            DataType.Primitive.INT
+            NONE,
+            INT.array,
+            INT.array,
+            INT
         ) { _, args ->
             val (xPoints, yPoints, nPoints) = args
             
@@ -1671,10 +1672,10 @@ class StandardLibrary {
         
         add(
             "fillPolygon",
-            DataType.Primitive.NONE,
-            DataType.Primitive.INT.array,
-            DataType.Primitive.INT.array,
-            DataType.Primitive.INT
+            NONE,
+            INT.array,
+            INT.array,
+            INT
         ) { _, args ->
             val (xPoints, yPoints, nPoints) = args
             
@@ -1690,10 +1691,10 @@ class StandardLibrary {
         
         add(
             "drawString",
-            DataType.Primitive.NONE,
-            DataType.Primitive.STRING,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            NONE,
+            STRING,
+            INT,
+            INT
         ) { _, args ->
             val (s, x, y) = args
             
@@ -1704,7 +1705,7 @@ class StandardLibrary {
             window.drawString(s, x, y)
         }
         
-        add("loadImage", "Image".data, DataType.Primitive.STRING) { script, args ->
+        add("loadImage", "Image".data, STRING) { script, args ->
             val (path) = args
             
             path as String
@@ -1716,10 +1717,10 @@ class StandardLibrary {
         
         add(
             "drawImage",
-            DataType.Primitive.NONE,
+            NONE,
             "Image".data,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            INT,
+            INT
         ) { _, args ->
             val (image, x, y) = args
             
@@ -1738,12 +1739,12 @@ class StandardLibrary {
         
         add(
             "drawImage",
-            DataType.Primitive.NONE,
+            NONE,
             "Image".data,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            INT,
+            INT,
+            INT,
+            INT
         ) { _, args ->
             val (image, x, y, width, height) = args
             
@@ -1764,16 +1765,16 @@ class StandardLibrary {
         
         add(
             "drawImage",
-            DataType.Primitive.NONE,
+            NONE,
             "Image".data,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT,
-            DataType.Primitive.INT
+            INT,
+            INT,
+            INT,
+            INT,
+            INT,
+            INT,
+            INT,
+            INT
         ) { _, args ->
             val (image, dxa, dya, dxb, dyb, sxa, sya, sxb, syb) = args
             
@@ -1796,9 +1797,9 @@ class StandardLibrary {
             Unit
         }
         
-        add("flip", DataType.Primitive.NONE) { _, _ -> window.flip() }
+        add("flip", NONE) { _, _ -> window.flip() }
         
-        add("keyIsDown", DataType.Primitive.BOOL, DataType.Primitive.INT) { _, args ->
+        add("keyIsDown", BOOL, INT) { _, args ->
             val (keyCode) = args
             
             keyCode as Int
@@ -1806,7 +1807,7 @@ class StandardLibrary {
             window.keyIsDown(keyCode)
         }
         
-        add("keyIsHeld", DataType.Primitive.BOOL, DataType.Primitive.INT) { _, args ->
+        add("keyIsHeld", BOOL, INT) { _, args ->
             val (keyCode) = args
             
             keyCode as Int
@@ -1814,7 +1815,7 @@ class StandardLibrary {
             window.keyIsHeld(keyCode)
         }
         
-        add("keyIsUp", DataType.Primitive.BOOL, DataType.Primitive.INT) { _, args ->
+        add("keyIsUp", BOOL, INT) { _, args ->
             val (keyCode) = args
             
             keyCode as Int
@@ -1822,7 +1823,7 @@ class StandardLibrary {
             window.keyIsUp(keyCode)
         }
         
-        add("buttonIsDown", DataType.Primitive.BOOL, DataType.Primitive.INT) { _, args ->
+        add("buttonIsDown", BOOL, INT) { _, args ->
             val (buttonCode) = args
             
             buttonCode as Int
@@ -1830,7 +1831,7 @@ class StandardLibrary {
             window.buttonIsDown(buttonCode)
         }
         
-        add("buttonIsHeld", DataType.Primitive.BOOL, DataType.Primitive.INT) { _, args ->
+        add("buttonIsHeld", BOOL, INT) { _, args ->
             val (buttonCode) = args
             
             buttonCode as Int
@@ -1838,7 +1839,7 @@ class StandardLibrary {
             window.buttonIsHeld(buttonCode)
         }
         
-        add("buttonIsUp", DataType.Primitive.BOOL, DataType.Primitive.INT) { _, args ->
+        add("buttonIsUp", BOOL, INT) { _, args ->
             val (buttonCode) = args
             
             buttonCode as Int
@@ -1846,13 +1847,13 @@ class StandardLibrary {
             window.buttonIsUp(buttonCode)
         }
         
-        add("mouseX", DataType.Primitive.INT) { _, _ -> window.mousePoint.x }
+        add("mouseX", INT) { _, _ -> window.mousePoint.x }
         
-        add("mouseY", DataType.Primitive.INT) { _, _ -> window.mousePoint.y }
+        add("mouseY", INT) { _, _ -> window.mousePoint.y }
         
-        add("mouseWheel", DataType.Primitive.INT) { _, _ -> window.mouseWheel }
+        add("mouseWheel", INT) { _, _ -> window.mouseWheel }
         
-        add("poll", DataType.Primitive.NONE) { _, _ -> window.poll() }
+        add("poll", NONE) { _, _ -> window.poll() }
     }
     
     private fun add(

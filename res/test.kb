@@ -1,71 +1,63 @@
-let fps = 60.0
-let wait = 1 / fps
+var n1 = 1.0
+var n2 = 1.0
+var n3 = 1.0
+var m  = 1.0
+var a  = 1.0
+var b  = 1.0
 
-let width = 640
-let height = 480
+let s = ((PI * 2) / 256.0)
 
-data Sphere
-    var x as double,
-    var y as double,
-    var dx as double,
-    var dy as double
-end data
-
-let spheres as Sphere[100]
-
-let radius = 16
-
-for i = 0 to #spheres
-	let x = (width / 2) - radius + (random() * 100) - 50
-	let y = (height / 2) - radius + (random() * 100) - 50
-	let dx = (random() * 2.0) - 1.0
-	let dy = (random() * 2.0) - 1.0
-    
-    spheres[i] = { x, y, dx, dy }
-end for
-
-createWindow(width, height, "Zen Rainbow Energy Spheres")
+createWindow(400, 400, "Supershape")
 
 openWindow()
 
-until not windowIsOpen()
-	setColor(0)
+while windowIsOpen()
+	setColor(51)
 	clear()
 	
-	for sphere in spheres
-        let each x, y, dx, dy = sphere
-    
-		setColor(random(), random(), random())
-        
-		fillOval(x as int, y as int, (radius * 2) as int, (radius * 2) as int)
-        
-        sphere.x += dx
-		sphere.y += dy
+	setColor(255)
+	
+	translate(200, 200)
+	
+	for theta = 0.0 to PI * 2 step s
+		let la = pow(abs((1 / a) * cos(theta * m / 4)), n2)
+		let ra = pow(abs((1 / b) * sin(theta * m / 4)), n3)
 		
-        if x < 0
-            sphere.x = 0
-            sphere.dx *= -1
-        end if
-        
-        if x >= width - radius * 2
-            sphere.x = width - radius * 2 - 0.5
-            sphere.dx *= -1
-        end if
+		let radA = 1 / pow(la + ra, 1 / n1)
 		
-        if y < 0
-            sphere.y = 0
-            sphere.dy *= -1
-        end if
-        
-        if y >= height - radius * 2
-            sphere.y = height - radius * 2 - 0.5
-            sphere.dy *= -1
-        end if
+		let lb = pow(abs((1 / a) * cos((theta + s) * m / 4)), n2)
+		let rb = pow(abs((1 / b) * sin((theta + s) * m / 4)), n3)
+		
+		let radB = 1 / pow(lb + rb, 1 / n1)
+		
+		let x1 = radA * 100 * cos(theta)
+		let y1 = radA * 100 * sin(theta)
+		let x2 = radB * 100 * cos(theta + s)
+		let y2 = radB * 100 * sin(theta + s)
+		
+		drawLine(x1 as int, y1 as int, x2 as int, y2 as int)
 	end for
 	
+	translate(-200, -200)
+	
 	flip()
-    
-	sleep(wait)
-end until
+	
+	if keyIsHeld(KEY_Q) n1 += 0.1 end if
+	if keyIsHeld(KEY_A) n1 -= 0.1 end if
+	if keyIsHeld(KEY_W) n2 += 0.1 end if
+	if keyIsHeld(KEY_S) n2 -= 0.1 end if
+	if keyIsHeld(KEY_E) n3 += 0.1 end if
+	if keyIsHeld(KEY_D) n3 -= 0.1 end if
+	if keyIsHeld(KEY_R) m += 0.1 end if
+	if keyIsHeld(KEY_F) m -= 0.1 end if
+	if keyIsHeld(KEY_T) a += 0.1 end if
+	if keyIsHeld(KEY_G) a -= 0.1 end if
+	if keyIsHeld(KEY_Y) b += 0.1 end if
+	if keyIsHeld(KEY_H) b -= 0.1 end if
+	
+	poll()
+	
+	sleep(1 / 60.0)
+end while
 
 closeWindow()

@@ -58,6 +58,9 @@ class Memory {
     fun getAlias(name: Expr.Name) =
         stack.peek()?.getAlias(name)
     
+    fun hasEnum(name: Expr.Name) =
+        stack.peek()?.hasEnum(name)
+    
     fun peek() =
         stack.peek()
     
@@ -69,6 +72,8 @@ class Memory {
         private val datas = mutableMapOf<String, Stmt.Data>()
         
         private val aliases = mutableMapOf<String, DataType>()
+        
+        private val enums = mutableMapOf<String, EnumInstance>()
         
         fun hasRef(name: Expr.Name) =
             references.containsKey(name.value)
@@ -135,9 +140,15 @@ class Memory {
         
         fun getAlias(name: Expr.Name) =
             getAlias(name.value)
-    
+        
         private fun getAlias(name: String): DataType? =
             aliases[name] ?: parent?.getAlias(name)
+        
+        fun hasEnum(name: Expr.Name) =
+            name.value in enums.keys
+        
+        fun getEnum(name: Expr.Name) =
+            enums[name.value]
         
         override fun toString() = "Scope $id"
         

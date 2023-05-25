@@ -27,7 +27,7 @@ private fun repl() {
     
     print("> ")
     
-    val text = readLine() ?: ""
+    val text = readln()
     
     println()
     

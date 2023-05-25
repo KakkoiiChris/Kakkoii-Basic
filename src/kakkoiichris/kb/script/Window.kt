@@ -45,7 +45,7 @@ class Window(width: Int, height: Int, title: String) : KeyListener, MouseListene
             }
         })
         
-        val icon = ImageIO.read(javaClass.getResource("/img/KakkoiiBasic.png"))
+        val icon = ImageIO.read(javaClass.getResource("/img/icon.png"))
         frame.iconImage = icon
         
         canvas.createBufferStrategy(2)

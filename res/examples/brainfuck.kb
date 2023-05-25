@@ -14,25 +14,25 @@ while ip < #c
         if t[tp] > 255
             t[tp] = 0
         end if
-	elif i == '-'
+	else if i == '-'
 		t[tp] -= 1
         
         if t[tp] < 0
             t[tp] = 255
         end if
-	elif i == '<'
+	else if i == '<'
 		tp -= 1
         
         if tp < 0
             tp = size - 1
         end if
-	elif i == '>'
+	else if i == '>'
 		tp += 1
         
         if tp >= size
             tp = 0
         end if
-	elif i == '['
+	else if i == '['
 		if t[tp] == 0
 			while i <> ']'
 				ip += 1
@@ -42,7 +42,7 @@ while ip < #c
             
 			ip += 1
 		end if
-	elif i == ']'
+	else if i == ']'
 		if t[tp] <> 0
 			while i <> ']'
 				ip -= 1
@@ -50,7 +50,7 @@ while ip < #c
 				i = c[ip]
 			end while
 		end if
-	elif i == '.'
+	else if i == '.'
 		print(t[tp] as char)
 	end if
     

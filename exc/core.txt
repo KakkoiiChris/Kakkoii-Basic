@@ -1,0 +1,696 @@
+rem general
+
+sub print with args as any* end sub
+
+sub input as string with args as any* end sub
+
+sub read as string with path as string end sub
+
+sub write with path as string, value as any end sub
+
+sub concat as string with args as any* end sub
+
+sub sleep with milliseconds as long end sub
+
+sub sleep with seconds as double
+    sleep((seconds * 1000) as long)
+end sub
+
+sub milliseconds as long end sub
+
+sub nanoseconds as long end sub
+
+sub seconds as double
+    yield nanoseconds() / 1E9
+end sub
+
+sub typeOf as string with x as any end sub
+
+sub invoke as any with name as string, arguments as any* end sub
+
+sub exit with code as int = 0 end sub
+
+rem char
+
+sub isAlpha as bool with c as char end sub
+
+sub isAlnum as bool with c as char end sub
+
+sub isDigit as bool with c as char end sub
+
+sub isSpace as bool with c as char end sub
+
+sub isVowel as bool with c as char end sub
+
+sub isLower as bool with c as char end sub
+
+sub isUpper as bool with c as char end sub
+
+sub toLower as char with c as char end sub
+
+sub toUpper as char with c as char end sub
+
+rem string
+
+sub isBlank as bool with s as string end sub
+
+sub isEmpty as bool with s as string end sub
+
+sub toLower as string with s as string end sub
+
+sub toUpper as string with s as string end sub
+
+sub startsWith as bool with s as string, prefix as string, ignoreCase as bool end sub
+
+sub startsWith as bool with s as string, prefix as string
+    yield startsWith(s, prefix, false)
+end sub
+
+sub endsWith as bool with s as string, suffix as string, ignoreCase as bool end sub
+
+sub endsWith as bool with s as string, suffix as string
+    yield endsWith(s, suffix, false)
+end sub
+
+sub trim as string with s as string end sub
+
+sub trimStart as string with s as string end sub
+
+sub trimEnd as string with s as string end sub
+
+sub substring as string with s as string, startIndex as int, endIndex as int end sub
+
+sub substring as string with s as string, startIndex as int
+    yield substring(s, startIndex, #s)
+end sub
+
+sub split as string[] with s as string, regex as string end sub
+
+sub indexOf as int with s as string, c as char end sub
+
+sub indexOf as int with s as string, sequence as string end sub
+
+sub lastIndexOf as int with s as string, c as char end sub
+
+sub lastIndexOf as int with s as string, sequence as string end sub
+
+sub padStart as string with s as string, length as int, c as char end sub
+
+sub padStart as string with s as string, length as int
+    yield padStart(s, length, ' ')
+end sub
+
+sub padEnd as string with s as string, length as int, c as char end sub
+
+sub padEnd as string with s as string, length as int
+    yield padEnd(s, length, ' ')
+end sub
+
+sub replace as string with s as string, old as char, new as char end sub
+
+sub replace as string with s as string, old as string, new as string end sub
+
+rem arrays
+
+sub forEach with x as any[], action as string
+    for y in x
+        invoke(action, y)
+    end for
+end sub
+
+sub map as any[] with x as any[], transform as string
+    let new as any[#x]
+
+    for i = 0 to #x
+        new[i] = invoke(transform, x[i])
+    end for
+
+    yield new
+end sub
+
+rem math
+
+let E =  2.718281828459045
+
+let PI = 3.141592653589793
+
+sub abs as double with n as double end sub
+
+sub abs as float with n as float end sub
+
+sub abs as int with n as int end sub
+
+sub abs as long with n as long end sub
+
+sub acos as double with n as double end sub
+
+sub acos as float with n as float end sub
+
+sub acosh as double with n as double end sub
+
+sub acosh as float with n as float end sub
+
+sub asin as double with n as double end sub
+
+sub asin as float with n as float end sub
+
+sub asinh as double with n as double end sub
+
+sub asinh as float with n as float end sub
+
+sub atan as double with n as double end sub
+
+sub atan as float with n as float end sub
+
+sub atan2 as double with y as double, x as double end sub
+
+sub atan2 as float with y as float, x as float end sub
+
+sub atanh as double with n as double end sub
+
+sub atanh as float with n as float end sub
+
+sub ceil as double with n as double end sub
+
+sub ceil as float with n as float end sub
+
+sub cos as double with n as double end sub
+
+sub cos as float with n as float end sub
+
+sub cosh as double with n as double end sub
+
+sub cosh as float with n as float end sub
+
+sub exp as double with n as double end sub
+
+sub exp as float with n as float end sub
+
+sub expm1 as double with n as double end sub
+
+sub expm1 as float with n as float end sub
+
+sub floor as double with n as double end sub
+
+sub floor as float with n as float end sub
+
+sub hypot as double with x as double, y as double end sub
+
+sub hypot as float with x as float, y as double end sub
+
+sub IEEErem as double with n as double, divisor as double end sub
+
+sub IEEErem as float with n as float, divisor as float end sub
+
+sub ln as double with n as double end sub
+
+sub ln as float with n as float end sub
+
+sub ln1p as double with n as double end sub
+
+sub ln1p as float with n as float end sub
+
+sub log as double with n as double, base as double end sub
+
+sub log as float with n as float, base as double end sub
+
+sub log10 as double with n as double end sub
+
+sub log10 as float with n as float end sub
+
+sub log2 as double with n as double end sub
+
+sub log2 as float with n as float end sub
+
+sub max as double with a as double, b as double end sub
+
+sub max as float with a as float, b as float end sub
+
+sub max as int with a as int, b as int end sub
+
+sub max as long with a as long, b as long end sub
+
+sub min as double with a as double, b as double end sub
+
+sub min as float with a as float, b as float end sub
+
+sub min as int with a as int, b as int end sub
+
+sub min as long with a as long, b as long end sub
+
+sub nextDown as double with n as double end sub
+
+sub nextDown as float with n as float end sub
+
+sub nextTowards as double with a as double, b as double end sub
+
+sub nextTowards as float with a as float, b as double end sub
+
+sub nextUp as double with n as double end sub
+
+sub nextUp as float with n as float end sub
+
+sub pow as double with b as double, e as double end sub
+
+sub pow as float with b as float, e as float end sub
+
+sub pow as double with b as double, e as int end sub
+
+sub pow as float with b as float, e as int end sub
+
+sub random as double end sub
+
+sub round as double with n as double end sub
+
+sub round as float with n as float end sub
+
+sub roundToInt as int with n as double end sub
+
+sub roundToInt as int with n as float end sub
+
+sub roundToLong as long with n as double end sub
+
+sub roundToLong as long with n as float end sub
+
+sub sign as double with n as double end sub
+
+sub sign as float with n as float end sub
+
+sub sign as int with n as int end sub
+
+sub sign as int with n as long end sub
+
+sub sin as double with n as double end sub
+
+sub sin as float with n as float end sub
+
+sub sinh as double with n as double end sub
+
+sub sinh as float with n as float end sub
+
+sub sqrt as double with n as double end sub
+
+sub sqrt as float with n as float end sub
+
+sub tan as double with n as double end sub
+
+sub tan as float with n as float end sub
+
+sub tanh as double with n as double end sub
+
+sub tanh as float with n as float end sub
+
+sub truncate as double with n as double end sub
+
+sub truncate as float with n as float end sub
+
+sub ulp as double with n as double end sub
+
+sub ulp as float with n as float end sub
+
+sub map as double with n as double, fromMin as double, fromMax as double, toMin as double, toMax as double end sub
+
+sub map as float with n as float, fromMin as float, fromMax as float, toMin as float, toMax as float end sub
+
+sub map as int with n as int, fromMin as int, fromMax as int, toMin as int, toMax as int end sub
+
+sub map as long with n as long, fromMin as long, fromMax as long, toMin as long, toMax as long end sub
+
+rem graphics
+
+let KEY_ENTER                     = '\n' as int
+let KEY_BACK_SPACE                = '\b' as int
+let KEY_TAB                       = '\t' as int
+let KEY_CANCEL                    = 0x03
+let KEY_CLEAR                     = 0x0C
+let KEY_SHIFT                     = 0x10
+let KEY_CONTROL                   = 0x11
+let KEY_ALT                       = 0x12
+let KEY_PAUSE                     = 0x13
+let KEY_CAPS_LOCK                 = 0x14
+let KEY_ESCAPE                    = 0x1B
+let KEY_SPACE                     = 0x20
+let KEY_PAGE_UP                   = 0x21
+let KEY_PAGE_DOWN                 = 0x22
+let KEY_END                       = 0x23
+let KEY_HOME                      = 0x24
+let KEY_LEFT                      = 0x25
+let KEY_UP                        = 0x26
+let KEY_RIGHT                     = 0x27
+let KEY_DOWN                      = 0x28
+let KEY_COMMA                     = 0x2C
+let KEY_MINUS                     = 0x2D
+let KEY_PERIOD                    = 0x2E
+let KEY_SLASH                     = 0x2F
+let KEY_0                         = 0x30
+let KEY_1                         = 0x31
+let KEY_2                         = 0x32
+let KEY_3                         = 0x33
+let KEY_4                         = 0x34
+let KEY_5                         = 0x35
+let KEY_6                         = 0x36
+let KEY_7                         = 0x37
+let KEY_8                         = 0x38
+let KEY_9                         = 0x39
+let KEY_SEMICOLON                 = 0x3B
+let KEY_EQUALS                    = 0x3D
+let KEY_A                         = 0x41
+let KEY_B                         = 0x42
+let KEY_C                         = 0x43
+let KEY_D                         = 0x44
+let KEY_E                         = 0x45
+let KEY_F                         = 0x46
+let KEY_G                         = 0x47
+let KEY_H                         = 0x48
+let KEY_I                         = 0x49
+let KEY_J                         = 0x4A
+let KEY_K                         = 0x4B
+let KEY_L                         = 0x4C
+let KEY_M                         = 0x4D
+let KEY_N                         = 0x4E
+let KEY_O                         = 0x4F
+let KEY_P                         = 0x50
+let KEY_Q                         = 0x51
+let KEY_R                         = 0x52
+let KEY_S                         = 0x53
+let KEY_T                         = 0x54
+let KEY_U                         = 0x55
+let KEY_V                         = 0x56
+let KEY_W                         = 0x57
+let KEY_X                         = 0x58
+let KEY_Y                         = 0x59
+let KEY_Z                         = 0x5A
+let KEY_OPEN_BRACKET              = 0x5B
+let KEY_BACK_SLASH                = 0x5C
+let KEY_CLOSE_BRACKET             = 0x5D
+let KEY_NUMPAD0                   = 0x60
+let KEY_NUMPAD1                   = 0x61
+let KEY_NUMPAD2                   = 0x62
+let KEY_NUMPAD3                   = 0x63
+let KEY_NUMPAD4                   = 0x64
+let KEY_NUMPAD5                   = 0x65
+let KEY_NUMPAD6                   = 0x66
+let KEY_NUMPAD7                   = 0x67
+let KEY_NUMPAD8                   = 0x68
+let KEY_NUMPAD9                   = 0x69
+let KEY_MULTIPLY                  = 0x6A
+let KEY_ADD                       = 0x6B
+let KEY_SEPARATOR                 = 0x6C
+let KEY_SUBTRACT                  = 0x6D
+let KEY_DECIMAL                   = 0x6E
+let KEY_DIVIDE                    = 0x6F
+let KEY_DELETE                    = 0x7F
+let KEY_NUM_LOCK                  = 0x90
+let KEY_SCROLL_LOCK               = 0x91
+let KEY_F1                        = 0x70
+let KEY_F2                        = 0x71
+let KEY_F3                        = 0x72
+let KEY_F4                        = 0x73
+let KEY_F5                        = 0x74
+let KEY_F6                        = 0x75
+let KEY_F7                        = 0x76
+let KEY_F8                        = 0x77
+let KEY_F9                        = 0x78
+let KEY_F10                       = 0x79
+let KEY_F11                       = 0x7A
+let KEY_F12                       = 0x7B
+let KEY_F13                       = 0xF000
+let KEY_F14                       = 0xF001
+let KEY_F15                       = 0xF002
+let KEY_F16                       = 0xF003
+let KEY_F17                       = 0xF004
+let KEY_F18                       = 0xF005
+let KEY_F19                       = 0xF006
+let KEY_F20                       = 0xF007
+let KEY_F21                       = 0xF008
+let KEY_F22                       = 0xF009
+let KEY_F23                       = 0xF00A
+let KEY_F24                       = 0xF00B
+let KEY_PRINTSCREEN               = 0x9A
+let KEY_INSERT                    = 0x9B
+let KEY_HELP                      = 0x9C
+let KEY_META                      = 0x9D
+let KEY_BACK_QUOTE                = 0xC0
+let KEY_QUOTE                     = 0xDE
+let KEY_KP_UP                     = 0xE0
+let KEY_KP_DOWN                   = 0xE1
+let KEY_KP_LEFT                   = 0xE2
+let KEY_KP_RIGHT                  = 0xE3
+let KEY_DEAD_GRAVE                = 0x80
+let KEY_DEAD_ACUTE                = 0x81
+let KEY_DEAD_CIRCUMFLEX           = 0x82
+let KEY_DEAD_TILDE                = 0x83
+let KEY_DEAD_MACRON               = 0x84
+let KEY_DEAD_BREVE                = 0x85
+let KEY_DEAD_ABOVEDOT             = 0x86
+let KEY_DEAD_DIAERESIS            = 0x87
+let KEY_DEAD_ABOVERING            = 0x88
+let KEY_DEAD_DOUBLEACUTE          = 0x89
+let KEY_DEAD_CARON                = 0x8a
+let KEY_DEAD_CEDILLA              = 0x8b
+let KEY_DEAD_OGONEK               = 0x8c
+let KEY_DEAD_IOTA                 = 0x8d
+let KEY_DEAD_VOICED_SOUND         = 0x8e
+let KEY_DEAD_SEMIVOICED_SOUND     = 0x8f
+let KEY_AMPERSAND                 = 0x96
+let KEY_ASTERISK                  = 0x97
+let KEY_QUOTEDBL                  = 0x98
+let KEY_LESS                      = 0x99
+let KEY_GREATER                   = 0xa0
+let KEY_BRACELEFT                 = 0xa1
+let KEY_BRACERIGHT                = 0xa2
+let KEY_AT                        = 0x0200
+let KEY_COLON                     = 0x0201
+let KEY_CIRCUMFLEX                = 0x0202
+let KEY_DOLLAR                    = 0x0203
+let KEY_EURO_SIGN                 = 0x0204
+let KEY_EXCLAMATION_MARK          = 0x0205
+let KEY_INVERTED_EXCLAMATION_MARK = 0x0206
+let KEY_LEFT_PARENTHESIS          = 0x0207
+let KEY_NUMBER_SIGN               = 0x0208
+let KEY_PLUS                      = 0x0209
+let KEY_RIGHT_PARENTHESIS         = 0x020A
+let KEY_UNDERSCORE                = 0x020B
+let KEY_WINDOWS                   = 0x020C
+let KEY_CONTEXT_MENU              = 0x020D
+let KEY_FINAL                     = 0x0018
+let KEY_CONVERT                   = 0x001C
+let KEY_NONCONVERT                = 0x001D
+let KEY_ACCEPT                    = 0x001E
+let KEY_MODECHANGE                = 0x001F
+let KEY_KANA                      = 0x0015
+let KEY_KANJI                     = 0x0019
+let KEY_ALPHANUMERIC              = 0x00F0
+let KEY_KATAKANA                  = 0x00F1
+let KEY_HIRAGANA                  = 0x00F2
+let KEY_FULL_WIDTH                = 0x00F3
+let KEY_HALF_WIDTH                = 0x00F4
+let KEY_ROMAN_CHARACTERS          = 0x00F5
+let KEY_ALL_CANDIDATES            = 0x0100
+let KEY_PREVIOUS_CANDIDATE        = 0x0101
+let KEY_CODE_INPUT                = 0x0102
+let KEY_JAPANESE_KATAKANA         = 0x0103
+let KEY_JAPANESE_HIRAGANA         = 0x0104
+let KEY_JAPANESE_ROMAN            = 0x0105
+let KEY_KANA_LOCK                 = 0x0106
+let KEY_INPUT_METHOD_ON_OFF       = 0x0107
+let KEY_CUT                       = 0xFFD1
+let KEY_COPY                      = 0xFFCD
+let KEY_PASTE                     = 0xFFCF
+let KEY_UNDO                      = 0xFFCB
+let KEY_AGAIN                     = 0xFFC9
+let KEY_FIND                      = 0xFFD0
+let KEY_PROPS                     = 0xFFCA
+let KEY_STOP                      = 0xFFC8
+let KEY_COMPOSE                   = 0xFF20
+let KEY_ALT_GRAPH                 = 0xFF7E
+let KEY_BEGIN                     = 0xFF58
+let KEY_UNDEFINED                 = 0x0
+
+sub createWindow with width as int, height as int, title as string end sub
+
+sub openWindow end sub
+
+sub closeWindow end sub
+
+sub windowIsOpen as bool end sub
+
+data Color
+    var red   as int,
+    var green as int,
+    var blue  as int,
+    var alpha as int = 255
+end data
+
+sub getColor as Color end sub
+
+sub setColor with red as int, green as int, blue as int, alpha as int end sub
+
+sub setColor with red as int, green as int, blue as int
+    setColor(red, green, blue, 255)
+end sub
+
+sub setColor with value as int, alpha as int
+    setColor(value, value, value, alpha)
+end sub
+
+sub setColor with value as int
+    setColor(value, 255)
+end sub
+
+sub setColor with red as double, green as double, blue as double, alpha as double
+    setColor((red * 255) as int, (green * 255) as int, (blue * 255) as int, (alpha * 255) as int)
+end sub
+
+sub setColor with red as double, green as double, blue as double
+    setColor(red, green, blue, 1.0)
+end sub
+
+sub setColor with value as double, alpha as double
+    setColor(value, value, value, alpha)
+end sub
+
+sub setColor with value as double
+    setColor(value, 1.0)
+end sub
+
+sub setColor with color as Color
+    setColor(color.red, color.green, color.blue, color.alpha)
+end sub
+
+sub hsbToColor as Color with h as double, s as double, b as double end sub
+
+data Font
+    var name  as string,
+    var style as int,
+    var size  as int
+end data
+
+sub getFont as Font end sub
+
+sub setFont with name as string, style as int, size  as int end sub
+
+sub setFont with font as Font
+    setFont(font.name, font.style, font.size)
+end sub
+
+let STROKE_JOIN_MITER = 0
+let STROKE_JOIN_ROUND = 1
+let STROKE_JOIN_BEVEL = 2
+
+let STROKE_CAP_BUTT   = 0
+let STROKE_CAP_ROUND  = 1
+let STROKE_CAP_SQUARE = 2
+
+data Stroke
+    var width      as float,
+    var cap        as int,
+    var join       as int,
+    var miterLimit as float,
+    var dash       as float[],
+    var dashPhase  as float
+end data
+
+sub getStroke as Stroke end sub
+
+sub setStroke with width as float, cap as int, join as int, miterLimit as float, dash as float[], dashPhase as float end sub
+
+sub setStroke with stroke as Stroke
+    setStroke(stroke.width, stroke.cap, stroke.join, stroke.miterLimit, stroke.dash, stroke.dashPhase)
+end sub
+
+sub translate with x as int, y as int end sub
+
+sub translate with x as double, y as double end sub
+
+sub rotate with theta as double end sub
+
+sub rotate with theta as double, x as double, y as double end sub
+
+sub scale with x as double, y as double end sub
+
+sub shear with x as double, y as double end sub
+
+sub pushMatrix end sub
+
+sub popMatrix end sub
+
+sub clear end sub
+
+sub drawLine with xa as int, ya as int, xb as int, yb as int end sub
+
+sub drawRect with x as int, y as int, width as int, height as int end sub
+
+sub fillRect with x as int, y as int, width as int, height as int end sub
+
+sub drawOval with x as int, y as int, width as int, height as int end sub
+
+sub fillOval with x as int, y as int, width as int, height as int end sub
+
+sub drawRoundRect with x as int, y as int, width as int, height as int, arcWidth as int, arcHeight as int end sub
+
+sub fillRoundRect with x as int, y as int, width as int, height as int, arcWidth as int, arcHeight as int end sub
+
+sub draw3DRect with x as int, y as int, width as int, height as int, raised as bool end sub
+
+sub fill3DRect with x as int, y as int, width as int, height as int, raised as bool end sub
+
+sub drawArc with x as int, y as int, width as int, height as int, startAngle as int, arcAngle as int end sub
+
+sub fillArc with x as int, y as int, width as int, height as int, startAngle as int, arcAngle as int end sub
+
+sub drawPolyline with xPoints as int[], yPoints as int[], nPoints as int end sub
+
+sub drawPolyline with xPoints as int[], yPoints as int[]
+    drawPolyline(xPoints, yPoints, #xPoints)
+end sub
+
+sub drawPolygon with xPoints as int[], yPoints as int[], nPoints as int end sub
+
+sub drawPolygon with xPoints as int[], yPoints as int[]
+    drawPolygon(xPoints, yPoints, #xPoints)
+end sub
+
+sub fillPolygon with xPoints as int[], yPoints as int[], nPoints as int end sub
+
+sub fillPolygon with xPoints as int[], yPoints as int[]
+    fillPolygon(xPoints, yPoints, #xPoints)
+end sub
+
+sub drawString with s as string, x as int, y as int end sub
+
+data Image
+    let id     as int,
+    let width  as int,
+    let height as int
+end data
+
+sub loadImage as Image with path as string end sub
+
+sub drawImage with image as Image, x as int, y as int end sub
+
+sub drawImage with image as Image, x as int, y as int, width as int, height as int end sub
+
+sub drawImage with image as Image, dxa as int, dya as int, dxb as int, dyb as int, sxa as int, sya as int, sxb as int, syb as int end sub
+
+sub flip end sub
+
+sub keyIsDown as bool with code as int end sub
+
+sub keyIsHeld as bool with code as int end sub
+
+sub keyIsUp as bool with code as int end sub
+
+sub buttonIsDown as bool with code as int end sub
+
+sub buttonIsHeld as bool with code as int end sub
+
+sub buttonIsUp as bool with code as int end sub
+
+sub mouseX as int end sub
+
+sub mouseY as int end sub
+
+sub mouseWheel as int end sub
+
+sub poll end sub

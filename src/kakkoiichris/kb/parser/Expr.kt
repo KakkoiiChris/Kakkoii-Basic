@@ -32,6 +32,8 @@ sealed class Expr(val location: Location) {
         fun visitGetMemberExpr(expr: GetMember): X
         
         fun visitSetMemberExpr(expr: SetMember): X
+    
+        fun visitGetEntryExpr(expr: GetEntry): X
         
         fun visitInvokeExpr(expr: Invoke): X
         
@@ -158,6 +160,11 @@ sealed class Expr(val location: Location) {
     class SetMember(location: Location, val target: Expr, val member: Name, val expr: Expr) : Expr(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitSetMemberExpr(this)
+    }
+    
+    class GetEntry(location: Location, val target: Name, val member: Name) : Expr(location) {
+        override fun <X> accept(visitor: Visitor<X>): X =
+            visitor.visitGetEntryExpr(this)
     }
     
     class Invoke(location: Location, val name: Name, val args: List<Expr>) : Expr(location) {

@@ -8,15 +8,15 @@ data Vector
     var y as double
 end data
 
-sub add(this as Vector, that as Vector) as Vector
+sub add as Vector with this as Vector, that as Vector
     add = { this.x + that.x, this.y + that.y }
 end sub
 
-sub multiply(this as Vector, that as Vector) as Vector
+sub multiply as Vector with this as Vector, that as Vector
     multiply = { this.x * that.x, this.y * that.y }
 end sub
 
-sub multiply(this as Vector, that as double) as Vector
+sub multiply as Vector with this as Vector, that as double
     multiply = { this.x * that, this.y * that }
 end sub
 
@@ -46,7 +46,7 @@ sub newRightPaddle as Paddle
     }
 end sub
 
-sub update(this as Paddle, delta as double)
+sub update with this as Paddle, delta as double
     if keyIsHeld(this.upKey)
         this.pos.y -= paddleSpeed * delta
     end if
@@ -62,7 +62,7 @@ sub update(this as Paddle, delta as double)
     end if
 end sub
 
-sub render(this as Paddle)
+sub render with this as Paddle
     fillRect(
         (this.pos.x - (paddleWidth / 2)) as int,
         (this.pos.y - (paddleHeight / 2)) as int,
@@ -71,7 +71,7 @@ sub render(this as Paddle)
     )
 end sub
 
-sub reset(this as Paddle)
+sub reset with this as Paddle
     this.pos = { width - (paddleWidth * 2), height / 2.0 }
 end sub
 
@@ -103,7 +103,7 @@ sub newBall as Ball
     newBall.vel = randomVector()
 end sub
 
-sub update(this as Ball, delta as double)
+sub update with this as Ball, delta as double
     this.pos += this.vel * delta
     
     if this.pos.y < ballRadius
@@ -119,7 +119,7 @@ sub update(this as Ball, delta as double)
     end if
 end sub
 
-sub render(this as Ball)
+sub render with this as Ball
     fillOval(
         (this.pos.x - ballRadius) as int,
         (this.pos.y - ballRadius) as int,
@@ -128,7 +128,7 @@ sub render(this as Ball)
     )
 end sub
 
-sub reset(this as Ball)
+sub reset with this as Ball
     this.pos = {
         (width  - ballRadius) / 2,
         (height - ballRadius) / 2
@@ -141,7 +141,7 @@ let ball = newBall()
 let left = newLeftPaddle()
 let right = newRightPaddle()
 
-sub update(delta as double)
+sub update with delta as double
     ball:update(delta)
     left:update(delta)
     right:update(delta)

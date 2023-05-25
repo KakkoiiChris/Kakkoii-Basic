@@ -421,13 +421,21 @@ class Lexer(private val source: Source) : Iterator<Token> {
             
             skip('$') -> Token.Type.DOLLAR
             
-            skip('&') -> Token.Type.AMPERSAND
+            skip('&') -> when {
+                skip('=') -> Token.Type.AMPERSAND_EQUAL
+                
+                else      -> Token.Type.AMPERSAND
+            }
             
             skip('#') -> Token.Type.POUND
             
             skip('.') -> Token.Type.DOT
             
-            skip(':') -> Token.Type.COLON
+            skip(':') -> when {
+                skip(':') -> Token.Type.DOUBLE_COLON
+                
+                else      -> Token.Type.COLON
+            }
             
             skip('(') -> Token.Type.LEFT_PAREN
             

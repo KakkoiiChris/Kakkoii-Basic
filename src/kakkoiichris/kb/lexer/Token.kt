@@ -49,6 +49,7 @@ data class Token(val location: Location, val type: Type, val value: Any = Unit) 
         STAR_EQUAL("*="),
         SLASH_EQUAL("/="),
         PERCENT_EQUAL("%="),
+        AMPERSAND_EQUAL("&="),
         DOLLAR("$"),
         
         // Disjunction
@@ -94,6 +95,7 @@ data class Token(val location: Location, val type: Type, val value: Any = Unit) 
         
         // Postfix
         DOT("."),
+        DOUBLE_COLON("::"),
         
         // Terminals
         VALUE("V"),

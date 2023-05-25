@@ -1,0 +1,17 @@
+for i = 1 to 101
+    var out = ""
+    
+    if i % 3 == 0
+        out &= "Fizz"
+    end if
+    
+    if i % 5 == 0
+        out &= "Buzz"
+    end if
+    
+    if out == empty
+        out &= i
+    end if
+    
+    print(out, '\n')
+end for

@@ -503,7 +503,7 @@ class Parser(private val lexer: Lexer) {
         val location = here()
         
         mustSkip(NEXT)
-    
+        
         val destination = if (skip(TO)) name() else Expr.Name.none
         
         return Stmt.Next(location, destination)
@@ -581,7 +581,7 @@ class Parser(private val lexer: Lexer) {
     private fun assign(): Expr {
         val expr = disjunction()
         
-        return if (matchAny(EQUAL_SIGN, PLUS_EQUAL, DASH_EQUAL, STAR_EQUAL, SLASH_EQUAL, PERCENT_EQUAL, DOLLAR)) {
+        return if (matchAny(EQUAL_SIGN, PLUS_EQUAL, DASH_EQUAL, STAR_EQUAL, SLASH_EQUAL, PERCENT_EQUAL, AMPERSAND_EQUAL, DOLLAR)) {
             val op = currentToken
             
             mustSkip(op.type)
@@ -595,17 +595,19 @@ class Parser(private val lexer: Lexer) {
                 )
             
             when (op.type) {
-                PLUS_EQUAL    -> desugar(Expr.Binary.Operator.ADD)
+                PLUS_EQUAL      -> desugar(Expr.Binary.Operator.ADD)
                 
-                DASH_EQUAL    -> desugar(Expr.Binary.Operator.SUBTRACT)
+                DASH_EQUAL      -> desugar(Expr.Binary.Operator.SUBTRACT)
                 
-                STAR_EQUAL    -> desugar(Expr.Binary.Operator.MULTIPLY)
+                STAR_EQUAL      -> desugar(Expr.Binary.Operator.MULTIPLY)
                 
-                SLASH_EQUAL   -> desugar(Expr.Binary.Operator.DIVIDE)
+                SLASH_EQUAL     -> desugar(Expr.Binary.Operator.DIVIDE)
                 
-                PERCENT_EQUAL -> desugar(Expr.Binary.Operator.MODULUS)
+                PERCENT_EQUAL   -> desugar(Expr.Binary.Operator.MODULUS)
                 
-                else          -> Expr.Binary(op.location, Expr.Binary.Operator[op.type], expr, disjunction())
+                AMPERSAND_EQUAL -> desugar(Expr.Binary.Operator.CONCAT)
+                
+                else            -> Expr.Binary(op.location, Expr.Binary.Operator[op.type], expr, disjunction())
             }
         }
         else {
@@ -785,15 +787,15 @@ class Parser(private val lexer: Lexer) {
     private fun postfix(): Expr {
         var expr = terminal()
         
-        while (matchAny(DOT, LEFT_SQUARE, LEFT_PAREN, LEFT_BRACE)) {
+        while (matchAny(DOT, LEFT_SQUARE, LEFT_PAREN, LEFT_BRACE, DOUBLE_COLON)) {
             val op = currentToken
             
             mustSkip(op.type)
             
             expr = when (op.type) {
-                DOT         -> Expr.GetMember(op.location, expr, name())
+                DOT          -> Expr.GetMember(op.location, expr, name())
                 
-                LEFT_SQUARE -> {
+                LEFT_SQUARE  -> {
                     val indices = mutableListOf<Expr>()
                     
                     do {
@@ -846,7 +848,7 @@ class Parser(private val lexer: Lexer) {
                     subExpr
                 }
                 
-                LEFT_PAREN  -> {
+                LEFT_PAREN   -> {
                     val name = expr as? Expr.Name ?: KBError.invalidInvocationTarget(expr.location)
                     
                     val args = mutableListOf<Expr>()
@@ -863,7 +865,7 @@ class Parser(private val lexer: Lexer) {
                     Expr.Invoke(op.location, name, args)
                 }
                 
-                LEFT_BRACE  -> {
+                LEFT_BRACE   -> {
                     val elements = mutableListOf<Expr>()
                     
                     if (!skip(RIGHT_BRACE)) {
@@ -878,7 +880,15 @@ class Parser(private val lexer: Lexer) {
                     Expr.Instantiate(op.location, expr as? Expr.Name ?: KBError.invalidInstantiationTarget(expr.location), elements)
                 }
                 
-                else        -> KBError.failure("Broken postfix operator '${op.type}'!", op.location)
+                DOUBLE_COLON -> {
+                    if (expr !is Expr.Name) {
+                        TODO("GET ENTRY ENUM NAME")
+                    }
+                    
+                    Expr.GetEntry(op.location, expr, name())
+                }
+                
+                else         -> KBError.failure("Broken postfix operator '${op.type}'!", op.location)
             }
         }
         

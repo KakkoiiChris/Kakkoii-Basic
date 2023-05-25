@@ -28,7 +28,7 @@ createWindow(width, height, "Zen Rainbow Energy Spheres")
 
 openWindow()
 
-while windowIsOpen()
+until not windowIsOpen()
 	setColor(0)
 	clear()
 	
@@ -37,16 +37,28 @@ while windowIsOpen()
     
 		setColor(random(), random(), random())
         
-		fillOval(x, y, radius * 2, radius * 2)
+		fillOval(x as int, y as int, (radius * 2) as int, (radius * 2) as int)
         
         sphere.x += dx
 		sphere.y += dy
 		
-        if x < 0 or x >= width - radius * 2
+        if x < 0
+            sphere.x = 0
+            sphere.dx *= -1
+        end if
+        
+        if x >= width - radius * 2
+            sphere.x = width - radius * 2 - 0.5
             sphere.dx *= -1
         end if
 		
-        if y < 0 or y >= height - radius * 2
+        if y < 0
+            sphere.y = 0
+            sphere.dy *= -1
+        end if
+        
+        if y >= height - radius * 2
+            sphere.y = height - radius * 2 - 0.5
             sphere.dy *= -1
         end if
 	end for
@@ -54,6 +66,6 @@ while windowIsOpen()
 	flip()
     
 	sleep(wait)
-end while
+end until
 
 closeWindow()
