@@ -364,11 +364,7 @@ interface DataType {
             }
             else 0
             
-            if (initSize > 0 && x.size != initSize) {
-                return true
-            }
-            
-            return false
+            return initSize > 0 && x.size != initSize
         }
     }
     
