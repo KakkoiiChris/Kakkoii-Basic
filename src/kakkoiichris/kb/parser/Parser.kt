@@ -1,6 +1,7 @@
 package kakkoiichris.kb.parser
 
 import kakkoiichris.kb.lexer.Lexer
+import kakkoiichris.kb.lexer.Location
 import kakkoiichris.kb.lexer.Token
 import kakkoiichris.kb.lexer.Token.Type.*
 import kakkoiichris.kb.script.DataType
@@ -541,36 +542,65 @@ class Parser(private val lexer: Lexer) {
         return Stmt.Type(location, full, alias)
     }
     
-    private fun enumStmt(): Stmt.Enum {
+    private fun enumStmt(): Stmt {
         val location = here()
         
         mustSkip(ENUM)
         
         val name = name()
         
-        mustSkip(AS)
+        return if (match(AS)) {
+            dataEnum(location, name)
+        }
+        else {
+            basicEnum(location, name)
+        }
+    }
+    
+    private fun basicEnum(location: Location, name: Expr.Name): Stmt.BasicEnum {
+        val entries = mutableListOf<Stmt.BasicEnum.Entry>()
         
-        val type = type()
-        
-        val start = if (skip(FOR)) expr() else Expr.Empty
-        
-        val step = if (skip(STEP)) expr() else Expr.Empty
-        
-        val entries = mutableListOf<Stmt.Enum.Entry>()
+        var ordinal = 0
         
         do {
             val entryName = name()
             
-            val value = if (skip(EQUAL_SIGN)) expr() else Expr.Empty
+            val value = if (skip(EQUAL_SIGN)) value() else ordinal.toExpr()
             
-            entries += Stmt.Enum.Entry(entryName.location, entryName, value)
+            entries += Stmt.BasicEnum.Entry(entryName.location, entryName, ordinal.toExpr(), value)
+            
+            ordinal++
         }
         while (skip(COMMA))
         
         mustSkip(END)
         mustSkip(ENUM)
         
-        return Stmt.Enum(location, name, type, start, step, entries)
+        return Stmt.BasicEnum(location, name, entries)
+    }
+    
+    private fun dataEnum(location: Location, name: Expr.Name): Stmt.DataEnum {
+        val type = if (skip(AS)) type() else Expr.Type(name.location, DataType.Primitive.INT)
+        
+        val entries = mutableListOf<Stmt.DataEnum.Entry>()
+        
+        var ordinal = 0
+        
+        do {
+            val entryName = name()
+            
+            val value = if (skip(EQUAL_SIGN)) instantiate() else TODO("DATA ENUM ENTRY MUST HAVE INSTANTIATE")
+            
+            entries += Stmt.DataEnum.Entry(entryName.location, entryName, ordinal.toExpr(), value)
+            
+            ordinal++
+        }
+        while (skip(COMMA))
+        
+        mustSkip(END)
+        mustSkip(ENUM)
+        
+        return Stmt.DataEnum(location, name, type, entries)
     }
     
     private fun expressionStmt() =
@@ -581,7 +611,7 @@ class Parser(private val lexer: Lexer) {
     private fun assign(): Expr {
         val expr = disjunction()
         
-        return if (matchAny(EQUAL_SIGN, PLUS_EQUAL, DASH_EQUAL, STAR_EQUAL, SLASH_EQUAL, PERCENT_EQUAL, AMPERSAND_EQUAL, DOLLAR)) {
+        return if (matchAny(EQUAL_SIGN, PLUS_EQUAL, DASH_EQUAL, STAR_EQUAL, SLASH_EQUAL, PERCENT_EQUAL, AMPERSAND_EQUAL)) {
             val op = currentToken
             
             mustSkip(op.type)
@@ -744,7 +774,7 @@ class Parser(private val lexer: Lexer) {
     }
     
     private fun prefix(): Expr {
-        return if (matchAny(DASH, NOT, POUND)) {
+        return if (matchAny(DASH, NOT, POUND, DOLLAR, AT)) {
             val op = currentToken
             
             mustSkip(op.type)
@@ -788,111 +818,137 @@ class Parser(private val lexer: Lexer) {
         var expr = terminal()
         
         while (matchAny(DOT, LEFT_SQUARE, LEFT_PAREN, LEFT_BRACE, DOUBLE_COLON)) {
-            val op = currentToken
-            
-            mustSkip(op.type)
-            
-            expr = when (op.type) {
-                DOT          -> Expr.GetMember(op.location, expr, name())
+            expr = when {
+                match(DOT)          -> member(expr)
                 
-                LEFT_SQUARE  -> {
-                    val indices = mutableListOf<Expr>()
-                    
-                    do {
-                        indices += expr()
-                    }
-                    while (skip(COMMA))
-                    
-                    mustSkip(RIGHT_SQUARE)
-                    
-                    var subExpr = expr
-                    
-                    for (index in indices) {
-                        subExpr = Expr.GetIndex(index.location, subExpr, index)
-                    }
-                    
-                    if (matchAny(EQUAL_SIGN, PLUS_EQUAL, DASH_EQUAL, STAR_EQUAL, SLASH_EQUAL, PERCENT_EQUAL)) {
-                        val subOp = currentToken
-                        
-                        mustSkip(subOp.type)
-                        
-                        val top = subExpr as Expr.GetIndex
-                        
-                        val location = top.location
-                        val target = top.target
-                        val index = top.index
-                        
-                        fun desugar(newOp: Expr.Binary.Operator): Expr.SetIndex {
-                            val getIndex = Expr.GetIndex(location, target, index)
-                            
-                            val binary = Expr.Binary(subOp.location, newOp, getIndex, expr())
-                            
-                            return Expr.SetIndex(location, target, index, binary)
-                        }
-                        
-                        subExpr = when (subOp.type) {
-                            PLUS_EQUAL    -> desugar(Expr.Binary.Operator.ADD)
-                            
-                            DASH_EQUAL    -> desugar(Expr.Binary.Operator.SUBTRACT)
-                            
-                            STAR_EQUAL    -> desugar(Expr.Binary.Operator.MULTIPLY)
-                            
-                            SLASH_EQUAL   -> desugar(Expr.Binary.Operator.DIVIDE)
-                            
-                            PERCENT_EQUAL -> desugar(Expr.Binary.Operator.MODULUS)
-                            
-                            else          -> Expr.SetIndex(location, target, index, expr())
-                        }
-                    }
-                    
-                    subExpr
-                }
+                match(LEFT_SQUARE)  -> index(expr)
                 
-                LEFT_PAREN   -> {
-                    val name = expr as? Expr.Name ?: KBError.invalidInvocationTarget(expr.location)
-                    
-                    val args = mutableListOf<Expr>()
-                    
-                    if (!skip(RIGHT_PAREN)) {
-                        do {
-                            args += if (match(COMMA)) Expr.Empty else expr()
-                        }
-                        while (skip(COMMA))
-                        
-                        mustSkip(RIGHT_PAREN)
-                    }
-                    
-                    Expr.Invoke(op.location, name, args)
-                }
+                match(LEFT_PAREN)   -> invoke(expr)
                 
-                LEFT_BRACE   -> {
-                    val elements = mutableListOf<Expr>()
-                    
-                    if (!skip(RIGHT_BRACE)) {
-                        do {
-                            elements += if (match(COMMA)) Expr.Empty else expr()
-                        }
-                        while (skip(COMMA))
-                        
-                        mustSkip(RIGHT_BRACE)
-                    }
-                    
-                    Expr.Instantiate(op.location, expr as? Expr.Name ?: KBError.invalidInstantiationTarget(expr.location), elements)
-                }
+                match(LEFT_BRACE)   -> instantiate(expr)
                 
-                DOUBLE_COLON -> {
-                    if (expr !is Expr.Name) {
-                        TODO("GET ENTRY ENUM NAME")
-                    }
-                    
-                    Expr.GetEntry(op.location, expr, name())
-                }
+                match(DOUBLE_COLON) -> entry(expr)
                 
-                else         -> KBError.failure("Broken postfix operator '${op.type}'!", op.location)
+                else                -> KBError.failure("Broken postfix operator '${currentToken.type}'!", currentToken.location)
             }
         }
         
         return expr
+    }
+    
+    private fun member(expr: Expr):Expr.GetMember {
+        val op = currentToken
+        
+        mustSkip(DOT)
+        
+        return Expr.GetMember(op.location, expr, name())
+    }
+    
+    private fun index(expr: Expr): Expr {
+        mustSkip(LEFT_SQUARE)
+        
+        val indices = mutableListOf<Expr>()
+        
+        do {
+            indices += expr()
+        }
+        while (skip(COMMA))
+        
+        mustSkip(RIGHT_SQUARE)
+        
+        var subExpr = expr
+        
+        for (index in indices) {
+            subExpr = Expr.GetIndex(index.location, subExpr, index)
+        }
+        
+        if (matchAny(EQUAL_SIGN, PLUS_EQUAL, DASH_EQUAL, STAR_EQUAL, SLASH_EQUAL, PERCENT_EQUAL)) {
+            val subOp = currentToken
+            
+            mustSkip(subOp.type)
+            
+            val top = subExpr as Expr.GetIndex
+            
+            val location = top.location
+            val target = top.target
+            val index = top.index
+            
+            fun desugar(newOp: Expr.Binary.Operator): Expr.SetIndex {
+                val getIndex = Expr.GetIndex(location, target, index)
+                
+                val binary = Expr.Binary(subOp.location, newOp, getIndex, expr())
+                
+                return Expr.SetIndex(location, target, index, binary)
+            }
+            
+            subExpr = when (subOp.type) {
+                PLUS_EQUAL    -> desugar(Expr.Binary.Operator.ADD)
+                
+                DASH_EQUAL    -> desugar(Expr.Binary.Operator.SUBTRACT)
+                
+                STAR_EQUAL    -> desugar(Expr.Binary.Operator.MULTIPLY)
+                
+                SLASH_EQUAL   -> desugar(Expr.Binary.Operator.DIVIDE)
+                
+                PERCENT_EQUAL -> desugar(Expr.Binary.Operator.MODULUS)
+                
+                else          -> Expr.SetIndex(location, target, index, expr())
+            }
+        }
+        
+        return subExpr
+    }
+    
+    private fun invoke(expr: Expr): Expr.Invoke {
+        val op = currentToken
+        
+        mustSkip(LEFT_PAREN)
+        
+        val name = expr as? Expr.Name ?: KBError.invalidInvocationTarget(expr.location)
+        
+        val args = mutableListOf<Expr>()
+        
+        if (!skip(RIGHT_PAREN)) {
+            do {
+                args += if (match(COMMA)) Expr.Empty else expr()
+            }
+            while (skip(COMMA))
+            
+            mustSkip(RIGHT_PAREN)
+        }
+        
+        return Expr.Invoke(op.location, name, args)
+    }
+    
+    private fun instantiate(expr: Expr = name()): Expr.Instantiate {
+        val op = currentToken
+        
+        mustSkip(LEFT_BRACE)
+        
+        val elements = mutableListOf<Expr>()
+        
+        if (!skip(RIGHT_BRACE)) {
+            do {
+                elements += if (match(COMMA)) Expr.Empty else expr()
+            }
+            while (skip(COMMA))
+            
+            mustSkip(RIGHT_BRACE)
+        }
+        
+        return Expr.Instantiate(op.location, expr as? Expr.Name ?: KBError.invalidInstantiationTarget(expr.location), elements)
+    }
+    
+    private fun entry(expr: Expr): Expr.GetEntry {
+        val op = currentToken
+        
+        mustSkip(DOUBLE_COLON)
+        
+        if (expr !is Expr.Name) {
+            TODO("GET ENTRY ENUM NAME")
+        }
+        
+        return Expr.GetEntry(op.location, expr, name())
     }
     
     private fun terminal(): Expr {

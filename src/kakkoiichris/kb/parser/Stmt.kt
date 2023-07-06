@@ -53,7 +53,9 @@ sealed class Stmt(val location: Location) {
         
         fun visitTypeStmt(stmt: Type): X
         
-        fun visitEnumStmt(stmt: Enum): X
+        fun visitBasicEnumStmt(stmt: BasicEnum): X
+        
+        fun visitDataEnumStmt(stmt: DataEnum): X
         
         fun visitExpressionStmt(stmt: Expression): X
     }
@@ -220,11 +222,18 @@ sealed class Stmt(val location: Location) {
             visitor.visitTypeStmt(this)
     }
     
-    class Enum(location: Location, val name: Expr.Name, val subType: Expr.Type, val start: Expr, val step: Expr, val entries: List<Entry>) : Stmt(location) {
+    class BasicEnum(location: Location, val name: Expr.Name, val entries: List<Entry>) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
-            visitor.visitEnumStmt(this)
+            visitor.visitBasicEnumStmt(this)
         
-        class Entry(val location: Location, val name: Expr.Name, val value: Expr)
+        data class Entry(val location: Location, val name: Expr.Name, val ordinal: Expr.Value, val value: Expr.Value)
+    }
+    
+    class DataEnum(location: Location, val name: Expr.Name, val subType: Expr.Type, val entries: List<Entry>) : Stmt(location) {
+        override fun <X> accept(visitor: Visitor<X>): X =
+            visitor.visitDataEnumStmt(this)
+        
+        data class Entry(val location: Location, val name: Expr.Name, val ordinal: Expr.Value, val value: Expr.Instantiate)
     }
     
     class Expression(val expr: Expr) : Stmt(expr.location) {

@@ -93,7 +93,9 @@ sealed class Expr(val location: Location) {
         enum class Operator(private val type: Token.Type) {
             NEGATE(Token.Type.DASH),
             NOT(Token.Type.NOT),
-            LENGTH(Token.Type.POUND);
+            LENGTH(Token.Type.POUND),
+            STRING(Token.Type.DOLLAR),
+            VALUE(Token.Type.AT);
             
             companion object {
                 operator fun get(type: Token.Type) =
@@ -110,7 +112,6 @@ sealed class Expr(val location: Location) {
     class Binary(location: Location, val op: Operator, val left: Expr, val right: Expr) : Expr(location) {
         enum class Operator(private val type: Token.Type) {
             ASSIGN(Token.Type.EQUAL_SIGN),
-            SWAP(Token.Type.DOLLAR),
             OR(Token.Type.OR),
             AND(Token.Type.AND),
             EQUAL(Token.Type.DOUBLE_EQUAL),

@@ -11,11 +11,13 @@ interface DataType {
     companion object {
         fun infer(script: Script, x: Any?): DataType =
             when (x) {
-                is ArrayInstance -> x.type.array
+                is ArrayInstance      -> x.type.array
                 
-                is DataInstance  -> Data(x.name)
+                is DataInstance       -> Data(x.name)
                 
-                is List<*>       -> {
+                is EnumInstance.Entry -> Enum(x.type.toName())
+                
+                is List<*>            -> {
                     val xn = x.filterNotNull()
                     
                     when {
@@ -29,7 +31,7 @@ interface DataType {
                     }
                 }
                 
-                else             -> Primitive.infer(script, x)
+                else                  -> Primitive.infer(script, x)
             }
         
         private fun List<*>.isHomogenous(script: Script): Boolean {
@@ -44,8 +46,14 @@ interface DataType {
             return true
         }
         
-        fun resolveAlias(script: Script, type: DataType): DataType {
+        fun resolveName(script: Script, type: DataType): DataType {
             if (type is Data) {
+                val enum = script.memory.getEnum(type.name)
+                
+                if (enum != null) {
+                    return Enum(enum.name.toName())
+                }
+                
                 val alias = script.memory.getAlias(type.name)
                 
                 if (alias != null) {
@@ -421,6 +429,27 @@ interface DataType {
             }
             
             return DataInstance(name, scope)
+        }
+        
+        override fun toString() = name.value
+    }
+    
+    class Enum(val name: Expr.Name) : DataType {
+        override val iterableType: DataType get() = Primitive.ANY
+        
+        override fun filter(script: Script, x: Any?): Any? =
+            super.filter(script, x) ?: x.takeIf { it is EnumInstance.Entry && it.type == name.value }
+        
+        override fun cast(script: Script, x: Any?): Any? = (x as? EnumInstance.Entry)?.takeIf { it.type == name.value }
+        
+        override fun coerce(x: Any?) = x.takeIf { it is EnumInstance.Entry && it.type == name.value }
+        
+        override fun iterable(script: Script, x: Any?): List<Any>? = null
+        
+        override fun default(script: Script): Any {
+            val enum = script.memory.getEnum(name) ?: KBError.undeclaredData(name, Location.none)
+            
+            return enum[0]
         }
         
         override fun toString() = name.value

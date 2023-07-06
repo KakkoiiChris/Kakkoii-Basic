@@ -420,11 +420,40 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         }
     }
     
-    override fun visitEnumStmt(stmt: Stmt.Enum) {
-        val name = stmt.name.value
+    override fun visitBasicEnumStmt(stmt: Stmt.BasicEnum) {
         val entries = mutableListOf<EnumInstance.Entry>()
         
-        //memory. EnumInstance(name, entries)
+        for (entry in stmt.entries) {
+            val (_, name, ordinal, value) = entry
+            
+            val ordinalResult = visit(ordinal)
+            
+            ordinalResult as? Int ?: TODO("INVALID BASIC ENUM ORDINAL '$ordinalResult'")
+            
+            val valueResult = visit(value).fromRef()
+            
+            entries.add(EnumInstance.Entry(stmt.name.value, name.value, ordinalResult, valueResult))
+        }
+        
+        memory.newEnum(stmt.name, EnumInstance(stmt.name.value, entries))
+    }
+    
+    override fun visitDataEnumStmt(stmt: Stmt.DataEnum) {
+        val entries = mutableListOf<EnumInstance.Entry>()
+        
+        for (entry in stmt.entries) {
+            val (_, name, ordinal, value) = entry
+            
+            val ordinalResult = visit(ordinal)
+            
+            ordinalResult as? Int ?: TODO("INVALID DATA ENUM ORDINAL '$ordinalResult'")
+            
+            val valueResult = visit(value).fromRef()
+            
+            entries.add(EnumInstance.Entry(stmt.name.value, name.value, ordinalResult, valueResult))
+        }
+        
+        memory.newEnum(stmt.name, EnumInstance(stmt.name.value, entries))
     }
     
     override fun visitExpressionStmt(stmt: Stmt.Expression) {
@@ -441,7 +470,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         memory.getRef(expr) ?: KBError.undeclaredVariable(expr, expr.location)
     
     override fun visitTypeExpr(expr: Expr.Type) =
-        DataType.resolveAlias(this, expr.value)
+        DataType.resolveName(this, expr.value)
     
     override fun visitArrayExpr(expr: Expr.Array): Any {
         val elements = mutableListOf<Any>()
@@ -482,13 +511,27 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             Expr.Unary.Operator.NOT    -> visit(expr.expr).fromRef().isEmptyValue()
             
             Expr.Unary.Operator.LENGTH -> when (val e = visit(expr.expr).fromRef()) {
-                is String        -> e.length
+                is String             -> e.length
                 
-                is ArrayInstance -> e.size
+                is ArrayInstance      -> e.size
                 
-                is DataInstance  -> e.deref().size
+                is DataInstance       -> e.deref().size
                 
-                else             -> 1
+                is EnumInstance.Entry -> e.ordinal
+                
+                else                  -> 1
+            }
+            
+            Expr.Unary.Operator.STRING -> when (val e = visit(expr.expr).fromRef()) {
+                is EnumInstance.Entry -> e.name
+                
+                else                  -> e.toString()
+            }
+            
+            Expr.Unary.Operator.VALUE->when (val e = visit(expr.expr).fromRef()) {
+                is EnumInstance.Entry -> e.value
+                
+                else                  -> e
             }
         }
     }
@@ -529,30 +572,6 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 }
                 
                 else                      -> KBError.assignedToValue(expr.left.location)
-            }
-            
-            Expr.Binary.Operator.SWAP          -> {
-                val l = visit(expr.left) as? Memory.Scope.Reference ?: KBError.assignedToValue(expr.left.location)
-                val r = visit(expr.right) as? Memory.Scope.Reference ?: KBError.assignedToValue(expr.right.location)
-                
-                val lv = r.type.coerce(l.value) ?: l.value
-                val rv = l.type.coerce(r.value) ?: r.value
-                
-                when (l.put(this, rv)) {
-                    true  -> Unit
-                    
-                    false -> KBError.mismatchedType(r, l.type, expr.left.location)
-                    
-                    null  -> KBError.reassignedConstant(expr.left.location)
-                }
-                
-                when (r.put(this, lv)) {
-                    true  -> Unit
-                    
-                    false -> KBError.mismatchedType(r, l.type, expr.right.location)
-                    
-                    null  -> KBError.reassignedConstant(expr.right.location)
-                }
             }
             
             Expr.Binary.Operator.OR            -> {
@@ -1584,8 +1603,9 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
     
     override fun visitGetEntryExpr(expr: Expr.GetEntry): Any {
-        //memory.get
-        return Unit
+        val enum = memory.getEnum(expr.target) ?: TODO("ENUM '${expr.target}' DOES NOT EXIST")
+        
+        return enum[expr.member]
     }
     
     fun invoke(name: String, vararg arguments: Any): Any? {

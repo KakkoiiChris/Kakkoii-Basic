@@ -1,5 +1,7 @@
 package kakkoiichris.kb.script
 
+import kakkoiichris.kb.parser.Expr
+
 /**
  * KakkoiiBasic
  *
@@ -11,6 +13,12 @@ package kakkoiichris.kb.script
  *
  * @author Christian Bryce Alexander
  */
-class EnumInstance(val name: String, val entries: List<Entry>) {
-    data class Entry(val name: String, val ordinal: Int, val value: Any)
+class EnumInstance(val name: String, private val entries: List<Entry>) {
+    operator fun get(name: Expr.Name) =
+        entries.first { it.name == name.value }
+    
+    operator fun get(index: Int) =
+        entries[index]
+    
+    data class Entry(val type: String, val name: String, val ordinal: Int, val value: Any)
 }

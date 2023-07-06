@@ -419,15 +419,17 @@ class Lexer(private val source: Source) : Iterator<Token> {
                 else      -> Token.Type.GREATER_SIGN
             }
             
-            skip('$') -> Token.Type.DOLLAR
-            
             skip('&') -> when {
                 skip('=') -> Token.Type.AMPERSAND_EQUAL
                 
                 else      -> Token.Type.AMPERSAND
             }
             
+            skip('$') -> Token.Type.DOLLAR
+            
             skip('#') -> Token.Type.POUND
+            
+            skip('@') -> Token.Type.AT
             
             skip('.') -> Token.Type.DOT
             

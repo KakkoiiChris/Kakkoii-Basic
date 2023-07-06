@@ -58,8 +58,14 @@ class Memory {
     fun getAlias(name: Expr.Name) =
         stack.peek()?.getAlias(name)
     
+    fun newEnum(name: Expr.Name, enum: EnumInstance) =
+        stack.peek()?.newEnum(name, enum) ?: error("NEW ENUM: NO ACTIVE SCOPE")
+    
     fun hasEnum(name: Expr.Name) =
         stack.peek()?.hasEnum(name)
+    
+    fun getEnum(name: Expr.Name) =
+        stack.peek()?.getEnum(name)
     
     fun peek() =
         stack.peek()
@@ -143,6 +149,16 @@ class Memory {
         
         private fun getAlias(name: String): DataType? =
             aliases[name] ?: parent?.getAlias(name)
+        
+        fun newEnum(name: Expr.Name, enum: EnumInstance) =
+            if (enums[name.value] == null) {
+                enums[name.value] = enum
+                
+                true
+            }
+            else {
+                false
+            }
         
         fun hasEnum(name: Expr.Name) =
             name.value in enums.keys

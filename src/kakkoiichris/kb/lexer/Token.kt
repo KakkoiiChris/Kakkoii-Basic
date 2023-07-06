@@ -50,7 +50,6 @@ data class Token(val location: Location, val type: Type, val value: Any = Unit) 
         SLASH_EQUAL("/="),
         PERCENT_EQUAL("%="),
         AMPERSAND_EQUAL("&="),
-        DOLLAR("$"),
         
         // Disjunction
         OR("or"),
@@ -89,6 +88,8 @@ data class Token(val location: Location, val type: Type, val value: Any = Unit) 
         // Prefix
         NOT("not"),
         POUND("#"),
+        DOLLAR("$"),
+        AT("@"),
         
         // Pipeline
         COLON(":"),
