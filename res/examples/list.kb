@@ -1,0 +1,30 @@
+data List
+    var head as Node
+end data
+
+data Node
+    var value as int,
+    var isHead as bool,
+    var isTail as bool,
+    var before as Node,
+    var after as Node
+end data
+
+sub listOf as List with values as int*
+    let head = Node { values[0], true, true }
+    
+    listOf = { head }
+    
+    var current = head
+    
+    for i = 1 to #values
+        let new = Node { values[i], false, true, current }
+        
+        current.after = new
+        current.isTail = false
+        
+        current = new
+    end for
+end sub
+
+let x as List = listOf(1, 2, 3, 4, 5)

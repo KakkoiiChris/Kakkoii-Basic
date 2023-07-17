@@ -1,0 +1,9 @@
+sub leftPad as string with str as string, len as int, chr as char
+    yield (chr * (len - #str)) & str
+end sub
+
+sub rightPad as string with str as string, len as int, chr as char
+    yield str & (chr * (len - #str))
+end sub
+
+print(rightPad("hello", 9, ' '), "|\n")
