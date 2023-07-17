@@ -589,8 +589,10 @@ class Parser(private val lexer: Lexer) {
         do {
             val entryName = name()
             
-            val value = if (skip(EQUAL_SIGN)) instantiate() else TODO("DATA ENUM ENTRY MUST HAVE INSTANTIATE")
-            
+            if (!skip(EQUAL_SIGN)) TODO("DATA ENUM ENTRY MUST HAVE INSTANTIATE")
+
+            val value = if(match(LEFT_BRACE)) data() else instantiate()
+
             entries += Stmt.DataEnum.Entry(entryName.location, entryName, ordinal.toExpr(), value)
             
             ordinal++
@@ -825,7 +827,11 @@ class Parser(private val lexer: Lexer) {
                 
                 match(LEFT_PAREN)   -> invoke(expr)
                 
-                match(LEFT_BRACE)   -> instantiate(expr)
+                match(LEFT_BRACE)   -> {
+                    if (expr !is Expr.Name) TODO("INSTANTIATE NOT NAME")
+
+                    instantiate(expr)
+                }
                 
                 match(DOUBLE_COLON) -> entry(expr)
                 
@@ -920,7 +926,7 @@ class Parser(private val lexer: Lexer) {
         return Expr.Invoke(op.location, name, args)
     }
     
-    private fun instantiate(expr: Expr = name()): Expr.Instantiate {
+    private fun instantiate(expr: Expr.Name = name()): Expr.Instantiate {
         val op = currentToken
         
         mustSkip(LEFT_BRACE)

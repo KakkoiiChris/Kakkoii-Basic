@@ -20,5 +20,8 @@ class EnumInstance(val name: String, private val entries: List<Entry>) {
     operator fun get(index: Int) =
         entries[index]
     
-    data class Entry(val type: String, val name: String, val ordinal: Int, val value: Any)
+    data class Entry(val type: String, val name: String, val ordinal: Int, val value: Any) {
+        override fun toString()=
+            "$type #$ordinal \$$name @$value"
+    }
 }

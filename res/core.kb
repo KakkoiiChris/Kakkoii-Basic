@@ -2,6 +2,14 @@ rem general
 
 sub print with args as any* end sub
 
+sub printLine with args as any*
+    print(args, '\n')
+end sub
+
+sub printLine
+    print('\n')
+end sub
+
 sub input as string with args as any* end sub
 
 sub read as string with path as string end sub

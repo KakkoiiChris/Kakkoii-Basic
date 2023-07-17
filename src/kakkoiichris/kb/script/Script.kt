@@ -441,6 +441,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
 
     override fun visitDataEnumStmt(stmt: Stmt.DataEnum) {
+        val type = visit(stmt.type) as? DataType.Data ?: TODO("DATA ENUM TYPE MUST BE DATA")
+
         val entries = mutableListOf<EnumInstance.Entry>()
 
         for (entry in stmt.entries) {
@@ -450,7 +452,13 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
             ordinalResult as? Int ?: TODO("INVALID DATA ENUM ORDINAL '$ordinalResult'")
 
-            val valueResult = visit(value).fromRef()
+            var instantiate = value
+
+            if (instantiate.isInferred) {
+                instantiate = instantiate.withTarget(type.name)
+            }
+
+            val valueResult = visit(instantiate).fromRef()
 
             entries.add(EnumInstance.Entry(stmt.name.value, name.value, ordinalResult, valueResult))
         }
@@ -1650,7 +1658,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
 
     override fun visitGetEntryExpr(expr: Expr.GetEntry): Any {
-        val enum = memory.getEnum(expr.target) ?: TODO("ENUM '${expr.target}' DOES NOT EXIST")
+        val enum = memory.getEnum(expr.target) ?: TODO("ENUM '${expr.target}' DOES NOT EXIST ${expr.location}")
 
         return enum[expr.member]
     }

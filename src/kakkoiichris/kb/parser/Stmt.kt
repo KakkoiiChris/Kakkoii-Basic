@@ -229,7 +229,7 @@ sealed class Stmt(val location: Location) {
         data class Entry(val location: Location, val name: Expr.Name, val ordinal: Expr.Value, val value: Expr.Value)
     }
     
-    class DataEnum(location: Location, val name: Expr.Name, val subType: Expr.Type, val entries: List<Entry>) : Stmt(location) {
+    class DataEnum(location: Location, val name: Expr.Name, val type: Expr.Type, val entries: List<Entry>) : Stmt(location) {
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitDataEnumStmt(this)
         
