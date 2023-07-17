@@ -1,0 +1,14 @@
+enum Coin
+    PENNY = 0.01,
+    NICKEL = 0.05,
+    DIME = 0.1,
+    QUARTER = 0.25,
+    HALF_DOLLAR = 0.5,
+    DOLLAR = 1.0
+end enum
+
+var c as Coin
+
+c = Coin::DOLLAR
+
+print($c, ',', #c, ',', @c, '\n')

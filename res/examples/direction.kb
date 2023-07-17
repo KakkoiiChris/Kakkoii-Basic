@@ -1,0 +1,42 @@
+data Vector
+    var x as int,
+    var y as int
+end data
+
+sub add as Vector with this as Vector, that as Vector
+    add = {
+        this.x + that.x,
+        this.y + that.y
+    }
+end sub
+
+sub mul as Vector with this as Vector, that as Vector
+    add = {
+        this.x * that.x,
+        this.y * that.y
+    }
+end sub
+
+enum Direction as Vector
+    NORTH = { 0, -1},
+    EAST  = { 1,  0},
+    SOUTH = { 0,  1},
+    WEST  = {-1,  0}
+end enum
+
+data Player
+    var dir as Direction = Direction::North,
+    var pos as Vector = {}
+end data
+
+var player = Player{}
+
+sub update with this as Player, delta as double
+    this.pos += @dir * delta
+end sub
+
+print(player, '\n')
+
+player:update(1.0)
+
+print(player, '\n')

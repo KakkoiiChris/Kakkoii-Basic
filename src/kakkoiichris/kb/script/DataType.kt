@@ -13,9 +13,9 @@ interface DataType {
             when (x) {
                 is ArrayInstance      -> x.type.array
                 
-                is DataInstance       -> Data(x.name)
-                
                 is EnumInstance.Entry -> Enum(x.type.toName())
+                
+                is DataInstance       -> Data(x.name)
                 
                 is List<*>            -> {
                     val xn = x.filterNotNull()
@@ -48,16 +48,16 @@ interface DataType {
         
         fun resolveName(script: Script, type: DataType): DataType {
             if (type is Data) {
-                val enum = script.memory.getEnum(type.name)
-                
-                if (enum != null) {
-                    return Enum(enum.name.toName())
-                }
-                
                 val alias = script.memory.getAlias(type.name)
                 
                 if (alias != null) {
                     return alias
+                }
+                
+                val enum = script.memory.getEnum(type.name)
+                
+                if (enum != null) {
+                    return Enum(enum.name.toName())
                 }
             }
             
@@ -435,16 +435,12 @@ interface DataType {
     }
     
     class Enum(val name: Expr.Name) : DataType {
-        override val iterableType: DataType get() = Primitive.ANY
-        
         override fun filter(script: Script, x: Any?): Any? =
             super.filter(script, x) ?: x.takeIf { it is EnumInstance.Entry && it.type == name.value }
         
         override fun cast(script: Script, x: Any?): Any? = (x as? EnumInstance.Entry)?.takeIf { it.type == name.value }
         
         override fun coerce(x: Any?) = x.takeIf { it is EnumInstance.Entry && it.type == name.value }
-        
-        override fun iterable(script: Script, x: Any?): List<Any>? = null
         
         override fun default(script: Script): Any {
             val enum = script.memory.getEnum(name) ?: KBError.undeclaredData(name, Location.none)
