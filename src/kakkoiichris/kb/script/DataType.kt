@@ -48,7 +48,7 @@ interface DataType {
             return true
         }
 
-        fun resolveName(script: Script, type: DataType): DataType {
+        fun resolve(script: Script, type: DataType): DataType {
             if (type is Data) {
                 val alias = script.memory.getAlias(type.name)
 

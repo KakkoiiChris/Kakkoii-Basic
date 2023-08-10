@@ -6,8 +6,11 @@ sub f as any with option as int
     end if
 end sub
 
-let x = f(0)
-let y = f(1)
-let z = f(23)
+var x = f(0)
+printLine(typeOf(x))
 
-print(typeOf(x), ", ", typeOf(y), ", ", typeOf(z))
+x = f(1)
+printLine(typeOf(x))
+
+x = f(23)
+printLine(typeOf(x))

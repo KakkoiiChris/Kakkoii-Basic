@@ -69,11 +69,13 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         }
 
         if (type === DataType.Inferred) {
-            if (value === Empty) {
-                KBError.inferEmpty(stmt.location)
+            if (value is InvokeResult) {
+                type = value.type
+                value = value.value
             }
-
-            type = DataType.infer(this, value)
+            else {
+                type = DataType.infer(this, value)
+            }
         }
 
         if (value === Empty) {
@@ -100,7 +102,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             }
         }
 
-        val value = visit(stmt.expr).fromRef()
+        val value = visit(stmt.expr).fromRef().unwrap()
 
         if (value === Unit) {
             KBError.assignedNone(stmt.expr.location)
@@ -160,7 +162,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
 
     override fun visitIfStmt(stmt: Stmt.If) {
-        val testValue = visit(stmt.test).fromRef()
+        val testValue = visit(stmt.test).fromRef().unwrap()
 
         testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.location)
 
@@ -174,14 +176,14 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
 
     override fun visitSwitchStmt(stmt: Stmt.Switch) {
-        val subject = visit(stmt.subject).fromRef()
+        val subject = visit(stmt.subject).fromRef().unwrap()
 
         for (case in stmt.cases) {
             try {
                 when (case) {
                     is Stmt.Switch.Case.Values -> {
                         for (test in case.tests) {
-                            if (subject == visit(test)) {
+                            if (subject == visit(test).unwrap()) {
                                 visit(case.block)
 
                                 return
@@ -212,7 +214,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
     override fun visitWhileStmt(stmt: Stmt.While) {
         while (true) {
-            val testValue = visit(stmt.test).fromRef()
+            val testValue = visit(stmt.test).fromRef().unwrap()
 
             testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.location)
 
@@ -250,7 +252,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 continue
             }
 
-            val testValue = visit(stmt.test).fromRef()
+            val testValue = visit(stmt.test).fromRef().unwrap()
 
             testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.location)
 
@@ -297,7 +299,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
                 visit(increment)
             }
-            while (visit(test).fromRef() as Boolean)
+            while (visit(test).fromRef().unwrap() as Boolean)
         }
         finally {
             memory.pop()
@@ -305,7 +307,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
 
     override fun visitForIterateStmt(stmt: Stmt.ForIterate) {
-        val iterableValue = visit(stmt.iterable).fromRef()
+        val iterableValue = visit(stmt.iterable).fromRef().unwrap()
 
         val iterableType = DataType.infer(this, iterableValue)
 
@@ -345,7 +347,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
 
     override fun visitForIterateEachStmt(stmt: Stmt.ForIterateEach) {
-        val iterableValue = visit(stmt.iterable).fromRef()
+        val iterableValue = visit(stmt.iterable).fromRef().unwrap()
 
         val iterableType = DataType.infer(this, iterableValue)
 
@@ -411,7 +413,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
 
     override fun visitYieldStmt(stmt: Stmt.Yield) {
-        val value = visit(stmt.value).fromRef()
+        val value = visit(stmt.value).fromRef().unwrap()
 
         throw Redirect.Yield(stmt.location, value)
     }
@@ -432,7 +434,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
             ordinalResult as? Int ?: TODO("INVALID BASIC ENUM ORDINAL '$ordinalResult'")
 
-            val valueResult = visit(value).fromRef()
+            val valueResult = visit(value).fromRef().unwrap()
 
             entries.add(EnumInstance.Entry(stmt.name.value, name.value, ordinalResult, valueResult))
         }
@@ -441,7 +443,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
 
     override fun visitDataEnumStmt(stmt: Stmt.DataEnum) {
-        val type = visit(stmt.type) as? DataType.Data ?: TODO("DATA ENUM TYPE MUST BE DATA")
+        val type = visit(stmt.type) as DataType.Data
 
         val entries = mutableListOf<EnumInstance.Entry>()
 
@@ -480,13 +482,13 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         memory.getRef(expr) ?: KBError.undeclaredVariable(expr, expr.location)
 
     override fun visitTypeExpr(expr: Expr.Type) =
-        DataType.resolveName(this, expr.value)
+        DataType.resolve(this, expr.value)
 
     override fun visitArrayExpr(expr: Expr.Array): Any {
         val elements = mutableListOf<Any>()
 
         for (element in expr.elements) {
-            elements += visit(element).fromRef()
+            elements += visit(element).fromRef().unwrap()
         }
 
         val type = DataType.infer(this, elements) as DataType.Array
@@ -496,7 +498,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
     override fun visitUnaryExpr(expr: Expr.Unary): Any {
         return when (expr.op) {
-            Expr.Unary.Operator.NEGATE -> when (val e = visit(expr.expr).fromRef()) {
+            Expr.Unary.Operator.NEGATE -> when (val e = visit(expr.expr).fromRef().unwrap()) {
                 is Byte          -> (-e).toByte()
 
                 is Short         -> (-e).toShort()
@@ -518,9 +520,9 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else             -> KBError.invalidUnaryOperand(e, expr.op, expr.expr.location)
             }
 
-            Expr.Unary.Operator.NOT    -> visit(expr.expr).fromRef().isEmptyValue()
+            Expr.Unary.Operator.NOT    -> visit(expr.expr).fromRef().unwrap().isEmptyValue()
 
-            Expr.Unary.Operator.LENGTH -> when (val e = visit(expr.expr).fromRef()) {
+            Expr.Unary.Operator.LENGTH -> when (val e = visit(expr.expr).fromRef().unwrap()) {
                 is String             -> e.length
 
                 is ArrayInstance      -> e.size
@@ -532,13 +534,13 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else                  -> 1
             }
 
-            Expr.Unary.Operator.STRING -> when (val e = visit(expr.expr).fromRef()) {
+            Expr.Unary.Operator.STRING -> when (val e = visit(expr.expr).fromRef().unwrap()) {
                 is EnumInstance.Entry -> e.name
 
                 else                  -> e.toString()
             }
 
-            Expr.Unary.Operator.VALUE  -> when (val e = visit(expr.expr).fromRef()) {
+            Expr.Unary.Operator.VALUE  -> when (val e = visit(expr.expr).fromRef().unwrap()) {
                 is EnumInstance.Entry -> e.value
 
                 else                  -> e
@@ -585,13 +587,13 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             }
 
             Expr.Binary.Operator.OR            -> {
-                val l = visit(expr.left).fromRef()
+                val l = visit(expr.left).fromRef().unwrap()
 
                 l as? Boolean ?: KBError.invalidLeftOperand(l, expr.op, expr.left.location)
 
                 if (l) return true
 
-                val r = visit(expr.right).fromRef()
+                val r = visit(expr.right).fromRef().unwrap()
 
                 r as? Boolean ?: KBError.invalidRightOperand(r, expr.op, expr.right.location)
 
@@ -599,27 +601,27 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             }
 
             Expr.Binary.Operator.AND           -> {
-                val l = visit(expr.left).fromRef()
+                val l = visit(expr.left).fromRef().unwrap()
 
                 l as? Boolean ?: KBError.invalidLeftOperand(l, expr.op, expr.left.location)
 
                 if (!l) return false
 
-                val r = visit(expr.right).fromRef()
+                val r = visit(expr.right).fromRef().unwrap()
 
                 r as? Boolean ?: KBError.invalidRightOperand(r, expr.op, expr.right.location)
 
                 return r
             }
 
-            Expr.Binary.Operator.EQUAL         -> when (val l = visit(expr.left).fromRef()) {
-                is Boolean       -> when (val r = visit(expr.right).fromRef()) {
+            Expr.Binary.Operator.EQUAL         -> when (val l = visit(expr.left).fromRef().unwrap()) {
+                is Boolean       -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Boolean -> l == r
                     Empty      -> l.isEmptyValue()
                     else       -> false
                 }
 
-                is Byte          -> when (val r = visit(expr.right).fromRef()) {
+                is Byte          -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l == r
                     is Short  -> l == r
                     is Int    -> l == r
@@ -630,7 +632,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> false
                 }
 
-                is Short         -> when (val r = visit(expr.right).fromRef()) {
+                is Short         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l == r
                     is Short  -> l == r
                     is Int    -> l == r
@@ -641,7 +643,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> false
                 }
 
-                is Int           -> when (val r = visit(expr.right).fromRef()) {
+                is Int           -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l == r
                     is Short  -> l == r
                     is Int    -> l == r
@@ -652,7 +654,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> false
                 }
 
-                is Long          -> when (val r = visit(expr.right).fromRef()) {
+                is Long          -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l == r
                     is Short  -> l == r
                     is Int    -> l == r
@@ -663,7 +665,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> false
                 }
 
-                is Float         -> when (val r = visit(expr.right).fromRef()) {
+                is Float         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l == r
                     is Short  -> l == r
                     is Int    -> l == r
@@ -674,7 +676,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> false
                 }
 
-                is Double        -> when (val r = visit(expr.right).fromRef()) {
+                is Double        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l == r
                     is Short  -> l == r
                     is Int    -> l == r
@@ -685,25 +687,25 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> false
                 }
 
-                is Char          -> when (val r = visit(expr.right).fromRef()) {
+                is Char          -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Char -> l == r
                     Empty   -> l.isEmptyValue()
                     else    -> false
                 }
 
-                is String        -> when (val r = visit(expr.right).fromRef()) {
+                is String        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is String -> l == r
                     Empty     -> l.isEmptyValue()
                     else      -> false
                 }
 
-                is ArrayInstance -> when (val r = visit(expr.right).fromRef()) {
+                is ArrayInstance -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is ArrayInstance -> l == r
                     Empty            -> l.isEmpty()
                     else             -> false
                 }
 
-                is DataInstance  -> when (val r = visit(expr.right).fromRef()) {
+                is DataInstance  -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is DataInstance -> l == r
                     Empty           -> l.isEmpty()
                     else            -> false
@@ -712,14 +714,14 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else             -> false
             }
 
-            Expr.Binary.Operator.NOT_EQUAL     -> when (val l = visit(expr.left).fromRef()) {
-                is Boolean       -> when (val r = visit(expr.right).fromRef()) {
+            Expr.Binary.Operator.NOT_EQUAL     -> when (val l = visit(expr.left).fromRef().unwrap()) {
+                is Boolean       -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Boolean -> l != r
                     Empty      -> !l.isEmptyValue()
                     else       -> true
                 }
 
-                is Byte          -> when (val r = visit(expr.right).fromRef()) {
+                is Byte          -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l != r
                     is Short  -> l != r
                     is Int    -> l != r
@@ -730,7 +732,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> true
                 }
 
-                is Short         -> when (val r = visit(expr.right).fromRef()) {
+                is Short         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l != r
                     is Short  -> l != r
                     is Int    -> l != r
@@ -741,7 +743,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> true
                 }
 
-                is Int           -> when (val r = visit(expr.right).fromRef()) {
+                is Int           -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l != r
                     is Short  -> l != r
                     is Int    -> l != r
@@ -752,7 +754,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> true
                 }
 
-                is Long          -> when (val r = visit(expr.right).fromRef()) {
+                is Long          -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l != r
                     is Short  -> l != r
                     is Int    -> l != r
@@ -763,7 +765,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> true
                 }
 
-                is Float         -> when (val r = visit(expr.right).fromRef()) {
+                is Float         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l != r
                     is Short  -> l != r
                     is Int    -> l != r
@@ -774,7 +776,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> true
                 }
 
-                is Double        -> when (val r = visit(expr.right).fromRef()) {
+                is Double        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l != r
                     is Short  -> l != r
                     is Int    -> l != r
@@ -785,25 +787,25 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> true
                 }
 
-                is Char          -> when (val r = visit(expr.right).fromRef()) {
+                is Char          -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Char -> l != r
                     Empty   -> !l.isEmptyValue()
                     else    -> true
                 }
 
-                is String        -> when (val r = visit(expr.right).fromRef()) {
+                is String        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is String -> l != r
                     Empty     -> !l.isEmptyValue()
                     else      -> true
                 }
 
-                is ArrayInstance -> when (val r = visit(expr.right).fromRef()) {
+                is ArrayInstance -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is ArrayInstance -> l != r
                     Empty            -> !l.isEmpty()
                     else             -> true
                 }
 
-                is DataInstance  -> when (val r = visit(expr.right).fromRef()) {
+                is DataInstance  -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is DataInstance -> l != r
                     Empty           -> !l.isEmpty()
                     else            -> true
@@ -812,8 +814,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else             -> true
             }
 
-            Expr.Binary.Operator.LESS          -> when (val l = visit(expr.left).fromRef()) {
-                is Byte   -> when (val r = visit(expr.right).fromRef()) {
+            Expr.Binary.Operator.LESS          -> when (val l = visit(expr.left).fromRef().unwrap()) {
+                is Byte   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l < r
                     is Short  -> l < r
                     is Int    -> l < r
@@ -823,7 +825,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Short  -> when (val r = visit(expr.right).fromRef()) {
+                is Short  -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l < r
                     is Short  -> l < r
                     is Int    -> l < r
@@ -833,7 +835,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Int    -> when (val r = visit(expr.right).fromRef()) {
+                is Int    -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l < r
                     is Short  -> l < r
                     is Int    -> l < r
@@ -843,7 +845,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Long   -> when (val r = visit(expr.right).fromRef()) {
+                is Long   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l < r
                     is Short  -> l < r
                     is Int    -> l < r
@@ -853,7 +855,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Float  -> when (val r = visit(expr.right).fromRef()) {
+                is Float  -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l < r
                     is Short  -> l < r
                     is Int    -> l < r
@@ -863,7 +865,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Double -> when (val r = visit(expr.right).fromRef()) {
+                is Double -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l < r
                     is Short  -> l < r
                     is Int    -> l < r
@@ -873,12 +875,12 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Char   -> when (val r = visit(expr.right).fromRef()) {
+                is Char   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Char -> l < r
                     else    -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is String -> when (val r = visit(expr.right).fromRef()) {
+                is String -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is String -> l < r
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
@@ -886,8 +888,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
 
-            Expr.Binary.Operator.LESS_EQUAL    -> when (val l = visit(expr.left).fromRef()) {
-                is Byte   -> when (val r = visit(expr.right).fromRef()) {
+            Expr.Binary.Operator.LESS_EQUAL    -> when (val l = visit(expr.left).fromRef().unwrap()) {
+                is Byte   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l <= r
                     is Short  -> l <= r
                     is Int    -> l <= r
@@ -897,7 +899,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Short  -> when (val r = visit(expr.right).fromRef()) {
+                is Short  -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l <= r
                     is Short  -> l <= r
                     is Int    -> l <= r
@@ -907,7 +909,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Int    -> when (val r = visit(expr.right).fromRef()) {
+                is Int    -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l <= r
                     is Short  -> l <= r
                     is Int    -> l <= r
@@ -917,7 +919,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Long   -> when (val r = visit(expr.right).fromRef()) {
+                is Long   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l <= r
                     is Short  -> l <= r
                     is Int    -> l <= r
@@ -927,7 +929,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Float  -> when (val r = visit(expr.right).fromRef()) {
+                is Float  -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l <= r
                     is Short  -> l <= r
                     is Int    -> l <= r
@@ -937,7 +939,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Double -> when (val r = visit(expr.right).fromRef()) {
+                is Double -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l <= r
                     is Short  -> l <= r
                     is Int    -> l <= r
@@ -947,12 +949,12 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Char   -> when (val r = visit(expr.right).fromRef()) {
+                is Char   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Char -> l <= r
                     else    -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is String -> when (val r = visit(expr.right).fromRef()) {
+                is String -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is String -> l <= r
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
@@ -960,8 +962,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
 
-            Expr.Binary.Operator.GREATER       -> when (val l = visit(expr.left).fromRef()) {
-                is Byte   -> when (val r = visit(expr.right).fromRef()) {
+            Expr.Binary.Operator.GREATER       -> when (val l = visit(expr.left).fromRef().unwrap()) {
+                is Byte   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l > r
                     is Short  -> l > r
                     is Int    -> l > r
@@ -971,7 +973,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Short  -> when (val r = visit(expr.right).fromRef()) {
+                is Short  -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l > r
                     is Short  -> l > r
                     is Int    -> l > r
@@ -981,7 +983,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Int    -> when (val r = visit(expr.right).fromRef()) {
+                is Int    -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l > r
                     is Short  -> l > r
                     is Int    -> l > r
@@ -991,7 +993,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Long   -> when (val r = visit(expr.right).fromRef()) {
+                is Long   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l > r
                     is Short  -> l > r
                     is Int    -> l > r
@@ -1001,7 +1003,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Float  -> when (val r = visit(expr.right).fromRef()) {
+                is Float  -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l > r
                     is Short  -> l > r
                     is Int    -> l > r
@@ -1011,7 +1013,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Double -> when (val r = visit(expr.right).fromRef()) {
+                is Double -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l > r
                     is Short  -> l > r
                     is Int    -> l > r
@@ -1021,12 +1023,12 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Char   -> when (val r = visit(expr.right).fromRef()) {
+                is Char   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Char -> l > r
                     else    -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is String -> when (val r = visit(expr.right).fromRef()) {
+                is String -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is String -> l > r
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
@@ -1034,8 +1036,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
 
-            Expr.Binary.Operator.GREATER_EQUAL -> when (val l = visit(expr.left).fromRef()) {
-                is Byte   -> when (val r = visit(expr.right).fromRef()) {
+            Expr.Binary.Operator.GREATER_EQUAL -> when (val l = visit(expr.left).fromRef().unwrap()) {
+                is Byte   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l >= r
                     is Short  -> l >= r
                     is Int    -> l >= r
@@ -1045,7 +1047,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Short  -> when (val r = visit(expr.right).fromRef()) {
+                is Short  -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l >= r
                     is Short  -> l >= r
                     is Int    -> l >= r
@@ -1055,7 +1057,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Int    -> when (val r = visit(expr.right).fromRef()) {
+                is Int    -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l >= r
                     is Short  -> l >= r
                     is Int    -> l >= r
@@ -1065,7 +1067,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Long   -> when (val r = visit(expr.right).fromRef()) {
+                is Long   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l >= r
                     is Short  -> l >= r
                     is Int    -> l >= r
@@ -1075,7 +1077,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Float  -> when (val r = visit(expr.right).fromRef()) {
+                is Float  -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l >= r
                     is Short  -> l >= r
                     is Int    -> l >= r
@@ -1085,7 +1087,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Double -> when (val r = visit(expr.right).fromRef()) {
+                is Double -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l >= r
                     is Short  -> l >= r
                     is Int    -> l >= r
@@ -1095,12 +1097,12 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Char   -> when (val r = visit(expr.right).fromRef()) {
+                is Char   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Char -> l >= r
                     else    -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is String -> when (val r = visit(expr.right).fromRef()) {
+                is String -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is String -> l >= r
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
@@ -1125,14 +1127,14 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             }
 
             Expr.Binary.Operator.CONCAT        -> {
-                val l = visit(expr.left).fromRef()
-                val r = visit(expr.right).fromRef()
+                val l = visit(expr.left).fromRef().unwrap()
+                val r = visit(expr.right).fromRef().unwrap()
 
                 "$l$r"
             }
 
-            Expr.Binary.Operator.ADD           -> when (val l = visit(expr.left).fromRef()) {
-                is Byte         -> when (val r = visit(expr.right).fromRef()) {
+            Expr.Binary.Operator.ADD           -> when (val l = visit(expr.left).fromRef().unwrap()) {
+                is Byte         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> (l + r).toByte()
                     is Short  -> (l + r).toShort()
                     is Int    -> l + r
@@ -1142,7 +1144,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Short        -> when (val r = visit(expr.right).fromRef()) {
+                is Short        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> (l + r).toShort()
                     is Short  -> (l + r).toShort()
                     is Int    -> l + r
@@ -1152,7 +1154,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Int          -> when (val r = visit(expr.right).fromRef()) {
+                is Int          -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l + r
                     is Short  -> l + r
                     is Int    -> l + r
@@ -1162,7 +1164,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Long         -> when (val r = visit(expr.right).fromRef()) {
+                is Long         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l + r
                     is Short  -> l + r
                     is Int    -> l + r
@@ -1172,7 +1174,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Float        -> when (val r = visit(expr.right).fromRef()) {
+                is Float        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l + r
                     is Short  -> l + r
                     is Int    -> l + r
@@ -1182,7 +1184,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Double       -> when (val r = visit(expr.right).fromRef()) {
+                is Double       -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l + r
                     is Short  -> l + r
                     is Int    -> l + r
@@ -1192,7 +1194,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Char         -> when (val r = visit(expr.right).fromRef()) {
+                is Char         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Int -> l + r
                     else   -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
@@ -1202,8 +1204,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
 
-            Expr.Binary.Operator.SUBTRACT      -> when (val l = visit(expr.left).fromRef()) {
-                is Byte         -> when (val r = visit(expr.right).fromRef()) {
+            Expr.Binary.Operator.SUBTRACT      -> when (val l = visit(expr.left).fromRef().unwrap()) {
+                is Byte         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> (l - r).toByte()
                     is Short  -> (l - r).toShort()
                     is Int    -> l - r
@@ -1213,7 +1215,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Short        -> when (val r = visit(expr.right).fromRef()) {
+                is Short        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> (l - r).toShort()
                     is Short  -> (l - r).toShort()
                     is Int    -> l - r
@@ -1223,7 +1225,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Int          -> when (val r = visit(expr.right).fromRef()) {
+                is Int          -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l - r
                     is Short  -> l - r
                     is Int    -> l - r
@@ -1233,7 +1235,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Long         -> when (val r = visit(expr.right).fromRef()) {
+                is Long         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l - r
                     is Short  -> l - r
                     is Int    -> l - r
@@ -1243,7 +1245,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Float        -> when (val r = visit(expr.right).fromRef()) {
+                is Float        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l - r
                     is Short  -> l - r
                     is Int    -> l - r
@@ -1253,7 +1255,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Double       -> when (val r = visit(expr.right).fromRef()) {
+                is Double       -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l - r
                     is Short  -> l - r
                     is Int    -> l - r
@@ -1268,8 +1270,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
 
-            Expr.Binary.Operator.MULTIPLY      -> when (val l = visit(expr.left).fromRef()) {
-                is Byte         -> when (val r = visit(expr.right).fromRef()) {
+            Expr.Binary.Operator.MULTIPLY      -> when (val l = visit(expr.left).fromRef().unwrap()) {
+                is Byte         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> (l * r).toByte()
                     is Short  -> (l * r).toShort()
                     is Int    -> l * r
@@ -1279,7 +1281,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Short        -> when (val r = visit(expr.right).fromRef()) {
+                is Short        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> (l * r).toShort()
                     is Short  -> (l * r).toShort()
                     is Int    -> l * r
@@ -1289,7 +1291,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Int          -> when (val r = visit(expr.right).fromRef()) {
+                is Int          -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l * r
                     is Short  -> l * r
                     is Int    -> l * r
@@ -1299,7 +1301,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Long         -> when (val r = visit(expr.right).fromRef()) {
+                is Long         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l * r
                     is Short  -> l * r
                     is Int    -> l * r
@@ -1309,7 +1311,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Float        -> when (val r = visit(expr.right).fromRef()) {
+                is Float        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l * r
                     is Short  -> l * r
                     is Int    -> l * r
@@ -1319,7 +1321,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Double       -> when (val r = visit(expr.right).fromRef()) {
+                is Double       -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l * r
                     is Short  -> l * r
                     is Int    -> l * r
@@ -1329,7 +1331,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Char         -> when (val r = visit(expr.right).fromRef()) {
+                is Char         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> buildString { repeat(r.toInt()) { append(l) } }
                     is Short  -> buildString { repeat(r.toInt()) { append(l) } }
                     is Int    -> buildString { repeat(r) { append(l) } }
@@ -1339,7 +1341,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is String ->when (val r = visit(expr.right).fromRef()) {
+                is String       -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l.repeat(r.toInt())
                     is Short  -> l.repeat(r.toInt())
                     is Int    -> l.repeat(r)
@@ -1354,8 +1356,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
 
-            Expr.Binary.Operator.DIVIDE        -> when (val l = visit(expr.left).fromRef()) {
-                is Byte         -> when (val r = visit(expr.right).fromRef()) {
+            Expr.Binary.Operator.DIVIDE        -> when (val l = visit(expr.left).fromRef().unwrap()) {
+                is Byte         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> (l / r).toByte()
                     is Short  -> (l / r).toShort()
                     is Int    -> l / r
@@ -1365,7 +1367,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Short        -> when (val r = visit(expr.right).fromRef()) {
+                is Short        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> (l / r).toShort()
                     is Short  -> (l / r).toShort()
                     is Int    -> l / r
@@ -1375,7 +1377,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Int          -> when (val r = visit(expr.right).fromRef()) {
+                is Int          -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l / r
                     is Short  -> l / r
                     is Int    -> l / r
@@ -1385,7 +1387,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Long         -> when (val r = visit(expr.right).fromRef()) {
+                is Long         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l / r
                     is Short  -> l / r
                     is Int    -> l / r
@@ -1395,7 +1397,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Float        -> when (val r = visit(expr.right).fromRef()) {
+                is Float        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l / r
                     is Short  -> l / r
                     is Int    -> l / r
@@ -1405,7 +1407,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Double       -> when (val r = visit(expr.right).fromRef()) {
+                is Double       -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l / r
                     is Short  -> l / r
                     is Int    -> l / r
@@ -1420,8 +1422,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
             }
 
-            Expr.Binary.Operator.MODULUS       -> when (val l = visit(expr.left).fromRef()) {
-                is Byte         -> when (val r = visit(expr.right).fromRef()) {
+            Expr.Binary.Operator.MODULUS       -> when (val l = visit(expr.left).fromRef().unwrap()) {
+                is Byte         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> (l % r).toByte()
                     is Short  -> (l % r).toShort()
                     is Int    -> l % r
@@ -1431,7 +1433,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Short        -> when (val r = visit(expr.right).fromRef()) {
+                is Short        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> (l % r).toShort()
                     is Short  -> (l % r).toShort()
                     is Int    -> l % r
@@ -1441,7 +1443,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Int          -> when (val r = visit(expr.right).fromRef()) {
+                is Int          -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l % r
                     is Short  -> l % r
                     is Int    -> l % r
@@ -1451,7 +1453,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Long         -> when (val r = visit(expr.right).fromRef()) {
+                is Long         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l % r
                     is Short  -> l % r
                     is Int    -> l % r
@@ -1461,7 +1463,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Float        -> when (val r = visit(expr.right).fromRef()) {
+                is Float        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l % r
                     is Short  -> l % r
                     is Int    -> l % r
@@ -1471,7 +1473,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
                 }
 
-                is Double       -> when (val r = visit(expr.right).fromRef()) {
+                is Double       -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Byte   -> l % r
                     is Short  -> l % r
                     is Int    -> l % r
@@ -1494,7 +1496,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 type.cast(this, value) ?: KBError.invalidCast(value, type, expr.location)
             }
 
-            Expr.Binary.Operator.DOT           -> when (val l = visit(expr.left).fromRef()) {
+            Expr.Binary.Operator.DOT           -> when (val l = visit(expr.left).fromRef().unwrap()) {
                 is DataInstance -> when (val r = expr.right) {
                     is Expr.Name -> l[r] ?: KBError.noMember(l.name, r.value, expr.right.location)
 
@@ -1507,8 +1509,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
 
     override fun visitGetIndexExpr(expr: Expr.GetIndex): Any {
-        return when (val target = visit(expr.target).fromRef()) {
-            is String        -> when (val index = visit(expr.index).fromRef()) {
+        return when (val target = visit(expr.target).fromRef().unwrap()) {
+            is String        -> when (val index = visit(expr.index).fromRef().unwrap()) {
                 is Int -> target[index]
 
                 else   -> KBError.invalidIndex(
@@ -1518,7 +1520,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 )
             }
 
-            is ArrayInstance -> when (val index = DataType.Primitive.INT.coerce(visit(expr.index).fromRef())) {
+            is ArrayInstance -> when (val index = DataType.Primitive.INT.coerce(visit(expr.index).fromRef().unwrap())) {
                 is Int -> target[index]
 
                 else   -> KBError.invalidIndex(
@@ -1528,7 +1530,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 )
             }
 
-            is DataInstance  -> when (val index = visit(expr.index).fromRef()) {
+            is DataInstance  -> when (val index = visit(expr.index).fromRef().unwrap()) {
                 is Char   -> target[index.toString()] ?: KBError.noMember(
                     target.name,
                     index.toString(),
@@ -1549,8 +1551,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
 
     override fun visitSetIndexExpr(expr: Expr.SetIndex): Any {
-        return when (val target = visit(expr.target).fromRef()) {
-            is ArrayInstance -> when (val index = DataType.Primitive.INT.coerce(visit(expr.index).fromRef())) {
+        return when (val target = visit(expr.target).fromRef().unwrap()) {
+            is ArrayInstance -> when (val index = DataType.Primitive.INT.coerce(visit(expr.index).fromRef().unwrap())) {
                 is Int -> {
                     val type = target.type
                     var subExpr = expr.expr
@@ -1559,7 +1561,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                         subExpr = subExpr.withTarget(type.name)
                     }
 
-                    val result = visit(subExpr).fromRef()
+                    val result = visit(subExpr).fromRef().unwrap()
                     val value = type.coerce(result) ?: KBError.mismatchedType(result, type, subExpr.location)
 
                     if (target.type.filter(this, value) == null) {
@@ -1578,7 +1580,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 )
             }
 
-            is DataInstance  -> when (val index = visit(expr.index).fromRef()) {
+            is DataInstance  -> when (val index = visit(expr.index).fromRef().unwrap()) {
                 is Char   -> {
                     val ref =
                         target[index.toString()] ?: KBError.noMember(target.name, index.toString(), expr.index.location)
@@ -1590,7 +1592,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                         subExpr = subExpr.withTarget(type.name)
                     }
 
-                    val result = visit(subExpr).fromRef()
+                    val result = visit(subExpr).fromRef().unwrap()
                     val value = type.coerce(result) ?: KBError.mismatchedType(result, type, subExpr.location)
 
                     when (ref.put(this, value)) {
@@ -1612,7 +1614,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                         subExpr = subExpr.withTarget(type.name)
                     }
 
-                    val result = visit(subExpr).fromRef()
+                    val result = visit(subExpr).fromRef().unwrap()
                     val value = type.coerce(result) ?: KBError.mismatchedType(result, type, subExpr.location)
 
                     when (ref.put(this, value)) {
@@ -1636,7 +1638,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
 
     override fun visitGetMemberExpr(expr: Expr.GetMember): Any {
-        val target = visit(expr.target).fromRef()
+        val target = visit(expr.target).fromRef().unwrap()
 
         if (target is DataInstance) {
             return target[expr.member] ?: KBError.noMember(target.name, expr.member.value, expr.location)
@@ -1646,7 +1648,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
 
     override fun visitSetMemberExpr(expr: Expr.SetMember): Any {
-        val target = visit(expr.target).fromRef()
+        val target = visit(expr.target).fromRef().unwrap()
 
         if (target is DataInstance) {
             target[expr.member]?.put(this, visit(expr.expr).fromRef())
@@ -1663,13 +1665,13 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         return enum[expr.member]
     }
 
-    fun invoke(name: String, vararg arguments: Any): Any? {
+    fun invoke(name: String, vararg arguments: Any): InvokeResult? {
         val invoke = Expr.Invoke(Location.none, name.toName(), arguments.map(Any::toExpr))
 
-        val (value, result) = performInvoke(invoke)
+        val result = performInvoke(invoke)
 
-        return when (result) {
-            InvokeResult.SUCCESS -> value.fromRef()
+        return when (result.mode) {
+            InvokeResult.Mode.SUCCESS -> result
 
             else                 -> null
         }
@@ -1683,16 +1685,16 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         )
 
     override fun visitInvokeExpr(expr: Expr.Invoke): Any {
-        val (value, result) = performInvoke(expr)
+        val result = performInvoke(expr)
 
-        return when (result) {
-            InvokeResult.SUCCESS         -> value
+        return when (result.mode) {
+            InvokeResult.Mode.SUCCESS         -> result
 
-            InvokeResult.FAIL_UNDECLARED -> KBError.undeclaredSub(expr.name, expr.location)
+            InvokeResult.Mode.FAIL_UNDECLARED -> KBError.undeclaredSub(expr.name, expr.location)
 
-            InvokeResult.FAIL_POSITIONS  -> KBError.unresolvedPositions(expr.name, expr.location)
+            InvokeResult.Mode.FAIL_POSITIONS  -> KBError.unresolvedPositions(expr.name, expr.location)
 
-            InvokeResult.FAIL_TYPES      -> KBError.unresolvedTypes(expr.name, expr.location)
+            InvokeResult.Mode.FAIL_TYPES      -> KBError.unresolvedTypes(expr.name, expr.location)
         }
     }
 
@@ -1753,7 +1755,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             val decl = params[i]
 
             val type = visit(decl.type) as DataType
-            val value = visit(decl.expr).fromRef()
+            val value = visit(decl.expr).fromRef().unwrap()
 
             val finalValue = type.filter(this, type.coerce(value) ?: value) ?: return null
 
@@ -1763,8 +1765,8 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         return params.mapIndexed { i, decl -> decl.withExpr(exprs[i]) }
     }
 
-    private fun performInvoke(expr: Expr.Invoke): Pair<Any, InvokeResult> {
-        val subs = memory.getSubs(expr.name) ?: return Unit to InvokeResult.FAIL_UNDECLARED
+    private fun performInvoke(expr: Expr.Invoke): InvokeResult {
+        val subs = memory.getSubs(expr.name) ?: return InvokeResult(InvokeResult.Mode.FAIL_UNDECLARED)
 
         val args = expr.args
 
@@ -1777,7 +1779,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         }
 
         if (positionValid.isEmpty()) {
-            return Unit to InvokeResult.FAIL_POSITIONS
+            return InvokeResult(InvokeResult.Mode.FAIL_POSITIONS)
         }
 
         val typeValid = mutableListOf<Pair<Stmt.Sub, List<Stmt.Decl>>>()
@@ -1789,14 +1791,13 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         }
 
         if (typeValid.isEmpty()) {
-            return Unit to InvokeResult.FAIL_TYPES
+            return InvokeResult(InvokeResult.Mode.FAIL_TYPES)
         }
 
         val (sub, decls) = if (typeValid.size == 1)
             typeValid[0]
         else
             typeValid.minByOrNull { (_, decls) -> decls.size }!!
-
 
         val type = visit(sub.type).fromRef() as DataType
 
@@ -1831,22 +1832,23 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
                 val builtinValue = builtin(this, subArgs) ?: KBError.mismatchedBuiltinType(sub.name, type, sub.location)
 
-                val value =
-                    type.filter(this, builtinValue) ?: KBError.mismatchedReturnType(sub.name, type, Location.none)
+                val value = type.filter(this, builtinValue)
+                    ?: KBError.mismatchedReturnType(sub.name, type, Location.none)
 
-                return value to InvokeResult.SUCCESS
+                return InvokeResult(InvokeResult.Mode.SUCCESS, type, value)
             }
 
             try {
                 visit(sub.body)
             }
             catch (r: Redirect.Yield) {
-                val value = type.filter(this, r.value) ?: KBError.mismatchedReturnType(sub.name, type, r.origin)
+                val value = type.filter(this, r.value)
+                    ?: KBError.mismatchedReturnType(sub.name, type, r.origin)
 
-                return value to InvokeResult.SUCCESS
+                return InvokeResult(InvokeResult.Mode.SUCCESS, type, value)
             }
             catch (r: Redirect.Return) {
-                return ref.value to InvokeResult.SUCCESS
+                return InvokeResult(InvokeResult.Mode.SUCCESS, type, ref.value)
             }
         }
         finally {
@@ -1855,7 +1857,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
         val value = type.filter(this, ref.value) ?: KBError.noYield(sub.name, expr.name.location)
 
-        return value to InvokeResult.SUCCESS
+        return InvokeResult(InvokeResult.Mode.SUCCESS, type, value)
     }
 
     fun instantiate(name: String, vararg elements: Any): DataInstance {
@@ -1902,10 +1904,14 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         return DataInstance(data.name, scope)
     }
 
-    private enum class InvokeResult {
-        SUCCESS,
-        FAIL_UNDECLARED,
-        FAIL_POSITIONS,
-        FAIL_TYPES
+    data class InvokeResult(val mode: Mode, val type: DataType = DataType.Inferred, val value: Any = Unit) {
+        enum class Mode {
+            SUCCESS,
+            FAIL_UNDECLARED,
+            FAIL_POSITIONS,
+            FAIL_TYPES
+        }
     }
+
+    fun Any.unwrap() = if (this is InvokeResult) value else this
 }
