@@ -140,6 +140,23 @@ sub map as any[] with x as any[], transform as string
     yield new
 end sub
 
+rem iteration
+
+data WithIndex
+    let index as int,
+    let value as any
+end data
+
+sub withIndex as WithIndex[] with x as any[]
+    let new as WithIndex[#x]
+    
+    for i = 0 to #x
+        new[i] = { i, x[i] }
+    end for
+    
+    yield new
+end sub
+
 rem math
 
 let E =  2.718281828459045
@@ -210,9 +227,9 @@ sub hypot as double with x as double, y as double end sub
 
 sub hypot as float with x as float, y as double end sub
 
-sub IEEErem as double with n as double, divisor as double end sub
+rem sub IEEErem as double with n as double, divisor as double end sub
 
-sub IEEErem as float with n as float, divisor as float end sub
+rem sub IEEErem as float with n as float, divisor as float end sub
 
 sub ln as double with n as double end sub
 

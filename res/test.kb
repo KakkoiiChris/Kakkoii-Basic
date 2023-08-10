@@ -1,49 +1,13 @@
-data Vector
-    var x as double,
-    var y as double
-end data
-
-sub add as Vector with this as Vector, that as Vector
-    add = {
-        this.x + that.x,
-        this.y + that.y
-    }
+sub f as any with option as int
+    if option == 0
+        f = 32
+    else if option == 1
+        f = '4'
+    end if
 end sub
 
-sub multiply as Vector with this as Vector, that as Vector
-    multiply = {
-        this.x * that.x,
-        this.y * that.y
-    }
-end sub
+let x = f(0)
+let y = f(1)
+let z = f(23)
 
-sub multiply as Vector with this as Vector, s as double
-    multiply = {
-        this.x * s,
-        this.y * s
-    }
-end sub
-
-enum Direction as Vector
-    NORTH = { 0, -1},
-    EAST  = { 1,  0},
-    SOUTH = { 0,  1},
-    WEST  = {-1,  0}
-end enum
-
-data Player
-    var dir as Direction = Direction::North,
-    var pos as Vector = {}
-end data
-
-var player = Player {}
-
-sub update with this as Player, delta as double
-    this.pos += @this.dir * delta
-end sub
-
-for i = 0 to 10
-    printLine(player)
-    
-    player:update(0.935)
-end for
+print(typeOf(x), ", ", typeOf(y), ", ", typeOf(z))
