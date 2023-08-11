@@ -16,19 +16,19 @@ class DataInstance(val name: Expr.Name, private val members: Memory.Scope) {
         members.getRef(name)
     
     fun invokeSub(script: Script, subName: Expr.Name, vararg otherArgs: Any): Any {
-        val invoke = Expr.Invoke(Location.none, subName, listOf(this, *otherArgs).map { it.toExpr() })
+        val invoke = Expr.Invoke(Location.none, subName, listOf(this, *otherArgs).map { Expr.Invoke.Argument(false, it.toExpr()) })
         
         return script.visitInvokeExpr(invoke)
     }
     
     fun invokeUnaryOperator(script: Script, operator: Expr.Unary.Operator): Any {
-        val invoke = Expr.Invoke(Location.none, operator.name.lowercase().toName(), listOf(this.toExpr()))
+        val invoke = Expr.Invoke(Location.none, operator.name.lowercase().toName(), listOf(Expr.Invoke.Argument(false, toExpr())))
         
         return script.visitInvokeExpr(invoke)
     }
     
     fun invokeBinaryOperator(script: Script, operator: Expr.Binary.Operator, otherArg: Any): Any {
-        val invoke = Expr.Invoke(Location.none, operator.name.lowercase().toName(), listOf(this, otherArg).map { it.toExpr() })
+        val invoke = Expr.Invoke(Location.none, operator.name.lowercase().toName(), listOf(this, otherArg).map { Expr.Invoke.Argument(false, it.toExpr()) })
         
         return script.visitInvokeExpr(invoke)
     }

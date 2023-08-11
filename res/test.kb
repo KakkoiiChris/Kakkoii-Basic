@@ -1,16 +1,5 @@
-sub f as any with option as int
-    if option == 0
-        f = 32
-    else if option == 1
-        f = '4'
-    end if
+sub printExtra with a as int, b as int, c as any*
+    print('(', a, ")(", b, ") ", *c, '\n')
 end sub
 
-var x = f(0)
-printLine(typeOf(x))
-
-x = f(1)
-printLine(typeOf(x))
-
-x = f(23)
-printLine(typeOf(x))
+printExtra(69, 420, 'a', 'b', 'c')

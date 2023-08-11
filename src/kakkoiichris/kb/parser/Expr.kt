@@ -37,6 +37,8 @@ sealed class Expr(val location: Location) {
 
         fun visitInvokeExpr(expr: Invoke): X
 
+        fun visitEachExpr(expr: Each): X
+
         fun visitInstantiateExpr(expr: Instantiate): X
     }
 
@@ -173,6 +175,11 @@ sealed class Expr(val location: Location) {
             visitor.visitInvokeExpr(this)
 
         data class Argument(val each: Boolean, val expr: Expr)
+    }
+
+    class Each(location: Location, val expr: Expr) : Expr(location) {
+        override fun <X> accept(visitor: Visitor<X>): X =
+            visitor.visitEachExpr(this)
     }
 
     class Instantiate(location: Location, val target: Name, val elements: List<Expr>) : Expr(location) {

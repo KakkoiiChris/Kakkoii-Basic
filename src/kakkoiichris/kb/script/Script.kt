@@ -488,7 +488,20 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         val elements = mutableListOf<Any>()
 
         for (element in expr.elements) {
-            elements += visit(element).fromRef().unwrap()
+            val element = visit(element).fromRef().unwrap()
+
+            if (element is Expr.Each) {
+                when (val value = visit(element.expr).fromRef().unwrap()) {
+                    is String        -> elements.addAll(listOf(value.toCharArray()))
+
+                    is ArrayInstance -> elements.addAll(value)
+
+                    else -> TODO("CAN'T EACH")
+                }
+            }
+            else {
+                elements += element
+            }
         }
 
         val type = DataType.infer(this, elements) as DataType.Array
@@ -1665,26 +1678,6 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         return enum[expr.member]
     }
 
-    fun invoke(name: String, vararg arguments: Any): InvokeResult? {
-        val invoke =
-            Expr.Invoke(Location.none, name.toName(), arguments.map { Expr.Invoke.Argument(false, it.toExpr()) })
-
-        val result = performInvoke(invoke)
-
-        return when (result.mode) {
-            InvokeResult.Mode.SUCCESS -> result
-
-            else                      -> null
-        }
-    }
-
-    fun getString(x: Any) =
-        (invoke("getstring", x) ?: x.toString()) as? String ?: KBError.mismatchedReturnType(
-            "getstring".toName(),
-            DataType.Primitive.STRING,
-            Location.none
-        )
-
     override fun visitInvokeExpr(expr: Expr.Invoke): Any {
         val result = performInvoke(expr)
 
@@ -1697,73 +1690,6 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
             InvokeResult.Mode.FAIL_TYPES      -> KBError.unresolvedTypes(expr.name, expr.location)
         }
-    }
-
-    private fun resolvePosition(params: List<Stmt.Decl>, args: List<Expr.Invoke.Argument>): List<Stmt.Decl>? {
-        val isVararg = params.isNotEmpty() && params.last().isVararg
-
-        if (!isVararg && args.size > params.size) {
-            return null
-        }
-
-        val exprs = MutableList(params.size) { i -> params[i].expr }
-
-        var p = 0
-
-        for (i in exprs.indices) {
-            if (p !in args.indices) continue
-
-            if (params[i].isVararg) continue
-
-            if (args[p] !is Expr.Empty) {
-                exprs[i] = args[p]
-            }
-
-            p++
-        }
-
-        if (p in args.indices) {
-            val varargs = mutableListOf<Expr>()
-
-            while (p < args.size) {
-                val arg = args[p++]
-
-                varargs += arg/*if (arg.spread) {
-                    Expr.Spread(arg.location, arg.expr)
-                }
-                else {
-                    arg.expr
-                }*/
-            }
-
-            exprs[exprs.lastIndex] = Expr.Array(varargs[0].location, varargs)
-        }
-
-        if (isVararg && exprs.last() is Expr.Empty) {
-            exprs[exprs.lastIndex] = Expr.Array(Location.none, emptyList())
-        }
-
-        return if (exprs.all { it !is Expr.Empty })
-            params.mapIndexed { i, decl -> decl.withExpr(exprs[i]) }
-        else
-            null
-    }
-
-    private fun resolveType(params: List<Stmt.Decl>): List<Stmt.Decl>? {
-        val exprs = params.map { it.expr }.toMutableList()
-
-        for (i in params.indices) {
-            val decl = params[i]
-
-            val type = visit(decl.type) as DataType
-            val value = visit(decl.expr).fromRef().unwrap()
-
-            val finalValue = type.filter(this, type.coerce(value) ?: value) ?: return null
-
-            exprs[i] = finalValue.toExpr()
-        }
-
-        return params.mapIndexed { i, decl -> decl.withExpr(exprs[i]) }
     }
 
     private fun performInvoke(expr: Expr.Invoke): InvokeResult {
@@ -1834,7 +1760,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 val builtinValue = builtin(this, subArgs) ?: KBError.mismatchedBuiltinType(sub.name, type, sub.location)
 
                 val value = type.filter(this, builtinValue)
-                    ?: KBError.mismatchedReturnType(sub.name, type, Location.none)
+                        ?: KBError.mismatchedReturnType(sub.name, type, Location.none)
 
                 return InvokeResult(InvokeResult.Mode.SUCCESS, type, value)
             }
@@ -1844,7 +1770,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             }
             catch (r: Redirect.Yield) {
                 val value = type.filter(this, r.value)
-                    ?: KBError.mismatchedReturnType(sub.name, type, r.origin)
+                        ?: KBError.mismatchedReturnType(sub.name, type, r.origin)
 
                 return InvokeResult(InvokeResult.Mode.SUCCESS, type, value)
             }
@@ -1859,6 +1785,104 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         val value = type.filter(this, ref.value) ?: KBError.noYield(sub.name, expr.name.location)
 
         return InvokeResult(InvokeResult.Mode.SUCCESS, type, value)
+    }
+
+    private fun resolvePosition(params: List<Stmt.Decl>, args: List<Expr.Invoke.Argument>): List<Stmt.Decl>? {
+        val isVararg = params.isNotEmpty() && params.last().isVararg
+
+        if (!isVararg && args.size > params.size) {
+            return null
+        }
+
+        val firstEach = args.indexOfFirst { it.each }
+
+        if (isVararg && firstEach in 0 until params.lastIndex) {
+            return null
+        }
+
+        val exprs = MutableList(params.size) { i -> params[i].expr }
+
+        var p = 0
+
+        for (i in exprs.indices) {
+            if (p !in args.indices) continue
+
+            if (params[i].isVararg) continue
+
+            if (args[p].expr !is Expr.Empty) {
+                exprs[i] = args[p].expr
+            }
+
+            p++
+        }
+
+        if (p in args.indices) {
+            val varargs = mutableListOf<Expr>()
+
+            while (p < args.size) {
+                val (each, expr) = args[p++]
+
+                varargs += if (each) {
+                    Expr.Each(expr.location, expr)
+                }
+                else {
+                    expr
+                }
+            }
+
+            exprs[exprs.lastIndex] = Expr.Array(varargs[0].location, varargs)
+        }
+
+        if (isVararg && exprs.last() is Expr.Empty) {
+            exprs[exprs.lastIndex] = Expr.Array(Location.none, emptyList())
+        }
+
+        return if (exprs.all { it !is Expr.Empty })
+            params.mapIndexed { i, decl -> decl.withExpr(exprs[i]) }
+        else
+            null
+    }
+
+    private fun resolveType(params: List<Stmt.Decl>): List<Stmt.Decl>? {
+        val exprs = params.map { it.expr }.toMutableList()
+
+        for (i in params.indices) {
+            val decl = params[i]
+
+            val type = visit(decl.type) as DataType
+            val value = visit(decl.expr).fromRef().unwrap()
+
+            val finalValue = type.filter(this, type.coerce(value) ?: value) ?: return null
+
+            exprs[i] = finalValue.toExpr()
+        }
+
+        return params.mapIndexed { i, decl -> decl.withExpr(exprs[i]) }
+    }
+
+    fun invoke(name: String, vararg arguments: Any): InvokeResult? {
+        val invoke =
+            Expr.Invoke(Location.none, name.toName(), arguments.map { Expr.Invoke.Argument(false, it.toExpr()) })
+
+        val result = performInvoke(invoke)
+
+        return when (result.mode) {
+            InvokeResult.Mode.SUCCESS -> result
+
+            else                      -> null
+        }
+    }
+
+    fun getString(x: Any) =
+        (invoke("getstring", x) ?: x.toString()) as? String ?: KBError.mismatchedReturnType(
+            "getstring".toName(),
+            DataType.Primitive.STRING,
+            Location.none
+        )
+
+
+    override fun visitEachExpr(expr: Expr.Each): Any {
+        return expr
     }
 
     fun instantiate(name: String, vararg elements: Any): DataInstance {

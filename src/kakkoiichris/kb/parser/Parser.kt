@@ -928,7 +928,7 @@ class Parser(private val lexer: Lexer) {
 
         if (!skip(RIGHT_PAREN)) {
             do {
-                val each = skip(EACH)
+                val each = skip(STAR)
 
                 val argExpr = if (match(COMMA)) Expr.Empty else expr()
 

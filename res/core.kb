@@ -3,7 +3,7 @@ rem general
 sub print with args as any* end sub
 
 sub printLine with args as any*
-    print(args, '\n')
+    print(*args, '\n')
 end sub
 
 sub printLine
