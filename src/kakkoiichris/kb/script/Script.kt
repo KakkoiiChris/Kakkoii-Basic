@@ -1666,14 +1666,15 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     }
 
     fun invoke(name: String, vararg arguments: Any): InvokeResult? {
-        val invoke = Expr.Invoke(Location.none, name.toName(), arguments.map(Any::toExpr))
+        val invoke =
+            Expr.Invoke(Location.none, name.toName(), arguments.map { Expr.Invoke.Argument(false, it.toExpr()) })
 
         val result = performInvoke(invoke)
 
         return when (result.mode) {
             InvokeResult.Mode.SUCCESS -> result
 
-            else                 -> null
+            else                      -> null
         }
     }
 
@@ -1698,10 +1699,10 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         }
     }
 
-    private fun resolvePosition(params: List<Stmt.Decl>, args: List<Expr>): List<Stmt.Decl>? {
+    private fun resolvePosition(params: List<Stmt.Decl>, args: List<Expr.Invoke.Argument>): List<Stmt.Decl>? {
         val isVararg = params.isNotEmpty() && params.last().isVararg
 
-        if (args.size > params.size && !isVararg) {
+        if (!isVararg && args.size > params.size) {
             return null
         }
 
