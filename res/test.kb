@@ -1,5 +1,5 @@
-sub printExtra with a as int, b as int, c as any*
-    print('(', a, ")(", b, ") ", *c, '\n')
-end sub
+let x as int[3] = [1, 2, 3]
+let y as float[3] = [4F, 5F, 6F]
+let z as any[5] = [*x, *y]
 
-printExtra(69, 420, 'a', 'b', 'c')
+printLine(z)

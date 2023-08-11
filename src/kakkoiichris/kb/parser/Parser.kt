@@ -1027,7 +1027,7 @@ class Parser(private val lexer: Lexer) {
                         .toString()
                         .equals(it.name, true)
                 }
-                ?: KBError.invalidDataType(token.type, token.location)
+                    ?: KBError.invalidDataType(token.type, token.location)
 
             mustSkip(token.type)
 
@@ -1085,7 +1085,10 @@ class Parser(private val lexer: Lexer) {
 
         if (!skip(RIGHT_SQUARE)) {
             do {
-                elements += expr()
+                val eachLocation = here()
+                val each = skip(STAR)
+
+                elements += if (each) Expr.Each(eachLocation, expr()) else expr()
             }
             while (skip(COMMA))
 
