@@ -1,5 +1,1 @@
-let x as int[3] = [1, 2, 3]
-let y as float[3] = [4F, 5F, 6F]
-let z as any[5] = [*x, *y]
-
-printLine(z)
+sleep(1, 2)

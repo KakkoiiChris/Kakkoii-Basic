@@ -1,5 +1,6 @@
 package kakkoiichris.kb.script
 
+import kakkoiichris.kb.lexer.Context
 import kakkoiichris.kb.lexer.Location
 import kakkoiichris.kb.parser.Expr
 import kakkoiichris.kb.parser.Stmt
@@ -51,12 +52,12 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         Unit
 
     override fun visitDeclStmt(stmt: Stmt.Decl) {
-        if (memory.hasRef(stmt.name)) {
-            KBError.alreadyDeclaredVariable(stmt.name, stmt.name.location)
+        if (memory.hasRef(stmt.definition.name)) {
+            KBError.alreadyDeclaredVariable(stmt.definition.name, stmt.definition.name.context)
         }
 
         var expr = stmt.expr
-        var type = visit(stmt.type) as DataType
+        var type = visit(stmt.definition.type) as DataType
 
         if (expr is Expr.Instantiate && expr.isInferred && type is DataType.Data) {
             expr = expr.withTarget(type.name)
@@ -65,7 +66,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         var value = visit(expr).fromRef()
 
         if (value === Unit) {
-            KBError.assignedNone(stmt.expr.location)
+            KBError.assignedNone(stmt.expr.context)
         }
 
         if (type === DataType.Inferred) {
@@ -79,36 +80,36 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         }
 
         if (value === Empty) {
-            value = type.default(this) ?: KBError.noDefaultValue(type, stmt.expr.location)
+            value = type.default(this) ?: KBError.noDefaultValue(type, stmt.expr.context)
         }
 
         value = type.coerce(value) ?: value
 
         if (type.filter(this, value) == null) {
             if (type is DataType.Array && type.mismatchedSize(this, value)) {
-                KBError.mismatchedArraySize(stmt.expr.location)
+                KBError.mismatchedArraySize(stmt.expr.context)
             }
 
-            KBError.mismatchedType(value, type, stmt.location)
+            KBError.mismatchedType(value, type, stmt.context)
         }
 
-        memory.newRef(stmt.constant, stmt.name, type, value)
+        memory.newRef(stmt.constant, stmt.definition.name, type, value)
     }
 
     override fun visitDeclEachStmt(stmt: Stmt.DeclEach) {
-        for ((name, _) in stmt.pairs) {
+        for ((name, _) in stmt.definitions) {
             if (memory.hasRef(name)) {
-                KBError.alreadyDeclaredVariable(name, name.location)
+                KBError.alreadyDeclaredVariable(name, name.context)
             }
         }
 
         val value = visit(stmt.expr).fromRef().unwrap()
 
         if (value === Unit) {
-            KBError.assignedNone(stmt.expr.location)
+            KBError.assignedNone(stmt.expr.context)
         }
 
-        for ((i, pair) in stmt.pairs.withIndex()) {
+        for ((i, pair) in stmt.definitions.withIndex()) {
             var subValue = when (value) {
                 is String        -> value[i]
 
@@ -116,7 +117,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
                 is DataInstance  -> value.deref()[i]
 
-                else             -> KBError.nonPartitionedType(DataType.infer(this, value), stmt.expr.location)
+                else             -> KBError.nonPartitionedType(DataType.infer(this, value), stmt.expr.context)
             }
 
             val (name, type) = pair
@@ -130,7 +131,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             subValue = subType.coerce(subValue) ?: subValue
 
             if (subType.filter(this, subValue) == null) {
-                KBError.mismatchedType(subValue, subType, stmt.location)
+                KBError.mismatchedType(subValue, subType, stmt.context)
             }
 
             memory.newRef(stmt.constant, name, subType, subValue)
@@ -164,7 +165,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     override fun visitIfStmt(stmt: Stmt.If) {
         val testValue = visit(stmt.test).fromRef().unwrap()
 
-        testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.location)
+        testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.context)
 
         if (testValue) {
             visit(stmt.body)
@@ -172,7 +173,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             return
         }
 
-        visit(stmt.elze)
+        visit(stmt.`else`)
     }
 
     override fun visitSwitchStmt(stmt: Stmt.Switch) {
@@ -216,7 +217,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         while (true) {
             val testValue = visit(stmt.test).fromRef().unwrap()
 
-            testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.location)
+            testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.context)
 
             if (!testValue) break
 
@@ -254,7 +255,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
             val testValue = visit(stmt.test).fromRef().unwrap()
 
-            testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.location)
+            testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.context)
 
             if (testValue) break
         }
@@ -266,16 +267,16 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
             visit(stmt.decl)
 
-            val pointer = stmt.decl.name
+            val pointer = stmt.decl.definition.name
 
-            val test = Expr.Binary(stmt.to.location, Expr.Binary.Operator.LESS, pointer, stmt.to)
+            val test = Expr.Binary(stmt.to.context, Expr.Binary.Operator.LESS, pointer, stmt.to)
 
             val increment =
                 Expr.Binary(
-                    stmt.step.location,
+                    stmt.step.context,
                     Expr.Binary.Operator.ASSIGN,
                     pointer,
-                    Expr.Binary(stmt.step.location, Expr.Binary.Operator.ADD, pointer, stmt.step)
+                    Expr.Binary(stmt.step.context, Expr.Binary.Operator.ADD, pointer, stmt.step)
                 )
 
             do {
@@ -312,7 +313,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         val iterableType = DataType.infer(this, iterableValue)
 
         val iterable =
-            iterableType.iterable(this, iterableValue) ?: KBError.nonIterableType(iterableType, stmt.iterable.location)
+            iterableType.iterable(this, iterableValue) ?: KBError.nonIterableType(iterableType, stmt.iterable.context)
 
         for (x in iterable) {
             try {
@@ -352,7 +353,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         val iterableType = DataType.infer(this, iterableValue)
 
         val iterable =
-            iterableType.iterable(this, iterableValue) ?: KBError.nonIterableType(iterableType, stmt.iterable.location)
+            iterableType.iterable(this, iterableValue) ?: KBError.nonIterableType(iterableType, stmt.iterable.context)
 
         for (x in iterable) {
             try {
@@ -388,39 +389,39 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
     override fun visitDataStmt(stmt: Stmt.Data) {
         if (!memory.newData(stmt)) {
-            KBError.redeclaredData(stmt.name, stmt.location)
+            KBError.redeclaredData(stmt.name, stmt.context)
         }
     }
 
     override fun visitSubStmt(stmt: Stmt.Sub) {
         if (!memory.newSub(stmt)) {
-            KBError.redeclaredSub(stmt.signature, stmt.location)
+            KBError.redeclaredSub(stmt.signature, stmt.context)
         }
 
-        stmt.scope = memory.peek() ?: KBError.noScope(stmt.location)
+        stmt.scope = memory.peek() ?: KBError.noScope(stmt.context)
     }
 
     override fun visitBreakStmt(stmt: Stmt.Break) {
-        throw Redirect.Break(stmt.location, stmt.destination)
+        throw Redirect.Break(stmt.context, stmt.destination)
     }
 
     override fun visitNextStmt(stmt: Stmt.Next) {
-        throw Redirect.Next(stmt.location, stmt.destination)
+        throw Redirect.Next(stmt.context, stmt.destination)
     }
 
     override fun visitReturnStmt(stmt: Stmt.Return) {
-        throw Redirect.Return(stmt.location)
+        throw Redirect.Return(stmt.context)
     }
 
     override fun visitYieldStmt(stmt: Stmt.Yield) {
         val value = visit(stmt.value).fromRef().unwrap()
 
-        throw Redirect.Yield(stmt.location, value)
+        throw Redirect.Yield(stmt.context, value)
     }
 
     override fun visitTypeStmt(stmt: Stmt.Type) {
         if (!memory.newAlias(stmt.alias.value, stmt.type.value)) {
-            KBError.redeclaredAlias(stmt.alias, stmt.alias.location)
+            KBError.redeclaredAlias(stmt.alias, stmt.alias.context)
         }
     }
 
@@ -479,7 +480,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         expr.value
 
     override fun visitNameExpr(expr: Expr.Name) =
-        memory.getRef(expr) ?: KBError.undeclaredVariable(expr, expr.location)
+        memory.getRef(expr) ?: KBError.undeclaredVariable(expr, expr.context)
 
     override fun visitTypeExpr(expr: Expr.Type) =
         DataType.resolve(this, expr.value)
@@ -530,7 +531,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
                 is DataInstance  -> e.invokeUnaryOperator(this, expr.op)
 
-                else             -> KBError.invalidUnaryOperand(e, expr.op, expr.expr.location)
+                else             -> KBError.invalidUnaryOperand(e, expr.op, expr.expr.context)
             }
 
             Expr.Unary.Operator.NOT    -> visit(expr.expr).fromRef().unwrap().isEmptyValue()
@@ -576,7 +577,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     var r = visit(right).fromRef()
 
                     if (r === Empty) {
-                        r = type.default(this) ?: KBError.noDefaultValue(type, expr.left.location)
+                        r = type.default(this) ?: KBError.noDefaultValue(type, expr.left.context)
                     }
 
                     r = type.coerce(r) ?: r
@@ -586,29 +587,29 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
                         false -> {
                             if (type is DataType.Array && type.mismatchedSize(this, r)) {
-                                KBError.mismatchedArraySize(expr.right.location)
+                                KBError.mismatchedArraySize(expr.right.context)
                             }
 
-                            KBError.mismatchedType(r, type, expr.location)
+                            KBError.mismatchedType(r, type, expr.context)
                         }
 
-                        null  -> KBError.reassignedConstant(expr.location)
+                        null  -> KBError.reassignedConstant(expr.context)
                     }
                 }
 
-                else                      -> KBError.assignedToValue(expr.left.location)
+                else                      -> KBError.assignedToValue(expr.left.context)
             }
 
             Expr.Binary.Operator.OR            -> {
                 val l = visit(expr.left).fromRef().unwrap()
 
-                l as? Boolean ?: KBError.invalidLeftOperand(l, expr.op, expr.left.location)
+                l as? Boolean ?: KBError.invalidLeftOperand(l, expr.op, expr.left.context)
 
                 if (l) return true
 
                 val r = visit(expr.right).fromRef().unwrap()
 
-                r as? Boolean ?: KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                r as? Boolean ?: KBError.invalidRightOperand(r, expr.op, expr.right.context)
 
                 return r
             }
@@ -616,13 +617,13 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             Expr.Binary.Operator.AND           -> {
                 val l = visit(expr.left).fromRef().unwrap()
 
-                l as? Boolean ?: KBError.invalidLeftOperand(l, expr.op, expr.left.location)
+                l as? Boolean ?: KBError.invalidLeftOperand(l, expr.op, expr.left.context)
 
                 if (!l) return false
 
                 val r = visit(expr.right).fromRef().unwrap()
 
-                r as? Boolean ?: KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                r as? Boolean ?: KBError.invalidRightOperand(r, expr.op, expr.right.context)
 
                 return r
             }
@@ -835,7 +836,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l < r
                     is Float  -> l < r
                     is Double -> l < r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Short  -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -845,7 +846,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l < r
                     is Float  -> l < r
                     is Double -> l < r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Int    -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -855,7 +856,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l < r
                     is Float  -> l < r
                     is Double -> l < r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Long   -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -865,7 +866,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l < r
                     is Float  -> l < r
                     is Double -> l < r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Float  -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -875,7 +876,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l < r
                     is Float  -> l < r
                     is Double -> l < r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Double -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -885,20 +886,20 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l < r
                     is Float  -> l < r
                     is Double -> l < r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Char   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Char -> l < r
-                    else    -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else    -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is String -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is String -> l < r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
+                else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
             }
 
             Expr.Binary.Operator.LESS_EQUAL    -> when (val l = visit(expr.left).fromRef().unwrap()) {
@@ -909,7 +910,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l <= r
                     is Float  -> l <= r
                     is Double -> l <= r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Short  -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -919,7 +920,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l <= r
                     is Float  -> l <= r
                     is Double -> l <= r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Int    -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -929,7 +930,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l <= r
                     is Float  -> l <= r
                     is Double -> l <= r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Long   -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -939,7 +940,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l <= r
                     is Float  -> l <= r
                     is Double -> l <= r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Float  -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -949,7 +950,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l <= r
                     is Float  -> l <= r
                     is Double -> l <= r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Double -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -959,20 +960,20 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l <= r
                     is Float  -> l <= r
                     is Double -> l <= r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Char   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Char -> l <= r
-                    else    -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else    -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is String -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is String -> l <= r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
+                else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
             }
 
             Expr.Binary.Operator.GREATER       -> when (val l = visit(expr.left).fromRef().unwrap()) {
@@ -983,7 +984,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l > r
                     is Float  -> l > r
                     is Double -> l > r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Short  -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -993,7 +994,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l > r
                     is Float  -> l > r
                     is Double -> l > r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Int    -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1003,7 +1004,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l > r
                     is Float  -> l > r
                     is Double -> l > r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Long   -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1013,7 +1014,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l > r
                     is Float  -> l > r
                     is Double -> l > r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Float  -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1023,7 +1024,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l > r
                     is Float  -> l > r
                     is Double -> l > r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Double -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1033,20 +1034,20 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l > r
                     is Float  -> l > r
                     is Double -> l > r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Char   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Char -> l > r
-                    else    -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else    -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is String -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is String -> l > r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
+                else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
             }
 
             Expr.Binary.Operator.GREATER_EQUAL -> when (val l = visit(expr.left).fromRef().unwrap()) {
@@ -1057,7 +1058,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l >= r
                     is Float  -> l >= r
                     is Double -> l >= r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Short  -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1067,7 +1068,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l >= r
                     is Float  -> l >= r
                     is Double -> l >= r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Int    -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1077,7 +1078,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l >= r
                     is Float  -> l >= r
                     is Double -> l >= r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Long   -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1087,7 +1088,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l >= r
                     is Float  -> l >= r
                     is Double -> l >= r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Float  -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1097,7 +1098,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l >= r
                     is Float  -> l >= r
                     is Double -> l >= r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Double -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1107,20 +1108,20 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l >= r
                     is Float  -> l >= r
                     is Double -> l >= r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Char   -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Char -> l >= r
-                    else    -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else    -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is String -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is String -> l >= r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
+                else      -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
             }
 
             Expr.Binary.Operator.IS            -> {
@@ -1154,7 +1155,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l + r
                     is Float  -> l + r
                     is Double -> l + r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Short        -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1164,7 +1165,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l + r
                     is Float  -> l + r
                     is Double -> l + r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Int          -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1174,7 +1175,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l + r
                     is Float  -> l + r
                     is Double -> l + r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Long         -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1184,7 +1185,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l + r
                     is Float  -> l + r
                     is Double -> l + r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Float        -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1194,7 +1195,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l + r
                     is Float  -> l + r
                     is Double -> l + r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Double       -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1204,17 +1205,17 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l + r
                     is Float  -> l + r
                     is Double -> l + r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Char         -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Int -> l + r
-                    else   -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else   -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is DataInstance -> l.invokeBinaryOperator(this, expr.op, visit(expr.right).fromRef())
 
-                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
+                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
             }
 
             Expr.Binary.Operator.SUBTRACT      -> when (val l = visit(expr.left).fromRef().unwrap()) {
@@ -1225,7 +1226,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l - r
                     is Float  -> l - r
                     is Double -> l - r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Short        -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1235,7 +1236,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l - r
                     is Float  -> l - r
                     is Double -> l - r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Int          -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1245,7 +1246,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l - r
                     is Float  -> l - r
                     is Double -> l - r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Long         -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1255,7 +1256,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l - r
                     is Float  -> l - r
                     is Double -> l - r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Float        -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1265,7 +1266,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l - r
                     is Float  -> l - r
                     is Double -> l - r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Double       -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1275,12 +1276,12 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l - r
                     is Float  -> l - r
                     is Double -> l - r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is DataInstance -> l.invokeBinaryOperator(this, expr.op, visit(expr.right).fromRef())
 
-                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
+                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
             }
 
             Expr.Binary.Operator.MULTIPLY      -> when (val l = visit(expr.left).fromRef().unwrap()) {
@@ -1291,7 +1292,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l * r
                     is Float  -> l * r
                     is Double -> l * r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Short        -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1301,7 +1302,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l * r
                     is Float  -> l * r
                     is Double -> l * r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Int          -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1311,7 +1312,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l * r
                     is Float  -> l * r
                     is Double -> l * r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Long         -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1321,7 +1322,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l * r
                     is Float  -> l * r
                     is Double -> l * r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Float        -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1331,7 +1332,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l * r
                     is Float  -> l * r
                     is Double -> l * r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Double       -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1341,7 +1342,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l * r
                     is Float  -> l * r
                     is Double -> l * r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Char         -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1351,7 +1352,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> buildString { repeat(r.toInt()) { append(l) } }
                     is Float  -> buildString { repeat(r.toInt()) { append(l) } }
                     is Double -> buildString { repeat(r.toInt()) { append(l) } }
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is String       -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1361,12 +1362,12 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l.repeat(r.toInt())
                     is Float  -> l.repeat(r.toInt())
                     is Double -> l.repeat(r.toInt())
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is DataInstance -> l.invokeBinaryOperator(this, expr.op, visit(expr.right).fromRef())
 
-                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
+                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
             }
 
             Expr.Binary.Operator.DIVIDE        -> when (val l = visit(expr.left).fromRef().unwrap()) {
@@ -1377,7 +1378,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l / r
                     is Float  -> l / r
                     is Double -> l / r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Short        -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1387,7 +1388,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l / r
                     is Float  -> l / r
                     is Double -> l / r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Int          -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1397,7 +1398,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l / r
                     is Float  -> l / r
                     is Double -> l / r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Long         -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1407,7 +1408,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l / r
                     is Float  -> l / r
                     is Double -> l / r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Float        -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1417,7 +1418,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l / r
                     is Float  -> l / r
                     is Double -> l / r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Double       -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1427,12 +1428,12 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l / r
                     is Float  -> l / r
                     is Double -> l / r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is DataInstance -> l.invokeBinaryOperator(this, expr.op, visit(expr.right).fromRef())
 
-                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
+                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
             }
 
             Expr.Binary.Operator.MODULUS       -> when (val l = visit(expr.left).fromRef().unwrap()) {
@@ -1443,7 +1444,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l % r
                     is Float  -> l % r
                     is Double -> l % r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Short        -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1453,7 +1454,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l % r
                     is Float  -> l % r
                     is Double -> l % r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Int          -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1463,7 +1464,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l % r
                     is Float  -> l % r
                     is Double -> l % r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Long         -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1473,7 +1474,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l % r
                     is Float  -> l % r
                     is Double -> l % r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Float        -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1483,7 +1484,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l % r
                     is Float  -> l % r
                     is Double -> l % r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is Double       -> when (val r = visit(expr.right).fromRef().unwrap()) {
@@ -1493,12 +1494,12 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     is Long   -> l % r
                     is Float  -> l % r
                     is Double -> l % r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
                 is DataInstance -> l.invokeBinaryOperator(this, expr.op, visit(expr.right).fromRef())
 
-                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
+                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
             }
 
             Expr.Binary.Operator.AS            -> {
@@ -1506,17 +1507,17 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
                 val type = visit(expr.right).fromRef() as DataType
 
-                type.cast(this, value) ?: KBError.invalidCast(value, type, expr.location)
+                type.cast(this, value) ?: KBError.invalidCast(value, type, expr.context)
             }
 
             Expr.Binary.Operator.DOT           -> when (val l = visit(expr.left).fromRef().unwrap()) {
                 is DataInstance -> when (val r = expr.right) {
-                    is Expr.Name -> l[r] ?: KBError.noMember(l.name, r.value, expr.right.location)
+                    is Expr.Name -> l[r] ?: KBError.noMember(l.name, r.value, expr.right.context)
 
-                    else         -> KBError.invalidRightOperand(r, expr.op, expr.right.location)
+                    else         -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.location)
+                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
             }
         }
     }
@@ -1529,7 +1530,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else   -> KBError.invalidIndex(
                     DataType.infer(this, target),
                     DataType.infer(this, index),
-                    expr.index.location
+                    expr.index.context
                 )
             }
 
@@ -1539,7 +1540,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else   -> KBError.invalidIndex(
                     DataType.infer(this, target),
                     DataType.infer(this, index),
-                    expr.index.location
+                    expr.index.context
                 )
             }
 
@@ -1547,19 +1548,19 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 is Char   -> target[index.toString()] ?: KBError.noMember(
                     target.name,
                     index.toString(),
-                    expr.index.location
+                    expr.index.context
                 )
 
-                is String -> target[index] ?: KBError.noMember(target.name, index, expr.index.location)
+                is String -> target[index] ?: KBError.noMember(target.name, index, expr.index.context)
 
                 else      -> KBError.invalidIndex(
                     DataType.infer(this, target),
                     DataType.infer(this, index),
-                    expr.index.location
+                    expr.index.context
                 )
             }
 
-            else             -> KBError.nonIndexedType(DataType.infer(this, target), expr.target.location)
+            else             -> KBError.nonIndexedType(DataType.infer(this, target), expr.target.context)
         }
     }
 
@@ -1575,10 +1576,10 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     }
 
                     val result = visit(subExpr).fromRef().unwrap()
-                    val value = type.coerce(result) ?: KBError.mismatchedType(result, type, subExpr.location)
+                    val value = type.coerce(result) ?: KBError.mismatchedType(result, type, subExpr.context)
 
                     if (target.type.filter(this, value) == null) {
-                        KBError.mismatchedType(value, target.type, expr.location)
+                        KBError.mismatchedType(value, target.type, expr.context)
                     }
 
                     target[index] = value
@@ -1589,14 +1590,14 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 else   -> KBError.invalidIndex(
                     DataType.infer(this, target),
                     DataType.infer(this, index),
-                    expr.index.location
+                    expr.index.context
                 )
             }
 
             is DataInstance  -> when (val index = visit(expr.index).fromRef().unwrap()) {
                 is Char   -> {
                     val ref =
-                        target[index.toString()] ?: KBError.noMember(target.name, index.toString(), expr.index.location)
+                        target[index.toString()] ?: KBError.noMember(target.name, index.toString(), expr.index.context)
 
                     val type = ref.type
                     var subExpr = expr.expr
@@ -1606,19 +1607,19 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     }
 
                     val result = visit(subExpr).fromRef().unwrap()
-                    val value = type.coerce(result) ?: KBError.mismatchedType(result, type, subExpr.location)
+                    val value = type.coerce(result) ?: KBError.mismatchedType(result, type, subExpr.context)
 
                     when (ref.put(this, value)) {
                         true  -> value
 
-                        false -> KBError.mismatchedType(value, ref.type, expr.location)
+                        false -> KBError.mismatchedType(value, ref.type, expr.context)
 
-                        null  -> KBError.reassignedConstant(expr.index.location)
+                        null  -> KBError.reassignedConstant(expr.index.context)
                     }
                 }
 
                 is String -> {
-                    val ref = target[index] ?: KBError.noMember(target.name, index, expr.index.location)
+                    val ref = target[index] ?: KBError.noMember(target.name, index, expr.index.context)
 
                     val type = ref.type
                     var subExpr = expr.expr
@@ -1628,25 +1629,25 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                     }
 
                     val result = visit(subExpr).fromRef().unwrap()
-                    val value = type.coerce(result) ?: KBError.mismatchedType(result, type, subExpr.location)
+                    val value = type.coerce(result) ?: KBError.mismatchedType(result, type, subExpr.context)
 
                     when (ref.put(this, value)) {
                         true  -> value
 
-                        false -> KBError.mismatchedType(value, ref.type, expr.location)
+                        false -> KBError.mismatchedType(value, ref.type, expr.context)
 
-                        null  -> KBError.reassignedConstant(expr.index.location)
+                        null  -> KBError.reassignedConstant(expr.index.context)
                     }
                 }
 
                 else      -> KBError.invalidIndex(
                     DataType.infer(this, target),
                     DataType.infer(this, index),
-                    expr.index.location
+                    expr.index.context
                 )
             }
 
-            else             -> KBError.nonIndexedType(DataType.infer(this, target), expr.target.location)
+            else             -> KBError.nonIndexedType(DataType.infer(this, target), expr.target.context)
         }
     }
 
@@ -1654,10 +1655,10 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         val target = visit(expr.target).fromRef().unwrap()
 
         if (target is DataInstance) {
-            return target[expr.member] ?: KBError.noMember(target.name, expr.member.value, expr.location)
+            return target[expr.member] ?: KBError.noMember(target.name, expr.member.value, expr.context)
         }
 
-        KBError.nonAccessedType(DataType.infer(this, target), expr.location)
+        KBError.nonAccessedType(DataType.infer(this, target), expr.context)
     }
 
     override fun visitSetMemberExpr(expr: Expr.SetMember): Any {
@@ -1669,11 +1670,11 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             return Unit
         }
 
-        KBError.nonAccessedType(DataType.infer(this, target), expr.location)
+        KBError.nonAccessedType(DataType.infer(this, target), expr.context)
     }
 
     override fun visitGetEntryExpr(expr: Expr.GetEntry): Any {
-        val enum = memory.getEnum(expr.target) ?: TODO("ENUM '${expr.target}' DOES NOT EXIST ${expr.location}")
+        val enum = memory.getEnum(expr.target) ?: TODO("ENUM '${expr.target}' DOES NOT EXIST ${expr.context}")
 
         return enum[expr.member]
     }
@@ -1684,11 +1685,11 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         return when (result.mode) {
             InvokeResult.Mode.SUCCESS         -> result
 
-            InvokeResult.Mode.FAIL_UNDECLARED -> KBError.undeclaredSub(expr.name, expr.location)
+            InvokeResult.Mode.FAIL_UNDECLARED -> KBError.undeclaredSub(expr.name, expr.name.context)
 
-            InvokeResult.Mode.FAIL_POSITIONS  -> KBError.unresolvedPositions(expr.name, expr.location)
+            InvokeResult.Mode.FAIL_POSITIONS  -> KBError.unresolvedPositions(expr.name, expr.context)
 
-            InvokeResult.Mode.FAIL_TYPES      -> KBError.unresolvedTypes(expr.name, expr.location)
+            InvokeResult.Mode.FAIL_TYPES      -> KBError.unresolvedTypes(expr.name, expr.context)
         }
     }
 
@@ -1726,9 +1727,9 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         else
             typeValid.minByOrNull { (_, decls) -> decls.size }!!
 
-        val type = visit(sub.type).fromRef() as DataType
+        val type = visit(sub.definition.type).fromRef() as DataType
 
-        val scope = Memory.Scope(sub.name.value, sub.scope)
+        val scope = Memory.Scope(sub.definition.name.value, sub.scope)
 
         val ref: Memory.Scope.Reference
 
@@ -1741,26 +1742,26 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
             memory.newRef(
                 false,
-                sub.name,
+                sub.definition.name,
                 type,
                 type.default(this) ?: Unit//KBError.noDefaultValue(sub.type.value, sub.name.location)
             )
 
-            ref = memory.getRef(sub.name)!!
+            ref = memory.getRef(sub.definition.name)!!
 
             if (sub.isLinked) {
                 val subArgs = mutableListOf<Any>()
 
-                for (name in decls.map { it.name }) {
+                for (name in decls.map { it.definition.name }) {
                     subArgs += memory.getRef(name)!!.fromRef()
                 }
 
-                val builtin = library[sub] ?: KBError.noBuiltin(sub.name, sub.location)
+                val builtin = library[sub] ?: KBError.noBuiltin(sub.definition.name, sub.context)
 
-                val builtinValue = builtin(this, subArgs) ?: KBError.mismatchedBuiltinType(sub.name, type, sub.location)
+                val builtinValue = builtin(this, subArgs) ?: KBError.mismatchedBuiltinType(sub.definition.name, type, sub.context)
 
                 val value = type.filter(this, builtinValue)
-                        ?: KBError.mismatchedReturnType(sub.name, type, Location.none)
+                        ?: KBError.mismatchedReturnType(sub.definition.name, type, Context.none)
 
                 return InvokeResult(InvokeResult.Mode.SUCCESS, type, value)
             }
@@ -1770,7 +1771,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             }
             catch (r: Redirect.Yield) {
                 val value = type.filter(this, r.value)
-                        ?: KBError.mismatchedReturnType(sub.name, type, r.origin)
+                        ?: KBError.mismatchedReturnType(sub.definition.name, type, r.origin)
 
                 return InvokeResult(InvokeResult.Mode.SUCCESS, type, value)
             }
@@ -1782,7 +1783,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             memory.pop()
         }
 
-        val value = type.filter(this, ref.value) ?: KBError.noYield(sub.name, expr.name.location)
+        val value = type.filter(this, ref.value) ?: KBError.noYield(sub.definition.name, expr.name.context)
 
         return InvokeResult(InvokeResult.Mode.SUCCESS, type, value)
     }
@@ -1823,18 +1824,18 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 val (each, expr) = args[p++]
 
                 varargs += if (each) {
-                    Expr.Each(expr.location, expr)
+                    Expr.Each(expr.context, expr)
                 }
                 else {
                     expr
                 }
             }
 
-            exprs[exprs.lastIndex] = Expr.Array(varargs[0].location, varargs)
+            exprs[exprs.lastIndex] = Expr.Array(varargs[0].context, varargs)
         }
 
         if (isVararg && exprs.last() is Expr.Empty) {
-            exprs[exprs.lastIndex] = Expr.Array(Location.none, emptyList())
+            exprs[exprs.lastIndex] = Expr.Array(Context.none, emptyList())
         }
 
         return if (exprs.all { it !is Expr.Empty })
@@ -1849,7 +1850,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         for (i in params.indices) {
             val decl = params[i]
 
-            val type = visit(decl.type) as DataType
+            val type = visit(decl.definition.type) as DataType
             val value = visit(decl.expr).fromRef().unwrap()
 
             val finalValue = type.filter(this, type.coerce(value) ?: value) ?: return null
@@ -1862,7 +1863,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
     fun invoke(name: String, vararg arguments: Any): InvokeResult? {
         val invoke =
-            Expr.Invoke(Location.none, name.toName(), arguments.map { Expr.Invoke.Argument(false, it.toExpr()) })
+            Expr.Invoke(Context.none, name.toName(), arguments.map { Expr.Invoke.Argument(false, it.toExpr()) })
 
         val result = performInvoke(invoke)
 
@@ -1877,7 +1878,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         (invoke("getstring", x) ?: x.toString()) as? String ?: KBError.mismatchedReturnType(
             "getstring".toName(),
             DataType.Primitive.STRING,
-            Location.none
+            Context.none
         )
 
 
@@ -1887,17 +1888,17 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
     fun instantiate(name: String, vararg elements: Any): DataInstance {
         val instantiate =
-            Expr.Instantiate(Location.none, name.lowercase().toName(), elements.map { it.toExpr() }.toList())
+            Expr.Instantiate(Context.none, name.lowercase().toName(), elements.map { it.toExpr() }.toList())
 
         return visit(instantiate) as DataInstance
     }
 
     override fun visitInstantiateExpr(expr: Expr.Instantiate): Any {
         if (expr.isInferred) {
-            KBError.emptyInstantiationTarget(expr.location)
+            KBError.emptyInstantiationTarget(expr.context)
         }
 
-        val data = memory.getData(expr.target) ?: KBError.undeclaredData(expr.target, expr.target.location)
+        val data = memory.getData(expr.target) ?: KBError.undeclaredData(expr.target, expr.target.context)
 
         val scope = Memory.Scope(data.name.value, memory.peek())
 
@@ -1910,7 +1911,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
                 if (i in expr.elements.indices) {
                     var element = expr.elements[i]
 
-                    val declType = visit(decl.type)
+                    val declType = visit(decl.definition.type)
 
                     if (declType is DataType.Data && element is Expr.Instantiate && element.isInferred) {
                         element = element.withTarget(declType.name)
@@ -1938,5 +1939,5 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         }
     }
 
-    fun Any.unwrap() = if (this is InvokeResult) value else this
+    private fun Any.unwrap() = if (this is InvokeResult) value else this
 }

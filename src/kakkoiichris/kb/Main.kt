@@ -62,8 +62,6 @@ private fun exec(name: String, text: String) {
     catch (_: Redirect.Return) {
     }
     catch (e: KBError) {
-        System.err.println(e.kbStackTrace)
-        
         e.printStackTrace()
     }
     

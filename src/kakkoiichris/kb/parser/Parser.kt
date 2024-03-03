@@ -1,7 +1,7 @@
 package kakkoiichris.kb.parser
 
+import kakkoiichris.kb.lexer.Context
 import kakkoiichris.kb.lexer.Lexer
-import kakkoiichris.kb.lexer.Location
 import kakkoiichris.kb.lexer.Token
 import kakkoiichris.kb.lexer.Token.Type.*
 import kakkoiichris.kb.script.DataType
@@ -9,6 +9,7 @@ import kakkoiichris.kb.util.KBError
 
 class Parser(private val lexer: Lexer) {
     private var currentToken = lexer.next()
+    private var lastToken = currentToken
 
     fun parse(): List<Stmt> {
         val stmts = mutableListOf<Stmt>()
@@ -20,11 +21,12 @@ class Parser(private val lexer: Lexer) {
         return stmts
     }
 
-    private fun here() =
-        currentToken.location
+    private fun context() =
+        currentToken.context
 
     private fun step() {
         if (lexer.hasNext()) {
+            lastToken = currentToken
             currentToken = lexer.next()
         }
     }
@@ -54,7 +56,7 @@ class Parser(private val lexer: Lexer) {
 
     private fun mustSkip(type: Token.Type) {
         if (!skip(type)) {
-            KBError.invalidTokenType(currentToken.type, type, here())
+            KBError.invalidTokenType(currentToken.type, type, context())
         }
     }
 
@@ -74,7 +76,7 @@ class Parser(private val lexer: Lexer) {
 
                 match(FOR)   -> forStmt(label)
 
-                else         -> KBError.nonLabeledStatement(currentToken.type, here())
+                else         -> KBError.nonLabeledStatement(currentToken.type, context())
             }
         }
 
@@ -114,7 +116,7 @@ class Parser(private val lexer: Lexer) {
     }
 
     private fun declStmt(): Stmt {
-        val location = here()
+        val startContext = context()
 
         val constant = skip(LET)
 
@@ -124,20 +126,18 @@ class Parser(private val lexer: Lexer) {
 
         val each = skip(EACH)
 
-        val pairs = mutableListOf<Pair<Expr.Name, Expr.Type>>()
+        val definitions = mutableListOf<Definition>()
 
         if (each) {
             do {
-                pairs += if (!match(COMMA)) {
+                definitions += if (!match(COMMA)) {
                     val name = name()
 
                     val type = if (skip(AS)) type() else Expr.Type.none
 
-                    name to type
+                    Definition(name, type)
                 }
-                else {
-                    Expr.Name.none to Expr.Type.none
-                }
+                else Definition.none
             }
             while (skip(COMMA))
         }
@@ -146,22 +146,30 @@ class Parser(private val lexer: Lexer) {
 
             val type = if (skip(AS)) type() else Expr.Type.none
 
-            pairs += name to type
+            definitions += Definition(name, type)
         }
 
         val expr = if (skip(EQUAL_SIGN)) expr() else Expr.Empty
 
         if (each) {
-            return Stmt.DeclEach(location, constant, pairs, expr)
+            val endContext = expr.context
+
+            val context = startContext + endContext
+
+            return Stmt.DeclEach(context, constant, definitions, expr)
         }
 
-        val (name, type) = pairs[0]
+        val definition = definitions[0]
 
-        return Stmt.Decl(location, constant, name, type, expr)
+        val endContext = expr.context
+
+        val context = startContext + endContext
+
+        return Stmt.Decl(context, constant, definition, expr)
     }
 
     private fun block(vararg ends: Token.Type): Stmt.Block {
-        val location = here()
+        val startContext = context()
 
         val stmts = mutableListOf<Stmt>()
 
@@ -169,24 +177,33 @@ class Parser(private val lexer: Lexer) {
             stmts += stmt()
         }
 
-        return Stmt.Block(location, stmts)
+        val endContext = context()
+
+        val context = startContext + endContext
+
+        return Stmt.Block(context, stmts)
     }
 
     private fun doStmt(label: Expr.Name): Stmt.Do {
-        val location = here()
+        val startContext = context()
 
         mustSkip(DO)
 
         val body = block(END)
 
         mustSkip(END)
+
+        val endContext = context()
+
         mustSkip(DO)
 
-        return Stmt.Do(location, label, body)
+        val context = startContext + endContext
+
+        return Stmt.Do(context, label, body)
     }
 
     private fun ifStmt(): Stmt.If {
-        val location = here()
+        val startContext = context()
 
         mustSkip(IF)
 
@@ -194,7 +211,7 @@ class Parser(private val lexer: Lexer) {
 
         val body = block(ELSE, END)
 
-        val elze = if (skip(ELSE)) {
+        val `else` = if (skip(ELSE)) {
             if (match(IF)) {
                 elseIfStmt()
             }
@@ -205,13 +222,18 @@ class Parser(private val lexer: Lexer) {
         else Stmt.None
 
         mustSkip(END)
+
+        val endContext = context()
+
         mustSkip(IF)
 
-        return Stmt.If(location, test, body, elze)
+        val context = startContext + endContext
+
+        return Stmt.If(context, test, body, `else`)
     }
 
     private fun elseIfStmt(): Stmt.If {
-        val location = here()
+        val startContext = context()
 
         mustSkip(IF)
 
@@ -229,11 +251,15 @@ class Parser(private val lexer: Lexer) {
         }
         else Stmt.None
 
-        return Stmt.If(location, test, body, elze)
+        val endContext = context()
+
+        val context = startContext + endContext
+
+        return Stmt.If(context, test, body, elze)
     }
 
     private fun switchStmt(): Stmt.Switch {
-        val location = here()
+        val startContext = context()
 
         mustSkip(SWITCH)
 
@@ -241,24 +267,27 @@ class Parser(private val lexer: Lexer) {
 
         val cases = mutableListOf<Stmt.Switch.Case>()
 
-        var elze: Stmt.Switch.Case.Else? = null
+        var `else`: Stmt.Switch.Case.Else? = null
 
         while (!match(END)) {
-            val caseLocation = here()
+            val caseStartContext = context()
 
             mustSkip(CASE)
 
             when {
-                skip(ELSE) -> if (elze == null) {
+                skip(ELSE) -> if (`else` == null) {
                     val block = block(END)
 
                     mustSkip(END)
+
+                    val caseContext = caseStartContext + context()
+
                     mustSkip(CASE)
 
-                    elze = Stmt.Switch.Case.Else(caseLocation, block)
+                    `else` = Stmt.Switch.Case.Else(caseContext, block)
                 }
                 else {
-                    KBError.duplicateElseCase(here())
+                    KBError.duplicateElseCase(context())
                 }
 
                 skip(IS)   -> {
@@ -269,9 +298,12 @@ class Parser(private val lexer: Lexer) {
                     val block = block(END)
 
                     mustSkip(END)
+
+                    val caseContext = caseStartContext + context()
+
                     mustSkip(CASE)
 
-                    cases += Stmt.Switch.Case.Type(caseLocation, inverted, type, block)
+                    cases += Stmt.Switch.Case.Type(caseContext, inverted, type, block)
                 }
 
                 else       -> {
@@ -285,25 +317,31 @@ class Parser(private val lexer: Lexer) {
                     val block = block(END)
 
                     mustSkip(END)
+
+                    val caseContext = caseStartContext + context()
+
                     mustSkip(CASE)
 
-                    cases += Stmt.Switch.Case.Values(caseLocation, values, block)
+                    cases += Stmt.Switch.Case.Values(caseContext, values, block)
                 }
             }
         }
 
         mustSkip(END)
+
+        val context = startContext + context()
+
         mustSkip(SWITCH)
 
-        if (elze != null) {
-            cases += elze
+        if (`else` != null) {
+            cases += `else`
         }
 
-        return Stmt.Switch(location, subject, cases)
+        return Stmt.Switch(context, subject, cases)
     }
 
     private fun whileStmt(label: Expr.Name): Stmt.While {
-        val location = here()
+        val startContext = context()
 
         mustSkip(WHILE)
 
@@ -312,13 +350,18 @@ class Parser(private val lexer: Lexer) {
         val body = block(END)
 
         mustSkip(END)
+
+        val endContext = context()
+
         mustSkip(WHILE)
 
-        return Stmt.While(location, label, test, body)
+        val context = startContext + endContext
+
+        return Stmt.While(context, label, test, body)
     }
 
     private fun untilStmt(label: Expr.Name): Stmt.Until {
-        val location = here()
+        val startContext = context()
 
         mustSkip(UNTIL)
 
@@ -327,31 +370,36 @@ class Parser(private val lexer: Lexer) {
         val body = block(END)
 
         mustSkip(END)
+
+        val endContext = context()
+
         mustSkip(UNTIL)
 
-        return Stmt.Until(location, label, test, body)
+        val context = startContext + endContext
+
+        return Stmt.Until(context, label, test, body)
     }
 
     private fun forStmt(label: Expr.Name): Stmt {
-        val location = here()
+        val startContext = context()
 
         mustSkip(FOR)
 
         val each = skip(EACH)
 
-        val pairs = mutableListOf<Pair<Expr.Name, Expr.Type>>()
+        val definitions = mutableListOf<Definition>()
 
         if (each) {
             do {
-                pairs += if (!match(COMMA)) {
+                definitions += if (!match(COMMA)) {
                     val name = name()
 
                     val type = if (skip(AS)) type() else Expr.Type.none
 
-                    name to type
+                    Definition(name, type)
                 }
                 else {
-                    Expr.Name.none to Expr.Type.none
+                    Definition.none
                 }
             }
             while (skip(COMMA))
@@ -361,46 +409,56 @@ class Parser(private val lexer: Lexer) {
 
             val type = if (skip(AS)) type() else Expr.Type.none
 
-            pairs += name to type
+            definitions += Definition(name, type)
         }
 
         return when {
             each                     -> {
                 mustSkip(IN)
 
-                val decl = Stmt.DeclEach(pairs[0].first.location, false, pairs, Expr.Empty)
+                val decl = Stmt.DeclEach(definitions[0].name.context, false, definitions, Expr.Empty)
 
                 val iterable = expr()
 
                 val body = block(END)
 
                 mustSkip(END)
+
+                val endContext = context()
+
                 mustSkip(FOR)
 
-                Stmt.ForIterateEach(location, label, decl, iterable, body)
+                val context = startContext + endContext
+
+                Stmt.ForIterateEach(context, label, decl, iterable, body)
             }
 
             skip(IN)                 -> {
-                val (name, type) = pairs[0]
+                val definition = definitions[0]
 
-                val decl = Stmt.Decl(name.location, false, name, type, Expr.Empty)
+                val decl = Stmt.Decl(definition.name.context, false, definition, Expr.Empty)
 
                 val iterable = expr()
 
                 val body = block(END)
 
                 mustSkip(END)
+
+                val endContext = context()
+
                 mustSkip(FOR)
 
-                Stmt.ForIterate(location, label, decl, iterable, body)
+                val context = startContext + endContext
+
+                Stmt.ForIterate(context, label, decl, iterable, body)
             }
 
             matchAny(EQUAL_SIGN, TO) -> {
                 val start = if (skip(EQUAL_SIGN)) expr() else Expr.Empty
 
-                val (name, type) = pairs[0]
+                val definition = definitions[0]
 
-                val decl = Stmt.Decl(name.location, false, name, type, start)
+                val decl = Stmt.Decl(definition.name.context, false, definition, start)
 
                 mustSkip(TO)
 
@@ -411,17 +469,22 @@ class Parser(private val lexer: Lexer) {
                 val body = block(END)
 
                 mustSkip(END)
+
+                val endContext = context()
+
                 mustSkip(FOR)
 
-                Stmt.ForCounter(location, label, decl, to, step, body)
+                val context = startContext + endContext
+
+                Stmt.ForCounter(context, label, decl, to, step, body)
             }
 
-            else                     -> KBError.invalidForLoop(here())
+            else                     -> KBError.invalidForLoop(startContext)
         }
     }
 
     private fun dataStmt(): Stmt.Data {
-        val location = here()
+        val startContext = context()
 
         mustSkip(DATA)
 
@@ -429,9 +492,10 @@ class Parser(private val lexer: Lexer) {
 
         val decls = mutableListOf<Stmt.Decl>()
 
-        if (!skip(END)) {
+        if (!match(END)) {
             do {
-                val declLoc = here()
+                val declStartContext = context()
+                var declEndContext = Context.none
 
                 val constant = skip(LET)
 
@@ -441,29 +505,52 @@ class Parser(private val lexer: Lexer) {
 
                 val declName = name()
 
-                val type = if (skip(AS)) type() else Expr.Type(declName.location, DataType.Inferred)
+                var declType = Expr.Type.none
 
-                val expr = if (skip(EQUAL_SIGN)) expr() else Expr.Empty
+                if (skip(AS)) {
+                    declType = type()
 
-                decls += Stmt.Decl(declLoc, constant, declName, type, expr)
+                    declEndContext = declType.context
+                }
+
+                val definition = Definition(declName, declType)
+
+                var expr: Expr = Expr.Empty
+
+                if (skip(EQUAL_SIGN)) {
+                    expr = expr()
+
+                    declEndContext = expr.context
+                }
+
+                val declContext = declStartContext + declEndContext
+
+                decls += Stmt.Decl(declContext, constant, definition, expr)
             }
             while (skip(COMMA))
-
-            mustSkip(END)
-            mustSkip(DATA)
         }
 
-        return Stmt.Data(location, name, decls)
+        mustSkip(END)
+
+        val endContext = context()
+
+        mustSkip(DATA)
+
+        val context = startContext + endContext
+
+        return Stmt.Data(context, name, decls)
     }
 
     private fun subStmt(): Stmt.Sub {
-        val location = here()
+        val startContext = context()
 
         mustSkip(SUB)
 
         val name = name()
 
         val type = if (skip(AS)) type() else DataType.Primitive.NONE.toType()
+
+        val definition = Definition(name, type)
 
         val params = mutableListOf<Stmt.Decl>()
 
@@ -475,9 +562,11 @@ class Parser(private val lexer: Lexer) {
 
                 val paramType = type()
 
+                val paramDefinition = Definition(paramName, paramType)
+
                 val expr = if (skip(EQUAL_SIGN)) expr() else Expr.Empty
 
-                params += Stmt.Decl(name.location, false, paramName, paramType, expr)
+                params += Stmt.Decl(name.context, false, paramDefinition, expr)
             }
             while (skip(COMMA))
         }
@@ -485,51 +574,68 @@ class Parser(private val lexer: Lexer) {
         val body = block(END)
 
         mustSkip(END)
+
+        val endContext = context()
+
         mustSkip(SUB)
 
-        return Stmt.Sub(location, name, type, params, body)
+        val context = startContext + endContext
+
+        return Stmt.Sub(context, definition, params, body)
     }
 
     private fun breakStmt(): Stmt.Break {
-        val location = here()
+        val startContext = context()
 
         mustSkip(BREAK)
 
         val destination = if (skip(TO)) name() else Expr.Name.none
 
-        return Stmt.Break(location, destination)
+        val endContext = destination.context
+
+        val context = startContext + endContext
+
+        return Stmt.Break(context, destination)
     }
 
     private fun nextStmt(): Stmt.Next {
-        val location = here()
+        val startContext = context()
 
         mustSkip(NEXT)
 
         val destination = if (skip(TO)) name() else Expr.Name.none
 
-        return Stmt.Next(location, destination)
+        val endContext = destination.context
+
+        val context = startContext + endContext
+
+        return Stmt.Next(context, destination)
     }
 
     private fun returnStmt(): Stmt.Return {
-        val location = here()
+        val context = context()
 
         mustSkip(RETURN)
 
-        return Stmt.Return(location)
+        return Stmt.Return(context)
     }
 
     private fun yieldStmt(): Stmt.Yield {
-        val location = here()
+        val startContext = context()
 
         mustSkip(YIELD)
 
         val expr = expr()
 
-        return Stmt.Yield(location, expr)
+        val endContext = expr.context
+
+        val context = startContext + endContext
+
+        return Stmt.Yield(context, expr)
     }
 
     private fun typeStmt(): Stmt.Type {
-        val location = here()
+        val startContext = context()
 
         mustSkip(TYPE)
 
@@ -539,25 +645,29 @@ class Parser(private val lexer: Lexer) {
 
         val alias = name()
 
-        return Stmt.Type(location, full, alias)
+        val endContext = alias.context
+
+        val context = startContext + endContext
+
+        return Stmt.Type(context, full, alias)
     }
 
     private fun enumStmt(): Stmt {
-        val location = here()
+        val startContext = context()
 
         mustSkip(ENUM)
 
         val name = name()
 
         return if (match(AS)) {
-            dataEnum(location, name)
+            dataEnum(startContext, name)
         }
         else {
-            basicEnum(location, name)
+            basicEnum(startContext, name)
         }
     }
 
-    private fun basicEnum(location: Location, name: Expr.Name): Stmt.BasicEnum {
+    private fun basicEnum(startContext: Context, name: Expr.Name): Stmt.BasicEnum {
         val entries = mutableListOf<Stmt.BasicEnum.Entry>()
 
         var ordinal = 0
@@ -567,20 +677,25 @@ class Parser(private val lexer: Lexer) {
 
             val value = if (skip(EQUAL_SIGN)) value() else ordinal.toExpr()
 
-            entries += Stmt.BasicEnum.Entry(entryName.location, entryName, ordinal.toExpr(), value)
+            entries += Stmt.BasicEnum.Entry(entryName.context, entryName, ordinal.toExpr(), value)
 
             ordinal++
         }
         while (skip(COMMA))
 
         mustSkip(END)
+
+        val endContext = context()
+
         mustSkip(ENUM)
 
-        return Stmt.BasicEnum(location, name, entries)
+        val context = startContext + endContext
+
+        return Stmt.BasicEnum(context, name, entries)
     }
 
-    private fun dataEnum(location: Location, name: Expr.Name): Stmt.DataEnum {
-        val type = if (skip(AS)) type() else Expr.Type(name.location, DataType.Primitive.INT)
+    private fun dataEnum(startContext: Context, name: Expr.Name): Stmt.DataEnum {
+        val type = if (skip(AS)) type() else Expr.Type(name.context, DataType.Primitive.INT)
 
         val entries = mutableListOf<Stmt.DataEnum.Entry>()
 
@@ -593,16 +708,21 @@ class Parser(private val lexer: Lexer) {
 
             val value = if (match(LEFT_BRACE)) data() else instantiate()
 
-            entries += Stmt.DataEnum.Entry(entryName.location, entryName, ordinal.toExpr(), value)
+            entries += Stmt.DataEnum.Entry(entryName.context, entryName, ordinal.toExpr(), value)
 
             ordinal++
         }
         while (skip(COMMA))
 
         mustSkip(END)
+
+        val endContext = context()
+
         mustSkip(ENUM)
 
-        return Stmt.DataEnum(location, name, type, entries)
+        val context = startContext + endContext
+
+        return Stmt.DataEnum(context, name, type, entries)
     }
 
     private fun expressionStmt() =
@@ -613,46 +733,42 @@ class Parser(private val lexer: Lexer) {
     private fun assign(): Expr {
         val expr = disjunction()
 
-        return if (matchAny(
-                EQUAL_SIGN,
-                PLUS_EQUAL,
-                DASH_EQUAL,
-                STAR_EQUAL,
-                SLASH_EQUAL,
-                PERCENT_EQUAL,
-                AMPERSAND_EQUAL
-            )
-        ) {
-            val op = currentToken
-
-            mustSkip(op.type)
-
-            fun desugar(newOp: Expr.Binary.Operator) =
-                Expr.Binary(
-                    op.location,
-                    Expr.Binary.Operator.ASSIGN,
-                    expr,
-                    Expr.Binary(op.location, newOp, expr, disjunction())
-                )
-
-            when (op.type) {
-                PLUS_EQUAL      -> desugar(Expr.Binary.Operator.ADD)
-
-                DASH_EQUAL      -> desugar(Expr.Binary.Operator.SUBTRACT)
-
-                STAR_EQUAL      -> desugar(Expr.Binary.Operator.MULTIPLY)
-
-                SLASH_EQUAL     -> desugar(Expr.Binary.Operator.DIVIDE)
-
-                PERCENT_EQUAL   -> desugar(Expr.Binary.Operator.MODULUS)
-
-                AMPERSAND_EQUAL -> desugar(Expr.Binary.Operator.CONCAT)
-
-                else            -> Expr.Binary(op.location, Expr.Binary.Operator[op.type], expr, disjunction())
-            }
+        if (!matchAny(EQUAL_SIGN, PLUS_EQUAL, DASH_EQUAL, STAR_EQUAL, SLASH_EQUAL, PERCENT_EQUAL, AMPERSAND_EQUAL)) {
+            return expr
         }
-        else {
-            expr
+
+        val op = currentToken
+
+        mustSkip(op.type)
+
+        fun desugar(newOp: Expr.Binary.Operator): Expr.Binary {
+            val right = disjunction()
+
+            val context = expr.context + right.context
+
+            return Expr.Binary(context, Expr.Binary.Operator.ASSIGN, expr, Expr.Binary(context, newOp, expr, right))
+        }
+
+        return when (op.type) {
+            PLUS_EQUAL      -> desugar(Expr.Binary.Operator.ADD)
+
+            DASH_EQUAL      -> desugar(Expr.Binary.Operator.SUBTRACT)
+
+            STAR_EQUAL      -> desugar(Expr.Binary.Operator.MULTIPLY)
+
+            SLASH_EQUAL     -> desugar(Expr.Binary.Operator.DIVIDE)
+
+            PERCENT_EQUAL   -> desugar(Expr.Binary.Operator.MODULUS)
+
+            AMPERSAND_EQUAL -> desugar(Expr.Binary.Operator.CONCAT)
+
+            else            -> {
+                val right = disjunction()
+
+                val context = expr.context + right.context
+
+                Expr.Binary(context, Expr.Binary.Operator[op.type], expr, right)
+            }
         }
     }
 
@@ -664,7 +780,11 @@ class Parser(private val lexer: Lexer) {
 
             mustSkip(op.type)
 
-            expr = Expr.Binary(op.location, Expr.Binary.Operator[op.type], expr, conjunction())
+            val right = conjunction()
+
+            val context = expr.context + right.context
+
+            expr = Expr.Binary(context, Expr.Binary.Operator[op.type], expr, right)
         }
 
         return expr
@@ -678,7 +798,11 @@ class Parser(private val lexer: Lexer) {
 
             mustSkip(op.type)
 
-            expr = Expr.Binary(op.location, Expr.Binary.Operator[op.type], expr, equality())
+            val right = equality()
+
+            val context = expr.context + right.context
+
+            expr = Expr.Binary(context, Expr.Binary.Operator[op.type], expr, right)
         }
 
         return expr
@@ -692,7 +816,11 @@ class Parser(private val lexer: Lexer) {
 
             mustSkip(op.type)
 
-            expr = Expr.Binary(op.location, Expr.Binary.Operator[op.type], expr, comparison())
+            val right = comparison()
+
+            val context = expr.context + right.context
+
+            expr = Expr.Binary(context, Expr.Binary.Operator[op.type], expr, right)
         }
 
         return expr
@@ -706,7 +834,11 @@ class Parser(private val lexer: Lexer) {
 
             mustSkip(op.type)
 
-            expr = Expr.Binary(op.location, Expr.Binary.Operator[op.type], expr, typeCheck())
+            val right = typeCheck()
+
+            val context = expr.context + right.context
+
+            expr = Expr.Binary(context, Expr.Binary.Operator[op.type], expr, right)
         }
 
         return expr
@@ -722,7 +854,11 @@ class Parser(private val lexer: Lexer) {
 
             val opType = if (skip(NOT)) NOT else IS
 
-            expr = Expr.Binary(op.location, Expr.Binary.Operator[opType], expr, type())
+            val right = type()
+
+            val context = expr.context + right.context
+
+            expr = Expr.Binary(context, Expr.Binary.Operator[opType], expr, right)
         }
 
         return expr
@@ -736,7 +872,11 @@ class Parser(private val lexer: Lexer) {
 
             mustSkip(op.type)
 
-            expr = Expr.Binary(op.location, Expr.Binary.Operator[op.type], expr, additive())
+            val right = additive()
+
+            val context = expr.context + right.context
+
+            expr = Expr.Binary(context, Expr.Binary.Operator[op.type], expr, right)
         }
 
         return expr
@@ -750,7 +890,11 @@ class Parser(private val lexer: Lexer) {
 
             mustSkip(op.type)
 
-            expr = Expr.Binary(op.location, Expr.Binary.Operator[op.type], expr, multiplicative())
+            val right = multiplicative()
+
+            val context = expr.context + right.context
+
+            expr = Expr.Binary(context, Expr.Binary.Operator[op.type], expr, right)
         }
 
         return expr
@@ -764,7 +908,11 @@ class Parser(private val lexer: Lexer) {
 
             mustSkip(op.type)
 
-            expr = Expr.Binary(op.location, Expr.Binary.Operator[op.type], expr, typeCast())
+            val right = typeCast()
+
+            val context = expr.context + right.context
+
+            expr = Expr.Binary(context, Expr.Binary.Operator[op.type], expr, right)
         }
 
         return expr
@@ -778,7 +926,11 @@ class Parser(private val lexer: Lexer) {
 
             mustSkip(op.type)
 
-            expr = Expr.Binary(op.location, Expr.Binary.Operator[op.type], expr, type())
+            val right = type()
+
+            val context = expr.context + right.context
+
+            expr = Expr.Binary(context, Expr.Binary.Operator[op.type], expr, right)
         }
 
         return expr
@@ -790,7 +942,11 @@ class Parser(private val lexer: Lexer) {
 
             mustSkip(op.type)
 
-            Expr.Unary(op.location, Expr.Unary.Operator[op.type], prefix())
+            val right = prefix()
+
+            val context = op.context + right.context
+
+            Expr.Unary(context, Expr.Unary.Operator[op.type], right)
         }
         else {
             pipeline()
@@ -807,18 +963,20 @@ class Parser(private val lexer: Lexer) {
 
             val right = postfix()
 
+            val context = expr.context + right.context
+
             expr = when (right) {
                 is Expr.Invoke -> {
                     val args = mutableListOf(Expr.Invoke.Argument(false, expr))
 
                     args.addAll(right.args)
 
-                    Expr.Invoke(op.location, right.name, args)
+                    Expr.Invoke(context, right.name, args)
                 }
 
-                is Expr.Name   -> Expr.Invoke(op.location, right, listOf(Expr.Invoke.Argument(false, expr)))
+                is Expr.Name   -> Expr.Invoke(context, right, listOf(Expr.Invoke.Argument(false, expr)))
 
-                else           -> KBError.invalidPipelineOperand(right.location)
+                else           -> KBError.invalidPipelineOperand(right.context)
             }
         }
 
@@ -834,19 +992,27 @@ class Parser(private val lexer: Lexer) {
 
                 match(LEFT_SQUARE)  -> index(expr)
 
-                match(LEFT_PAREN)   -> invoke(expr)
+                match(LEFT_PAREN)   -> {
+                    if (expr !is Expr.Name) KBError.invalidInvocationTarget(expr.context)
+
+                    invoke(expr)
+                }
 
                 match(LEFT_BRACE)   -> {
-                    if (expr !is Expr.Name) TODO("INSTANTIATE NOT NAME")
+                    if (expr !is Expr.Name) KBError.invalidInstantiationTarget(expr.context)
 
                     instantiate(expr)
                 }
 
-                match(DOUBLE_COLON) -> entry(expr)
+                match(DOUBLE_COLON) -> {
+                    if (expr !is Expr.Name) KBError.invalidEntryTarget(expr.context)
+
+                    entry(expr)
+                }
 
                 else                -> KBError.failure(
                     "Broken postfix operator '${currentToken.type}'!",
-                    currentToken.location
+                    context()
                 )
             }
         }
@@ -855,11 +1021,13 @@ class Parser(private val lexer: Lexer) {
     }
 
     private fun member(expr: Expr): Expr.GetMember {
-        val op = currentToken
-
         mustSkip(DOT)
 
-        return Expr.GetMember(op.location, expr, name())
+        val name = name()
+
+        val context = expr.context + name.context
+
+        return Expr.GetMember(context, expr, name)
     }
 
     private fun index(expr: Expr): Expr {
@@ -877,56 +1045,58 @@ class Parser(private val lexer: Lexer) {
         var subExpr = expr
 
         for (index in indices) {
-            subExpr = Expr.GetIndex(index.location, subExpr, index)
+            subExpr = Expr.GetIndex(index.context, subExpr, index)
         }
 
-        if (matchAny(EQUAL_SIGN, PLUS_EQUAL, DASH_EQUAL, STAR_EQUAL, SLASH_EQUAL, PERCENT_EQUAL)) {
-            val subOp = currentToken
-
-            mustSkip(subOp.type)
-
-            val top = subExpr as Expr.GetIndex
-
-            val location = top.location
-            val target = top.target
-            val index = top.index
-
-            fun desugar(newOp: Expr.Binary.Operator): Expr.SetIndex {
-                val getIndex = Expr.GetIndex(location, target, index)
-
-                val binary = Expr.Binary(subOp.location, newOp, getIndex, expr())
-
-                return Expr.SetIndex(location, target, index, binary)
-            }
-
-            subExpr = when (subOp.type) {
-                PLUS_EQUAL    -> desugar(Expr.Binary.Operator.ADD)
-
-                DASH_EQUAL    -> desugar(Expr.Binary.Operator.SUBTRACT)
-
-                STAR_EQUAL    -> desugar(Expr.Binary.Operator.MULTIPLY)
-
-                SLASH_EQUAL   -> desugar(Expr.Binary.Operator.DIVIDE)
-
-                PERCENT_EQUAL -> desugar(Expr.Binary.Operator.MODULUS)
-
-                else          -> Expr.SetIndex(location, target, index, expr())
-            }
+        if (!matchAny(EQUAL_SIGN, PLUS_EQUAL, DASH_EQUAL, STAR_EQUAL, SLASH_EQUAL, PERCENT_EQUAL)) {
+            return subExpr
         }
 
-        return subExpr
+        val subOp = currentToken
+
+        mustSkip(subOp.type)
+
+        val top = subExpr as Expr.GetIndex
+
+        val context = top.context
+        val target = top.target
+        val index = top.index
+
+        fun desugar(newOp: Expr.Binary.Operator): Expr.SetIndex {
+            val getIndex = Expr.GetIndex(context, target, index)
+
+            val expr = expr()
+
+            val indexContext = target.context + expr.context
+
+            val binary = Expr.Binary(indexContext, newOp, getIndex, expr())
+
+            return Expr.SetIndex(indexContext, target, index, binary)
+        }
+
+        return when (subOp.type) {
+            PLUS_EQUAL    -> desugar(Expr.Binary.Operator.ADD)
+
+            DASH_EQUAL    -> desugar(Expr.Binary.Operator.SUBTRACT)
+
+            STAR_EQUAL    -> desugar(Expr.Binary.Operator.MULTIPLY)
+
+            SLASH_EQUAL   -> desugar(Expr.Binary.Operator.DIVIDE)
+
+            PERCENT_EQUAL -> desugar(Expr.Binary.Operator.MODULUS)
+
+            else          -> Expr.SetIndex(context, target, index, expr())
+        }
     }
 
-    private fun invoke(expr: Expr): Expr.Invoke {
-        val op = currentToken
+    private fun invoke(name: Expr.Name): Expr.Invoke {
+        val startContext = name.context
 
         mustSkip(LEFT_PAREN)
 
-        val name = expr as? Expr.Name ?: KBError.invalidInvocationTarget(expr.location)
-
         val args = mutableListOf<Expr.Invoke.Argument>()
 
-        if (!skip(RIGHT_PAREN)) {
+        if (!match(RIGHT_PAREN)) {
             do {
                 val each = skip(STAR)
 
@@ -935,46 +1105,48 @@ class Parser(private val lexer: Lexer) {
                 args += Expr.Invoke.Argument(each, argExpr)
             }
             while (skip(COMMA))
-
-            mustSkip(RIGHT_PAREN)
         }
 
-        return Expr.Invoke(op.location, name, args)
+        val endContext = context()
+
+        mustSkip(RIGHT_PAREN)
+
+        val context = startContext + endContext
+
+        return Expr.Invoke(context, name, args)
     }
 
-    private fun instantiate(expr: Expr.Name = name()): Expr.Instantiate {
-        val op = currentToken
+    private fun instantiate(name: Expr.Name = name()): Expr.Instantiate {
+        val startContext = name.context
 
         mustSkip(LEFT_BRACE)
 
         val elements = mutableListOf<Expr>()
 
-        if (!skip(RIGHT_BRACE)) {
+        if (!match(RIGHT_BRACE)) {
             do {
                 elements += if (match(COMMA)) Expr.Empty else expr()
             }
             while (skip(COMMA))
-
-            mustSkip(RIGHT_BRACE)
         }
 
-        return Expr.Instantiate(
-            op.location,
-            expr as? Expr.Name ?: KBError.invalidInstantiationTarget(expr.location),
-            elements
-        )
+        val endContext = context()
+
+        mustSkip(RIGHT_BRACE)
+
+        val context = startContext + endContext
+
+        return Expr.Instantiate(context, name, elements)
     }
 
-    private fun entry(expr: Expr): Expr.GetEntry {
-        val op = currentToken
-
+    private fun entry(name: Expr.Name): Expr.GetEntry {
         mustSkip(DOUBLE_COLON)
 
-        if (expr !is Expr.Name) {
-            TODO("GET ENTRY ENUM NAME")
-        }
+        val member = name()
 
-        return Expr.GetEntry(op.location, expr, name())
+        val context = name.context + member.context
+
+        return Expr.GetEntry(context, name, name())
     }
 
     private fun terminal(): Expr {
@@ -989,7 +1161,7 @@ class Parser(private val lexer: Lexer) {
 
             match(LEFT_PAREN)  -> nested()
 
-            else               -> KBError.invalidTerminal(currentToken.type, here())
+            else               -> KBError.invalidTerminal(currentToken.type, currentToken.context)
         }
     }
 
@@ -998,7 +1170,7 @@ class Parser(private val lexer: Lexer) {
 
         mustSkip(VALUE)
 
-        return Expr.Value(token.location, token.value)
+        return Expr.Value(token.context, token.value)
     }
 
     private fun name(): Expr.Name {
@@ -1006,11 +1178,12 @@ class Parser(private val lexer: Lexer) {
 
         mustSkip(WORD)
 
-        return Expr.Name(token.location, token.value as String)
+        return Expr.Name(token.context, token.value as String)
     }
 
     private fun type(): Expr.Type {
-        val location = here()
+        val startContext = context()
+        var endContext = context()
 
         var type = if (match(WORD)) {
             DataType.Data(name())
@@ -1027,7 +1200,7 @@ class Parser(private val lexer: Lexer) {
                         .toString()
                         .equals(it.name, true)
                 }
-                    ?: KBError.invalidDataType(token.type, token.location)
+                ?: KBError.invalidDataType(token.type, token.context)
 
             mustSkip(token.type)
 
@@ -1036,15 +1209,23 @@ class Parser(private val lexer: Lexer) {
 
         while (skip(LEFT_SQUARE)) {
             when {
-                skip(RIGHT_SQUARE) -> type = DataType.Array(type)
+                match(RIGHT_SQUARE) -> {
+                    endContext = context()
 
-                else               -> {
+                    mustSkip(RIGHT_SQUARE)
+
+                    type = DataType.Array(type)
+                }
+
+                else                -> {
                     do {
                         val initSize = if (!matchAny(COMMA, RIGHT_SQUARE)) expr() else null
 
                         type = DataType.Array(type, initSize)
                     }
                     while (skip(COMMA))
+
+                    endContext = context()
 
                     mustSkip(RIGHT_SQUARE)
                 }
@@ -1069,41 +1250,69 @@ class Parser(private val lexer: Lexer) {
             }
         }
 
-        if (skip(STAR)) {
+        if (match(STAR)) {
+            endContext = context()
+
+            mustSkip(STAR)
+
             type = DataType.Vararg(type)
         }
 
-        return Expr.Type(location, type)
+        val context = startContext + endContext
+
+        return Expr.Type(context, type)
     }
 
     private fun array(): Expr.Array {
-        val location = here()
+        val startContext = context()
+        var endContext: Context
 
         mustSkip(LEFT_SQUARE)
 
         val elements = mutableListOf<Expr>()
 
+        endContext = context()
+
         if (!skip(RIGHT_SQUARE)) {
             do {
-                val eachLocation = here()
+                val eachStartContext = context()
+                var eachEndContext: Context
+
                 val each = skip(STAR)
 
-                elements += if (each) Expr.Each(eachLocation, expr()) else expr()
+                var element = expr()
+
+                if (each) {
+                    eachEndContext = element.context
+
+                    val eachContext = eachStartContext + eachEndContext
+
+                    element = Expr.Each(eachContext, element)
+                }
+
+                elements += element
             }
             while (skip(COMMA))
+
+            endContext = context()
 
             mustSkip(RIGHT_SQUARE)
         }
 
-        return Expr.Array(location, elements)
+        val context = startContext + endContext
+
+        return Expr.Array(context, elements)
     }
 
     private fun data(): Expr.Instantiate {
-        val location = here()
+        val startContext = context()
+        var endContext: Context
 
         mustSkip(LEFT_BRACE)
 
         val elements = mutableListOf<Expr>()
+
+        endContext = context()
 
         if (!skip(RIGHT_BRACE)) {
             do {
@@ -1113,10 +1322,14 @@ class Parser(private val lexer: Lexer) {
             }
             while (skip(COMMA))
 
+            endContext = context()
+
             mustSkip(RIGHT_BRACE)
         }
 
-        return Expr.Instantiate(location, Expr.Name.none, elements)
+        val context = startContext + endContext
+
+        return Expr.Instantiate(context, Expr.Name.none, elements)
     }
 
     private fun nested(): Expr {

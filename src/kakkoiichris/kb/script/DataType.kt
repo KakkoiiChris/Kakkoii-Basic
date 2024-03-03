@@ -1,6 +1,6 @@
 package kakkoiichris.kb.script
 
-import kakkoiichris.kb.lexer.Location
+import kakkoiichris.kb.lexer.Context
 import kakkoiichris.kb.parser.Expr
 import kakkoiichris.kb.parser.toExpr
 import kakkoiichris.kb.parser.toName
@@ -356,7 +356,7 @@ interface DataType {
             else 0
 
             return ArrayInstance(subType, MutableList(initSize) {
-                subType.default(script) ?: KBError.noDefaultValue(DataType.Primitive.ANY.array, Location.none)
+                subType.default(script) ?: KBError.noDefaultValue(DataType.Primitive.ANY.array, Context.none)
             })
         }
 
@@ -415,7 +415,7 @@ interface DataType {
         override fun iterable(script: Script, x: Any?): List<Any>? = (x as? DataInstance)?.deref()
 
         override fun default(script: Script): Any {
-            val data = script.memory.getData(name) ?: KBError.undeclaredData(name, Location.none)
+            val data = script.memory.getData(name) ?: KBError.undeclaredData(name, Context.none)
 
             val scope = Memory.Scope(name.value, script.memory.peek())
 
@@ -445,7 +445,7 @@ interface DataType {
         override fun coerce(x: Any?) = x.takeIf { it is EnumInstance.Entry && it.type == name.value }
 
         override fun default(script: Script): Any {
-            val enum = script.memory.getEnum(name) ?: KBError.undeclaredData(name, Location.none)
+            val enum = script.memory.getEnum(name) ?: KBError.undeclaredData(name, Context.none)
 
             return enum[0]
         }

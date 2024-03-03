@@ -1,6 +1,6 @@
 package kakkoiichris.kb.lexer
 
-data class Token(val location: Location, val type: Type, val value: Any = Unit) {
+data class Token(val context: Context, val type: Type, val value: Any = Unit) {
     enum class Type(val symbol: String) {
         // Keywords
         LET("let"),

@@ -95,11 +95,11 @@ class Memory {
             references[name] ?: parent?.getRef(name)
 
         fun newSub(sub: Stmt.Sub): Boolean {
-            if (allSubs[sub.name.value.lowercase()] == null) {
-                allSubs[sub.name.value.lowercase()] = emptySubs()
+            if (allSubs[sub.definition.name.value.lowercase()] == null) {
+                allSubs[sub.definition.name.value.lowercase()] = emptySubs()
             }
 
-            val subs = allSubs[sub.name.value.lowercase()]!!
+            val subs = allSubs[sub.definition.name.value.lowercase()]!!
 
             for (other in subs) {
                 if (sub.signature == other.signature) {
