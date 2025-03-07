@@ -1,9 +1,9 @@
 @file:Suppress("RedundantUnitExpression")
 
-package kakkoiichris.kb.script
+package kakkoiichris.kb.runtime
 
 import kakkoiichris.kb.parser.Stmt
-import kakkoiichris.kb.script.DataType.Primitive.*
+import kakkoiichris.kb.runtime.DataType.Primitive.*
 import kakkoiichris.kb.util.KBError
 import java.awt.Color
 import java.nio.file.Files
@@ -1860,7 +1860,7 @@ class StandardLibrary {
         name: String,
         returnType: DataType,
         vararg paramTypes: DataType,
-        function: (script: Script, args: List<Any>) -> Any,
+        function: (runtime: Runtime, args: List<Any>) -> Any,
     ) {
         val key = paramTypes.joinToString(prefix = "${name.lowercase()}(", separator = ",", postfix = ")")
         
@@ -1870,11 +1870,11 @@ class StandardLibrary {
     operator fun get(sub: Stmt.Sub) =
         builtins[sub.signature]
     
-    class Builtin(private val returnType: DataType, val function: (script: Script, args: List<Any>) -> Any) {
-        operator fun invoke(script: Script, args: List<Any>): Any? {
-            val result = function(script, args)
+    class Builtin(private val returnType: DataType, val function: (runtime: Runtime, args: List<Any>) -> Any) {
+        operator fun invoke(runtime: Runtime, args: List<Any>): Any? {
+            val result = function(runtime, args)
             
-            return returnType.filter(script, result)
+            return returnType.filter(runtime, result)
         }
     }
 }

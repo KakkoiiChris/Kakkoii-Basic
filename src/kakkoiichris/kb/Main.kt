@@ -1,7 +1,7 @@
 package kakkoiichris.kb
 
-import kakkoiichris.kb.script.Redirect
-import kakkoiichris.kb.script.Script
+import kakkoiichris.kb.runtime.Redirect
+import kakkoiichris.kb.runtime.Runtime
 import kakkoiichris.kb.util.KBError
 import kakkoiichris.kb.util.Source
 import java.io.File
@@ -49,12 +49,12 @@ private fun exec(name: String, text: String) {
     
     val stmts = source.compile()
     
-    val script = Script(stmts)
+    val runtime = Runtime(stmts)
     
     val start = System.nanoTime()
     
     val value = try {
-        script.run()
+        runtime.run()
     }
     catch (r: Redirect.Yield) {
         r.value

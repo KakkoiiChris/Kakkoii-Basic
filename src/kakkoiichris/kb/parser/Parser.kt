@@ -4,7 +4,7 @@ import kakkoiichris.kb.lexer.Context
 import kakkoiichris.kb.lexer.Lexer
 import kakkoiichris.kb.lexer.Token
 import kakkoiichris.kb.lexer.Token.Type.*
-import kakkoiichris.kb.script.DataType
+import kakkoiichris.kb.runtime.DataType
 import kakkoiichris.kb.util.KBError
 
 class Parser(private val lexer: Lexer) {
@@ -1065,9 +1065,9 @@ class Parser(private val lexer: Lexer) {
         fun desugar(newOp: Expr.Binary.Operator): Expr.SetIndex {
             val getIndex = Expr.GetIndex(context, target, index)
 
-            val expr = expr()
+            val right = expr()
 
-            val indexContext = target.context + expr.context
+            val indexContext = target.context + right.context
 
             val binary = Expr.Binary(indexContext, newOp, getIndex, expr())
 
@@ -1098,7 +1098,7 @@ class Parser(private val lexer: Lexer) {
 
         if (!match(RIGHT_PAREN)) {
             do {
-                val each = skip(STAR)
+                val each = skip(EACH)
 
                 val argExpr = if (match(COMMA)) Expr.Empty else expr()
 
@@ -1142,11 +1142,16 @@ class Parser(private val lexer: Lexer) {
     private fun entry(name: Expr.Name): Expr.GetEntry {
         mustSkip(DOUBLE_COLON)
 
-        val member = name()
+        val end = currentToken.context
+
+        val member = if (skip(Token.Type.STAR))
+            Expr.Name(end, "*")
+        else
+            name()
 
         val context = name.context + member.context
 
-        return Expr.GetEntry(context, name, name())
+        return Expr.GetEntry(context, name, member)
     }
 
     private fun terminal(): Expr {
@@ -1278,7 +1283,7 @@ class Parser(private val lexer: Lexer) {
                 val eachStartContext = context()
                 var eachEndContext: Context
 
-                val each = skip(STAR)
+                val each = skip(EACH)
 
                 var element = expr()
 

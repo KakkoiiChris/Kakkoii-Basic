@@ -1,4 +1,4 @@
-package kakkoiichris.kb.script
+package kakkoiichris.kb.runtime
 
 class ArrayInstance(val type: DataType, private val elements: MutableList<Any>) : MutableList<Any> by elements {
     fun asBooleanArray() =

@@ -1,4 +1,4 @@
-package kakkoiichris.kb.script
+package kakkoiichris.kb.runtime
 
 object Empty {
     override fun toString() = "empty"

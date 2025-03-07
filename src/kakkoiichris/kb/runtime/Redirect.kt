@@ -1,7 +1,6 @@
-package kakkoiichris.kb.script
+package kakkoiichris.kb.runtime
 
 import kakkoiichris.kb.lexer.Context
-import kakkoiichris.kb.lexer.Location
 import kakkoiichris.kb.parser.Expr
 
 sealed class Redirect(val origin: Context) : Throwable() {

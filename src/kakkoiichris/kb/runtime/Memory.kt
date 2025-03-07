@@ -1,12 +1,10 @@
-package kakkoiichris.kb.script
+package kakkoiichris.kb.runtime
 
 import kakkoiichris.kb.parser.Expr
 import kakkoiichris.kb.parser.Stmt
 import kakkoiichris.kb.util.Stack
 
 typealias Subs = MutableList<Stmt.Sub>
-
-fun emptySubs() = mutableListOf<Stmt.Sub>()
 
 class Memory {
     private val stack = Stack<Scope>()
@@ -96,7 +94,7 @@ class Memory {
 
         fun newSub(sub: Stmt.Sub): Boolean {
             if (allSubs[sub.definition.name.value.lowercase()] == null) {
-                allSubs[sub.definition.name.value.lowercase()] = emptySubs()
+                allSubs[sub.definition.name.value.lowercase()] = mutableListOf()
             }
 
             val subs = allSubs[sub.definition.name.value.lowercase()]!!
@@ -169,12 +167,12 @@ class Memory {
         override fun toString() = "Scope $id"
 
         data class Reference(val constant: Boolean, val type: DataType, var value: Any) {
-            fun put(script: Script, x: Any): Boolean? {
+            fun put(runtime: Runtime, x: Any): Boolean? {
                 if (constant) {
                     return null
                 }
 
-                return if (type.filter(script, x) != null) {
+                return if (type.filter(runtime, x) != null) {
                     value = x
 
                     true

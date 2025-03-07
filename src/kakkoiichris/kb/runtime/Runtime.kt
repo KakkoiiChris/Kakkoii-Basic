@@ -1,7 +1,6 @@
-package kakkoiichris.kb.script
+package kakkoiichris.kb.runtime
 
 import kakkoiichris.kb.lexer.Context
-import kakkoiichris.kb.lexer.Location
 import kakkoiichris.kb.parser.Expr
 import kakkoiichris.kb.parser.Stmt
 import kakkoiichris.kb.parser.toExpr
@@ -9,7 +8,7 @@ import kakkoiichris.kb.parser.toName
 import kakkoiichris.kb.util.KBError
 import kakkoiichris.kb.util.Source
 
-class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<Any> {
+class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<Any> {
     val memory = Memory()
 
     private val global = Memory.Scope("global")
@@ -429,11 +428,11 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
         val entries = mutableListOf<EnumInstance.Entry>()
 
         for (entry in stmt.entries) {
-            val (_, name, ordinal, value) = entry
+            val (context, name, ordinal, value) = entry
 
             val ordinalResult = visit(ordinal)
 
-            ordinalResult as? Int ?: TODO("INVALID BASIC ENUM ORDINAL '$ordinalResult'")
+            ordinalResult as? Int ?: TODO("INVALID BASIC ENUM ORDINAL '$ordinalResult' $context")
 
             val valueResult = visit(value).fromRef().unwrap()
 
@@ -482,14 +481,17 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     override fun visitNameExpr(expr: Expr.Name) =
         memory.getRef(expr) ?: KBError.undeclaredVariable(expr, expr.context)
 
+    override fun visitVariableExpr(expr: Expr.Variable) =
+        Unit//memory.getRef(expr) ?: KBError.undeclaredVariable(expr, expr.context)
+
     override fun visitTypeExpr(expr: Expr.Type) =
         DataType.resolve(this, expr.value)
 
     override fun visitArrayExpr(expr: Expr.Array): Any {
         val elements = mutableListOf<Any>()
 
-        for (element in expr.elements) {
-            val element = visit(element).fromRef().unwrap()
+        for (elementNode in expr.elements) {
+            val element = visit(elementNode).fromRef().unwrap()
 
             if (element is Expr.Each) {
                 when (val value = visit(element.expr).fromRef().unwrap()) {
@@ -497,7 +499,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
                     is ArrayInstance -> elements.addAll(value)
 
-                    else -> TODO("CAN'T EACH")
+                    else             -> TODO("CAN'T EACH")
                 }
             }
             else {
@@ -1509,16 +1511,6 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
                 type.cast(this, value) ?: KBError.invalidCast(value, type, expr.context)
             }
-
-            Expr.Binary.Operator.DOT           -> when (val l = visit(expr.left).fromRef().unwrap()) {
-                is DataInstance -> when (val r = expr.right) {
-                    is Expr.Name -> l[r] ?: KBError.noMember(l.name, r.value, expr.right.context)
-
-                    else         -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
-                }
-
-                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
-            }
         }
     }
 
@@ -1676,14 +1668,18 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
     override fun visitGetEntryExpr(expr: Expr.GetEntry): Any {
         val enum = memory.getEnum(expr.target) ?: TODO("ENUM '${expr.target}' DOES NOT EXIST ${expr.context}")
 
+        if (expr.member.value == "*") {
+            return ArrayInstance(DataType.Enum(Expr.Name(Context.none, enum.name)), enum.entries.toMutableList())
+        }
+
         return enum[expr.member]
     }
 
     override fun visitInvokeExpr(expr: Expr.Invoke): Any {
-        val result = performInvoke(expr)
+        val (mode, _, value) = performInvoke(expr)
 
-        return when (result.mode) {
-            InvokeResult.Mode.SUCCESS         -> result
+        return when (mode) {
+            InvokeResult.Mode.SUCCESS         -> value
 
             InvokeResult.Mode.FAIL_UNDECLARED -> KBError.undeclaredSub(expr.name, expr.name.context)
 
@@ -1758,10 +1754,11 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
 
                 val builtin = library[sub] ?: KBError.noBuiltin(sub.definition.name, sub.context)
 
-                val builtinValue = builtin(this, subArgs) ?: KBError.mismatchedBuiltinType(sub.definition.name, type, sub.context)
+                val builtinValue =
+                    builtin(this, subArgs) ?: KBError.mismatchedBuiltinType(sub.definition.name, type, sub.context)
 
                 val value = type.filter(this, builtinValue)
-                        ?: KBError.mismatchedReturnType(sub.definition.name, type, Context.none)
+                    ?: KBError.mismatchedReturnType(sub.definition.name, type, Context.none)
 
                 return InvokeResult(InvokeResult.Mode.SUCCESS, type, value)
             }
@@ -1771,7 +1768,7 @@ class Script(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<A
             }
             catch (r: Redirect.Yield) {
                 val value = type.filter(this, r.value)
-                        ?: KBError.mismatchedReturnType(sub.definition.name, type, r.origin)
+                    ?: KBError.mismatchedReturnType(sub.definition.name, type, r.origin)
 
                 return InvokeResult(InvokeResult.Mode.SUCCESS, type, value)
             }

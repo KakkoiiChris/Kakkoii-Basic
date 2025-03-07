@@ -1,8 +1,8 @@
 package kakkoiichris.kb.parser
 
 import kakkoiichris.kb.lexer.Context
-import kakkoiichris.kb.script.DataType
-import kakkoiichris.kb.script.Memory
+import kakkoiichris.kb.runtime.DataType
+import kakkoiichris.kb.runtime.Memory
 
 sealed class Stmt(val context: Context) {
     open val detail get() = ""

@@ -1,4 +1,4 @@
-package kakkoiichris.kb.script
+package kakkoiichris.kb.runtime
 
 import kakkoiichris.kb.lexer.Context
 import kakkoiichris.kb.parser.Expr
@@ -15,29 +15,29 @@ class DataInstance(val name: Expr.Name, private val members: Memory.Scope) {
     operator fun get(name: String) =
         members.getRef(name)
 
-    fun invokeSub(script: Script, subName: Expr.Name, vararg otherArgs: Any): Any {
+    fun invokeSub(runtime: Runtime, subName: Expr.Name, vararg otherArgs: Any): Any {
         val invoke = Expr.Invoke(
             Context.none,
             subName,
             listOf(this, *otherArgs).map { Expr.Invoke.Argument(false, it.toExpr()) })
 
-        return script.visitInvokeExpr(invoke)
+        return runtime.visitInvokeExpr(invoke)
     }
 
-    fun invokeUnaryOperator(script: Script, operator: Expr.Unary.Operator): Any {
+    fun invokeUnaryOperator(runtime: Runtime, operator: Expr.Unary.Operator): Any {
         val invoke =
             Expr.Invoke(Context.none, operator.name.lowercase().toName(), listOf(Expr.Invoke.Argument(false, toExpr())))
 
-        return script.visitInvokeExpr(invoke)
+        return runtime.visitInvokeExpr(invoke)
     }
 
-    fun invokeBinaryOperator(script: Script, operator: Expr.Binary.Operator, otherArg: Any): Any {
+    fun invokeBinaryOperator(runtime: Runtime, operator: Expr.Binary.Operator, otherArg: Any): Any {
         val invoke = Expr.Invoke(
             Context.none,
             operator.name.lowercase().toName(),
             listOf(this, otherArg).map { Expr.Invoke.Argument(false, it.toExpr()) })
 
-        return script.visitInvokeExpr(invoke)
+        return runtime.visitInvokeExpr(invoke)
     }
 
     fun isEmpty(): Boolean {

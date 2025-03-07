@@ -1,4 +1,4 @@
-package kakkoiichris.kb.script
+package kakkoiichris.kb.runtime
 
 import kakkoiichris.kb.parser.Expr
 
@@ -13,7 +13,7 @@ import kakkoiichris.kb.parser.Expr
  *
  * @author Christian Bryce Alexander
  */
-class EnumInstance(val name: String, private val entries: List<Entry>) {
+class EnumInstance(val name: String, val entries: List<Entry>) {
     operator fun get(name: Expr.Name) =
         entries.first { it.name == name.value }
     

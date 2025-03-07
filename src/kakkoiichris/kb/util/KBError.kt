@@ -5,7 +5,7 @@ import kakkoiichris.kb.lexer.Token.Type
 import kakkoiichris.kb.lexer.Token.Type.*
 import kakkoiichris.kb.parser.Expr
 import kakkoiichris.kb.parser.Stmt
-import kakkoiichris.kb.script.DataType
+import kakkoiichris.kb.runtime.DataType
 
 class KBError(
     stage: String,

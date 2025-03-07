@@ -1,6 +1,6 @@
 package kakkoiichris.kb.lexer
 
-import kakkoiichris.kb.script.Empty
+import kakkoiichris.kb.runtime.Empty
 import kakkoiichris.kb.util.KBError
 import kakkoiichris.kb.util.Source
 import java.util.*
