@@ -11,7 +11,7 @@ class Memory {
 
     private var n = 0
 
-    fun push(scope: Scope = Scope("\$$n", stack.peek())) {
+    fun push(scope: Scope = Scope("$$n", stack.peek())) {
         stack.push(scope)
 
         n++
@@ -32,7 +32,7 @@ class Memory {
     fun hasRef(name: Expr.Name) =
         stack.peek()?.hasRef(name) ?: error("NEW LET: NO ACTIVE SCOPE")
 
-    fun newRef(constant: Boolean, name: Expr.Name, type: DataType, value: Any) =
+    fun newRef(constant: Boolean, name: Expr.Name, type: DataType, value: KBValue<*>) =
         stack.peek()?.newRef(constant, name.value, type, value) ?: error("NEW: NO ACTIVE SCOPE")
 
     fun getRef(name: Expr.Name): Scope.Reference? =
@@ -82,7 +82,7 @@ class Memory {
         fun hasRef(name: Expr.Name) =
             references.containsKey(name.value)
 
-        fun newRef(constant: Boolean, name: String, type: DataType, value: Any) {
+        fun newRef(constant: Boolean, name: String, type: DataType, value: KBValue<*>) {
             references[name] = Reference(constant, type, value)
         }
 
@@ -166,8 +166,8 @@ class Memory {
 
         override fun toString() = "Scope $id"
 
-        data class Reference(val constant: Boolean, val type: DataType, var value: Any) {
-            fun put(runtime: Runtime, x: Any): Boolean? {
+        data class Reference(val constant: Boolean, val type: DataType, var value: KBValue<*>) {
+            fun put(runtime: Runtime, x: KBValue<*>): Boolean? {
                 if (constant) {
                     return null
                 }

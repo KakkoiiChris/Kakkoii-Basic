@@ -1,47 +1,70 @@
 package kakkoiichris.kb.lexer
 
-data class Token(val context: Context, val type: Type, val value: Any = Unit) {
-    enum class Type(val symbol: String) {
+data class Token<X : Token.Type>(val context: Context, val type: X) {
+    sealed interface Type {
+        val symbol: String
+    }
+
+    enum class Keyword() : Type {
         // Keywords
-        LET("let"),
-        VAR("var"),
-        EACH("each"),
-        DO("do"),
-        IF("if"),
-        ELSE("else"),
-        SWITCH("switch"),
-        CASE("case"),
-        WHILE("while"),
-        UNTIL("until"),
-        FOR("for"),
-        TO("to"),
-        STEP("step"),
-        IN("in"),
-        DATA("data"),
-        SUB("sub"),
-        WITH("with"),
-        BREAK("break"),
-        NEXT("next"),
-        RETURN("return"),
-        YIELD("yield"),
-        LABEL("label"),
-        TYPE("type"),
-        ENUM("enum"),
-        END("end"),
-        
+        LET,
+        VAR,
+        EACH,
+        DO,
+        IF,
+        ELSE,
+        SWITCH,
+        CASE,
+        WHILE,
+        UNTIL,
+        FOR,
+        TO,
+        STEP,
+        IN,
+        DATA,
+        SUB,
+        WITH,
+        BREAK,
+        NEXT,
+        RETURN,
+        YIELD,
+        LABEL,
+        TYPE,
+        ENUM,
+        END,
+
         // Types
-        NONE("none"),
-        BOOL("bool"),
-        BYTE("byte"),
-        SHORT("short"),
-        INT("int"),
-        LONG("long"),
-        FLOAT("float"),
-        DOUBLE("double"),
-        CHAR("char"),
-        STRING("string"),
-        ANY("any"),
-        
+        NONE,
+        BOOL,
+        BYTE,
+        SHORT,
+        INT,
+        LONG,
+        FLOAT,
+        DOUBLE,
+        CHAR,
+        STRING,
+        ANY,
+
+        // Disjunction
+        OR,
+
+        // Conjunction
+        AND,
+
+        // Type Check
+        IS,
+
+        // Type Cast
+        AS,
+
+        // Prefix
+        NOT;
+
+        override val symbol = name.lowercase()
+    }
+
+    enum class Symbol(override val symbol: String) : Type {
         // Assignment
         EQUAL_SIGN("="),
         PLUS_EQUAL("+="),
@@ -50,58 +73,41 @@ data class Token(val context: Context, val type: Type, val value: Any = Unit) {
         SLASH_EQUAL("/="),
         PERCENT_EQUAL("%="),
         AMPERSAND_EQUAL("&="),
-        
-        // Disjunction
-        OR("or"),
-        
-        // Conjunction
-        AND("and"),
-        
+
         // Equality
         DOUBLE_EQUAL("=="),
         LESS_GREATER("<>"),
-        
+
         // Comparison
         LESS_SIGN("<"),
         LESS_EQUAL_SIGN("<="),
         GREATER_SIGN(">"),
         GREATER_EQUAL_SIGN(">="),
-        
-        // Type Check
-        IS("is"),
-        
+
         // Concatenate
         AMPERSAND("&"),
-        
+
         // Additive
         PLUS("+"),
         DASH("-"),
-        
+
         // Multiplicative
         STAR("*"),
         SLASH("/"),
         PERCENT("%"),
-        
-        // Type Cast
-        AS("as"),
-        
-        // Prefix
-        NOT("not"),
+
+
         POUND("#"),
         DOLLAR("$"),
         AT("@"),
-        
+
         // Pipeline
         COLON(":"),
-        
+
         // Postfix
         DOT("."),
         DOUBLE_COLON("::"),
-        
-        // Terminals
-        VALUE("V"),
-        WORD("N"),
-        
+
         // Delimiters
         LEFT_PAREN("("),
         RIGHT_PAREN(")"),
@@ -110,8 +116,17 @@ data class Token(val context: Context, val type: Type, val value: Any = Unit) {
         LEFT_BRACE("{"),
         RIGHT_BRACE("}"),
         COMMA(","),
-        END_OF_FILE("0");
-        
-        override fun toString() = symbol
+    }
+
+    class Value(val value: Any) : Type {
+        override val symbol = "<Value $value>"
+    }
+
+    class Word(val value: String) : Type {
+        override val symbol = "<Name $value>"
+    }
+
+    data object EndOfFile : Type {
+        override val symbol = "<EOF>"
     }
 }

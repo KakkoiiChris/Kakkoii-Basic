@@ -9,23 +9,23 @@ import kotlin.reflect.KClass
 
 interface DataType {
     companion object {
-        fun infer(runtime: Runtime, x: Any?): DataType =
+        fun infer(runtime: Runtime, x: KBValue<*>?): DataType =
             when (x) {
-                Empty                 -> Primitive.ANY
+                KBEmpty    -> Primitive.ANY
 
-                is ArrayInstance      -> x.type.array
+                is KBArray -> x.value.type.array
 
-                is EnumInstance.Entry -> Enum(x.type.toName())
+                is KBEnum  -> Enum(x.value.type.toName())
 
-                is DataInstance       -> Data(x.name)
+                is KBData  -> Data(x.value.name)
 
-                is List<*>            -> {
+                is List<*> -> {
                     val xn = x.filterNotNull()
 
                     when {
                         xn.isEmpty()                   -> Primitive.ANY.array
 
-                        xn.isHomogenous(runtime) -> Array(infer(runtime, xn[0]))
+                        xn.isHomogenous(runtime)       -> Array(infer(runtime, KBValue.of(xn[0])))
 
                         xn.all { it is ArrayInstance } -> Primitive.ANY.array.array
 
@@ -33,14 +33,14 @@ interface DataType {
                     }
                 }
 
-                else                  -> Primitive.infer(runtime, x)
+                else       -> Primitive.infer(runtime, x)
             }
 
         private fun List<*>.isHomogenous(runtime: Runtime): Boolean {
-            val firstType = infer(runtime, get(0))
+            val firstType = infer(runtime, KBValue.of(get(0)))
 
             for (x in drop(1)) {
-                if (firstType.filter(runtime, x) == null) {
+                if (firstType.filter(runtime, KBValue.of(x)) == null) {
                     return false
                 }
             }
@@ -73,232 +73,235 @@ interface DataType {
 
     val array get() = Array(this)
 
-    fun filter(runtime: Runtime, x: Any?): Any? = x.takeIf { it === Empty }
+    fun filter(runtime: Runtime, x: KBValue<*>?): KBValue<*>? = x.takeIf { it === KBEmpty }
 
-    fun cast(runtime: Runtime, x: Any?): Any? = null
+    fun cast(runtime: Runtime, x: KBValue<*>?): KBValue<*>? = null
 
-    fun coerce(x: Any?): Any? = x
+    fun coerce(x: KBValue<*>?): KBValue<*>? = x
 
-    fun iterable(runtime: Runtime, x: Any?): List<Any>? = null
+    fun iterable(runtime: Runtime, x: KBValue<*>?): List<KBValue<*>>? = null
 
-    fun default(runtime: Runtime): Any? = null
+    fun default(runtime: Runtime): KBValue<*>? = null
 
     object Inferred : DataType {
-        override fun coerce(x: Any?) = null
+        override fun coerce(x: KBValue<*>?) = null
 
-        override fun filter(runtime: Runtime, x: Any?) = x
+        override fun filter(runtime: Runtime, x: KBValue<*>?) = x
     }
 
     enum class Primitive(private val clazz: KClass<out Any>) : DataType {
         NONE(Unit::class) {
-            override fun default(runtime: Runtime) = Unit
+            override fun default(runtime: Runtime) = KBEmpty
         },
 
         BOOL(Boolean::class) {
-            override fun cast(runtime: Runtime, x: Any?) = when (x) {
-                is Boolean -> x
-                is Byte    -> x != 0.toByte()
-                is Short   -> x != 0.toShort()
-                is Int     -> x != 0
-                is Long    -> x != 0L
-                is Float   -> x != 0F
-                is Double  -> x != 0.0
-                is Char    -> x != '\u0000'
-                is String  -> x.toBoolean()
-                else       -> null
+            override fun cast(runtime: Runtime, x: KBValue<*>?) = when (x) {
+                is KBBool   -> x
+                is KBByte   -> KBBool(x.value != 0.toByte())
+                is KBShort  -> KBBool(x.value != 0.toShort())
+                is KBInt    -> KBBool(x.value != 0)
+                is KBLong   -> KBBool(x.value != 0L)
+                is KBFloat  -> KBBool(x.value != 0F)
+                is KBDouble -> KBBool(x.value != 0.0)
+                is KBChar   -> KBBool(x.value != '\u0000')
+                is KBString -> KBBool(x.value.toBoolean())
+                else        -> null
             }
 
-            override fun default(runtime: Runtime) = false
+            override fun default(runtime: Runtime) = KBBool(false)
         },
 
         BYTE(Byte::class) {
-            override fun cast(runtime: Runtime, x: Any?) = when (x) {
-                is Boolean -> (if (x) 0 else 1).toByte()
-                is Byte    -> x
-                is Short   -> x.toByte()
-                is Int     -> x.toByte()
-                is Long    -> x.toByte()
-                is Float   -> x.toInt().toByte()
-                is Double  -> x.toInt().toByte()
-                is Char    -> x.code.toByte()
-                is String  -> x.toByte()
-                else       -> null
+            override fun cast(runtime: Runtime, x: KBValue<*>?) = when (x) {
+                is KBBool   -> KBByte((if (x.value) 0 else 1).toByte())
+                is KBByte   -> x
+                is KBShort  -> KBByte(x.value.toByte())
+                is KBInt    -> KBByte(x.value.toByte())
+                is KBLong   -> KBByte(x.value.toByte())
+                is KBFloat  -> KBByte(x.value.toInt().toByte())
+                is KBDouble -> KBByte(x.value.toInt().toByte())
+                is KBChar   -> KBByte(x.value.code.toByte())
+                is KBString -> KBByte(x.value.toByte())
+                else        -> null
             }
 
-            override fun coerce(x: Any?) = when (x) {
-                is Byte -> x
-                else    -> null
+            override fun coerce(x: KBValue<*>?) = when (x) {
+                is KBByte -> x
+                else      -> null
             }
 
-            override fun default(runtime: Runtime) = 0.toByte()
+            override fun default(runtime: Runtime) = KBByte(0.toByte())
         },
 
         SHORT(Short::class) {
-            override fun cast(runtime: Runtime, x: Any?) = when (x) {
-                is Boolean -> (if (x) 0 else 1).toShort()
-                is Byte    -> x.toShort()
-                is Short   -> x
-                is Int     -> x.toShort()
-                is Long    -> x.toShort()
-                is Float   -> x.toInt().toShort()
-                is Double  -> x.toInt().toShort()
-                is Char    -> x.code.toShort()
-                is String  -> x.toShort()
+            override fun cast(runtime: Runtime, x: KBValue<*>?) = when (x) {
+                is KBBool   -> KBShort((if (x.value) 0 else 1).toShort())
+                is KBByte   -> KBShort(x.value.toShort())
+                is KBShort  -> x
+                is KBInt    -> KBShort(x.value.toShort())
+                is KBLong   -> KBShort(x.value.toShort())
+                is KBFloat  -> KBShort(x.value.toInt().toShort())
+                is KBDouble -> KBShort(x.value.toInt().toShort())
+                is KBChar   -> KBShort(x.value.code.toShort())
+                is KBString -> KBShort(x.value.toShort())
+                else        -> null
+            }
+
+            override fun coerce(x: KBValue<*>?) = when (x) {
+                is KBByte  -> KBShort(x.value.toShort())
+                is KBShort -> x
                 else       -> null
             }
 
-            override fun coerce(x: Any?) = when (x) {
-                is Byte  -> x.toShort()
-                is Short -> x
-                else     -> null
-            }
-
-            override fun default(runtime: Runtime) = 0.toShort()
+            override fun default(runtime: Runtime) = KBShort(0.toShort())
         },
 
         INT(Int::class) {
-            override fun cast(runtime: Runtime, x: Any?) = when (x) {
-                is Boolean -> if (x) 0 else 1
-                is Byte    -> x.toInt()
-                is Short   -> x.toInt()
-                is Int     -> x
-                is Long    -> x.toInt()
-                is Float   -> x.toInt()
-                is Double  -> x.toInt()
-                is Char    -> x.code
-                is String  -> x.toInt()
+            override fun cast(runtime: Runtime, x: KBValue<*>?) = when (x) {
+                is KBBool   -> KBInt(if (x.value) 0 else 1)
+                is KBByte   -> KBInt(x.value.toInt())
+                is KBShort  -> KBInt(x.value.toInt())
+                is KBInt    -> x
+                is KBLong   -> KBInt(x.value.toInt())
+                is KBFloat  -> KBInt(x.value.toInt())
+                is KBDouble -> KBInt(x.value.toInt())
+                is KBChar   -> KBInt(x.value.code)
+                is KBString -> KBInt(x.value.toInt())
+                else        -> null
+            }
+
+            override fun coerce(x: KBValue<*>?) = when (x) {
+                is KBByte  -> KBInt(x.value.toInt())
+                is KBShort -> KBInt(x.value.toInt())
+                is KBInt   -> KBInt(x.value)
+                is KBChar  -> KBInt(x.value.code)
                 else       -> null
             }
 
-            override fun coerce(x: Any?) = when (x) {
-                is Byte  -> x.toInt()
-                is Short -> x.toInt()
-                is Int   -> x
-                is Char  -> x.code
-                else     -> null
-            }
-
-            override fun default(runtime: Runtime) = 0
+            override fun default(runtime: Runtime) = KBInt(0)
         },
 
         LONG(Long::class) {
-            override fun cast(runtime: Runtime, x: Any?) = when (x) {
-                is Boolean -> if (x) 0L else 1L
-                is Byte    -> x.toLong()
-                is Short   -> x.toLong()
-                is Int     -> x.toLong()
-                is Long    -> x
-                is Float   -> x.toLong()
-                is Double  -> x.toLong()
-                is Char    -> x.code.toLong()
-                is String  -> x.toLong()
+            override fun cast(runtime: Runtime, x: KBValue<*>?) = when (x) {
+                is KBBool   -> KBLong(if (x.value) 0L else 1L)
+                is KBByte   -> KBLong(x.value.toLong())
+                is KBShort  -> KBLong(x.value.toLong())
+                is KBInt    -> KBLong(x.value.toLong())
+                is KBLong   -> x
+                is KBFloat  -> KBLong(x.value.toLong())
+                is KBDouble -> KBLong(x.value.toLong())
+                is KBChar   -> KBLong(x.value.code.toLong())
+                is KBString -> KBLong(x.value.toLong())
+                else        -> null
+            }
+
+            override fun coerce(x: KBValue<*>?) = when (x) {
+                is KBByte  -> KBLong(x.value.toLong())
+                is KBShort -> KBLong(x.value.toLong())
+                is KBInt   -> KBLong(x.value.toLong())
+                is KBLong  -> KBLong(x.value)
+                is KBChar  -> KBLong(x.value.code.toLong())
                 else       -> null
             }
 
-            override fun coerce(x: Any?) = when (x) {
-                is Byte  -> x.toLong()
-                is Short -> x.toLong()
-                is Int   -> x.toLong()
-                is Long  -> x
-                is Char  -> x.code.toLong()
-                else     -> null
-            }
-
-            override fun default(runtime: Runtime) = 0L
+            override fun default(runtime: Runtime) = KBLong(0L)
         },
 
         FLOAT(Float::class) {
-            override fun cast(runtime: Runtime, x: Any?) = when (x) {
-                is Boolean -> if (x) 0F else 1F
-                is Byte    -> x.toFloat()
-                is Short   -> x.toFloat()
-                is Int     -> x.toFloat()
-                is Long    -> x.toFloat()
-                is Float   -> x
-                is Double  -> x.toFloat()
-                is Char    -> x.code.toFloat()
-                is String  -> x.toFloat()
+            override fun cast(runtime: Runtime, x: KBValue<*>?) = when (x) {
+                is KBBool   -> KBFloat(if (x.value) 0F else 1F)
+                is KBByte   -> KBFloat(x.value.toFloat())
+                is KBShort  -> KBFloat(x.value.toFloat())
+                is KBInt    -> KBFloat(x.value.toFloat())
+                is KBLong   -> KBFloat(x.value.toFloat())
+                is KBFloat  -> x
+                is KBDouble -> KBFloat(x.value.toFloat())
+                is KBChar   -> KBFloat(x.value.code.toFloat())
+                is KBString -> KBFloat(x.value.toFloat())
+                else        -> null
+            }
+
+            override fun coerce(x: KBValue<*>?) = when (x) {
+                is KBByte  -> KBFloat(x.value.toFloat())
+                is KBShort -> KBFloat(x.value.toFloat())
+                is KBInt   -> KBFloat(x.value.toFloat())
+                is KBLong  -> KBFloat(x.value.toFloat())
+                is KBFloat -> KBFloat(x.value)
+                is KBChar  -> KBFloat(x.value.code.toFloat())
                 else       -> null
             }
 
-            override fun coerce(x: Any?) = when (x) {
-                is Byte  -> x.toFloat()
-                is Short -> x.toFloat()
-                is Int   -> x.toFloat()
-                is Long  -> x.toFloat()
-                is Float -> x
-                is Char  -> x.code.toFloat()
-                else     -> null
-            }
-
-            override fun default(runtime: Runtime) = 0F
+            override fun default(runtime: Runtime) = KBFloat(0F)
         },
 
         DOUBLE(Double::class) {
-            override fun cast(runtime: Runtime, x: Any?) = when (x) {
-                is Boolean -> if (x) 0.0 else 1.0
-                is Byte    -> x.toDouble()
-                is Short   -> x.toDouble()
-                is Int     -> x.toDouble()
-                is Long    -> x.toDouble()
-                is Float   -> x.toDouble()
-                is Double  -> x
-                is Char    -> x.code.toDouble()
-                is String  -> x.toDouble()
-                else       -> null
+            override fun cast(runtime: Runtime, x: KBValue<*>?) = when (x) {
+                is KBBool   -> KBDouble(if (x.value) 0.0 else 1.0)
+                is KBByte   -> KBDouble(x.value.toDouble())
+                is KBShort  -> KBDouble(x.value.toDouble())
+                is KBInt    -> KBDouble(x.value.toDouble())
+                is KBLong   -> KBDouble(x.value.toDouble())
+                is KBFloat  -> KBDouble(x.value.toDouble())
+                is KBDouble -> x
+                is KBChar   -> KBDouble(x.value.code.toDouble())
+                is KBString -> KBDouble(x.value.toDouble())
+                else        -> null
             }
 
-            override fun coerce(x: Any?) = when (x) {
-                is Byte   -> x.toDouble()
-                is Short  -> x.toDouble()
-                is Int    -> x.toDouble()
-                is Long   -> x.toDouble()
-                is Float  -> x.toDouble()
-                is Double -> x
-                is Char   -> x.code.toDouble()
-                else      -> null
+            override fun coerce(x: KBValue<*>?) = when (x) {
+                is KBByte   -> KBDouble(x.value.toDouble())
+                is KBShort  -> KBDouble(x.value.toDouble())
+                is KBInt    -> KBDouble(x.value.toDouble())
+                is KBLong   -> KBDouble(x.value.toDouble())
+                is KBFloat  -> KBDouble(x.value.toDouble())
+                is KBDouble -> KBDouble(x.value)
+                is KBChar   -> KBDouble(x.value.code.toDouble())
+                else        -> null
             }
 
-            override fun default(runtime: Runtime) = 0.0
+            override fun default(runtime: Runtime) = KBDouble(0.0)
         },
 
         CHAR(Char::class) {
-            override fun cast(runtime: Runtime, x: Any?) = when (x) {
-                is Byte   -> x.toInt().toChar()
-                is Short  -> x.toInt().toChar()
-                is Int    -> x.toChar()
-                is Long   -> x.toInt().toChar()
-                is Float  -> x.toInt().toChar()
-                is Double -> x.toInt().toChar()
-                is Char   -> x
-                else      -> null
+            override fun cast(runtime: Runtime, x: KBValue<*>?) = when (x) {
+                is KBByte   -> KBChar(x.value.toInt().toChar())
+                is KBShort  -> KBChar(x.value.toInt().toChar())
+                is KBInt    -> KBChar(x.value.toChar())
+                is KBLong   -> KBChar(x.value.toInt().toChar())
+                is KBFloat  -> KBChar(x.value.toInt().toChar())
+                is KBDouble -> KBChar(x.value.toInt().toChar())
+                is KBChar   -> x
+                else        -> null
             }
 
-            override fun default(runtime: Runtime) = '\u0000'
+            override fun default(runtime: Runtime) = KBChar('\u0000')
         },
 
         STRING(String::class) {
             override val iterableType: DataType get() = CHAR
 
-            override fun cast(runtime: Runtime, x: Any?) = x?.toString()
+            override fun cast(runtime: Runtime, x: KBValue<*>?) = when (x) {
+                null -> null
+                else -> KBString(x.value.toString())
+            }
 
-            override fun default(runtime: Runtime) = ""
+            override fun default(runtime: Runtime) = KBString("")
 
-            override fun iterable(runtime: Runtime, x: Any?): List<Any>? = cast(runtime, x)?.toList()
+            override fun iterable(runtime: Runtime, x: KBValue<*>?): List<KBValue<*>>? = cast(runtime, x)?.value?.toCharArray()?.map { KBChar(it) }
         },
 
         ANY(Any::class) {
-            override fun cast(runtime: Runtime, x: Any?) = x
+            override fun cast(runtime: Runtime, x: KBValue<*>?) = x
 
-            override fun default(runtime: Runtime): Any = Empty
+            override fun default(runtime: Runtime) = KBEmpty
         };
 
         companion object {
-            fun infer(runtime: Runtime, x: Any?) =
+            fun infer(runtime: Runtime, x: KBValue<*>?) =
                 values().first { it.filter(runtime, x) != null }
         }
 
-        override fun filter(runtime: Runtime, x: Any?): Any? =
+        override fun filter(runtime: Runtime, x: KBValue<*>?): KBValue<*>? =
             super.filter(runtime, x) ?: x.takeIf { clazz.isInstance(x) }
 
         override fun toString() = name.lowercase()
@@ -307,78 +310,78 @@ interface DataType {
     class Array(val subType: DataType, val initSize: Expr? = null) : DataType {
         override val iterableType: DataType get() = subType
 
-        override fun filter(runtime: Runtime, x: Any?): Any? {
+        override fun filter(runtime: Runtime, x: KBValue<*>?): KBValue<*>? {
             val match = super.filter(runtime, x)
 
             if (match != null) {
                 return match
             }
 
-            if (x !is ArrayInstance) {
+            if (x !is KBArray) {
                 return null
             }
 
             val initSize = if (initSize != null) {
-                val value = runtime.visit(initSize).fromRef()
+                val value = runtime.visit(initSize)
 
-                Primitive.INT.coerce(value) as? Int ?: KBError.invalidArraySize()
+                Primitive.INT.coerce(value) as? KBInt ?: KBError.invalidArraySize()
             }
-            else 0
+            else KBInt(0)
 
-            if (initSize > 0 && x.size != initSize) {
+            if (initSize.value > 0 && x.value.size != initSize.value) {
                 return null
             }
 
-            return x.takeIf { it.all { e -> subType.filter(runtime, e) != null } }
+            return x.takeIf { it.value.all { e -> subType.filter(runtime, e) != null } }
         }
 
-        override fun cast(runtime: Runtime, x: Any?) = when (x) {
-            is String        -> when (subType) {
-                Primitive.CHAR -> ArrayInstance(subType, x.toList().toMutableList())
+        override fun cast(runtime: Runtime, x: KBValue<*>?) = when (x) {
+            is KBString -> when (subType) {
+                Primitive.CHAR -> KBArray(ArrayInstance(subType, x.value.map { KBChar(it) }.toMutableList()))
 
                 else           -> null
             }
 
-            is ArrayInstance -> if (x.type == subType)
+            is KBArray  -> if (x.value.type == subType)
                 x
             else
-                ArrayInstance(subType, x.map {
+                KBArray(ArrayInstance(subType, x.value.map {
                     subType.cast(runtime, it) ?: return null
-                }.toMutableList())
+                }.toMutableList()))
 
-            else             -> null
+            else        -> null
         }
 
-        override fun iterable(runtime: Runtime, x: Any?) = cast(runtime, x)
+        override fun iterable(runtime: Runtime, x: KBValue<*>?) = cast(runtime, x)?.value
 
-        override fun default(runtime: Runtime): ArrayInstance {
+        override fun default(runtime: Runtime): KBArray {
             val initSize = if (initSize != null) {
-                val value = runtime.visit(initSize).fromRef()
+                val value = runtime.visit(initSize)
 
-                Primitive.INT.coerce(value) as? Int ?: KBError.invalidArraySize()
+                Primitive.INT.coerce(value) as? KBInt ?: KBError.invalidArraySize()
             }
-            else 0
+            else KBInt(0)
 
-            return ArrayInstance(subType, MutableList(initSize) {
-                subType.default(runtime) ?: KBError.noDefaultValue(DataType.Primitive.ANY.array, Context.none)
-            })
+            return KBArray(ArrayInstance(subType, MutableList(initSize.value) {
+                subType.default(runtime) ?: KBError.noDefaultValue(Primitive.ANY.array, Context.none)
+            }))
         }
 
         override fun toString() = "$subType[]"
 
-        fun mismatchedSize(runtime: Runtime, x: Any?): Boolean {
-            if (x !is ArrayInstance) {
+        fun mismatchedSize(runtime: Runtime, x: KBValue<*>?): Boolean {
+            if (x !is KBArray) {
                 return false
             }
 
             val initSize = if (initSize != null) {
-                val value = runtime.visit(initSize).fromRef()
+                val value = runtime.visit(initSize)
 
-                Primitive.INT.coerce(value) as? Int ?: KBError.invalidArraySize()
+                Primitive.INT.coerce(value) as? KBInt ?: KBError.invalidArraySize()
             }
-            else 0
+            else KBInt(0)
 
-            return initSize > 0 && x.size != initSize
+            return initSize.value > 0 && x.value.size != initSize.value
         }
     }
 
@@ -387,18 +390,18 @@ interface DataType {
 
         override val iterableType: DataType get() = subType
 
-        override fun filter(runtime: Runtime, x: Any?): Any? {
+        override fun filter(runtime: Runtime, x: KBValue<*>?): KBValue<*>? {
             val match = super.filter(runtime, x)
 
             if (match != null) {
                 return match
             }
 
-            if (x !is ArrayInstance) {
+            if (x !is KBArray) {
                 return null
             }
 
-            return x.takeIf { it.all { e -> subType.filter(runtime, e) != null } }
+            return x.takeIf { it.value.all { e -> subType.filter(runtime, e) != null } }
         }
 
         override fun default(runtime: Runtime) = arrayType.default(runtime)
@@ -409,16 +412,17 @@ interface DataType {
     class Data(val name: Expr.Name) : DataType {
         override val iterableType: DataType get() = Primitive.ANY
 
-        override fun filter(runtime: Runtime, x: Any?): Any? =
-            super.filter(runtime, x) ?: x.takeIf { it is DataInstance && it.name == name }
+        override fun filter(runtime: Runtime, x: KBValue<*>?): KBValue<*>? =
+            super.filter(runtime, x) ?: x.takeIf { it is KBData && it.value.name == name }
 
-        override fun cast(runtime: Runtime, x: Any?): Any? = (x as? DataInstance)?.takeIf { it.name == name }
+        override fun cast(runtime: Runtime, x: KBValue<*>?): KBValue<*>? =
+            (x as? KBData)?.takeIf { it.value.name == name }
 
-        override fun coerce(x: Any?) = x.takeIf { it is DataInstance && it.name == name }
+        override fun coerce(x: KBValue<*>?) = x.takeIf { it is KBData && it.value.name == name }
 
-        override fun iterable(runtime: Runtime, x: Any?): List<Any>? = (x as? DataInstance)?.deref()
+        override fun iterable(runtime: Runtime, x: KBValue<*>?): List<KBValue<*>>? = (x as? KBData)?.value?.deref()
 
-        override fun default(runtime: Runtime): Any {
+        override fun default(runtime: Runtime): KBValue<*> {
             val data = runtime.memory.getData(name) ?: KBError.undeclaredData(name, Context.none)
 
             val scope = Memory.Scope(name.value, runtime.memory.peek())
@@ -434,28 +438,30 @@ interface DataType {
                 runtime.memory.pop()
             }
 
-            return DataInstance(name, scope)
+            return KBData(DataInstance(name, scope))
         }
 
         override fun toString() = name.value
     }
 
     class Enum(val name: Expr.Name) : DataType {
-        override fun filter(runtime: Runtime, x: Any?): Any? =
-            super.filter(runtime, x) ?: x.takeIf { it is EnumInstance.Entry && it.type == name.value }
+        override fun filter(runtime: Runtime, x: KBValue<*>?): KBValue<*>? =
+            super.filter(runtime, x) ?: x.takeIf { it is KBEnum && it.value.type == name.value }
 
-        override fun cast(runtime: Runtime, x: Any?): Any? = (x as? EnumInstance.Entry)?.takeIf { it.type == name.value }
+        override fun cast(runtime: Runtime, x: KBValue<*>?): KBValue<*>? =
+            (x as? KBEnum)?.takeIf { it.value.type == name.value }
 
-        override fun coerce(x: Any?) = x.takeIf { it is EnumInstance.Entry && it.type == name.value }
+        override fun coerce(x: KBValue<*>?) = x.takeIf { it is KBEnum && it.value.type == name.value }
 
-        override fun default(runtime: Runtime): Any {
+        override fun default(runtime: Runtime): KBValue<*> {
             val enum = runtime.memory.getEnum(name) ?: KBError.undeclaredData(name, Context.none)
 
-            return enum[0]
+            return KBEnum(enum[0])
         }
 
         override fun toString() = name.value
     }
 }
+
 val String.data
     get() = DataType.Data(lowercase().toName())

@@ -3,6 +3,16 @@ package kakkoiichris.kb.parser
 import kakkoiichris.kb.lexer.Context
 import kakkoiichris.kb.lexer.Token
 import kakkoiichris.kb.runtime.DataType
+import kakkoiichris.kb.runtime.KBBool
+import kakkoiichris.kb.runtime.KBByte
+import kakkoiichris.kb.runtime.KBChar
+import kakkoiichris.kb.runtime.KBDouble
+import kakkoiichris.kb.runtime.KBFloat
+import kakkoiichris.kb.runtime.KBInt
+import kakkoiichris.kb.runtime.KBLong
+import kakkoiichris.kb.runtime.KBShort
+import kakkoiichris.kb.runtime.KBString
+import kakkoiichris.kb.runtime.KBValue
 
 sealed class Expr(val context: Context) {
     open fun getDataType(): DataType =
@@ -52,19 +62,19 @@ sealed class Expr(val context: Context) {
             visitor.visitEmptyExpr(this)
     }
 
-    class Value(context: Context, val value: Any) : Expr(context) {
+    class Value(context: Context, val value: KBValue<*>) : Expr(context) {
         override fun getDataType() = when (value) {
-            Unit       -> DataType.Primitive.NONE
-            is Boolean -> DataType.Primitive.BOOL
-            is Byte    -> DataType.Primitive.BYTE
-            is Short   -> DataType.Primitive.SHORT
-            is Int     -> DataType.Primitive.INT
-            is Long    -> DataType.Primitive.LONG
-            is Float   -> DataType.Primitive.FLOAT
-            is Double  -> DataType.Primitive.DOUBLE
-            is Char    -> DataType.Primitive.CHAR
-            is String  -> DataType.Primitive.STRING
-            else       -> TODO("VALUE DATA TYPE")
+            Unit      -> DataType.Primitive.NONE
+            is KBBool  -> DataType.Primitive.BOOL
+            is KBByte  -> DataType.Primitive.BYTE
+            is KBShort -> DataType.Primitive.SHORT
+            is KBInt   -> DataType.Primitive.INT
+            is KBLong  -> DataType.Primitive.LONG
+            is KBFloat -> DataType.Primitive.FLOAT
+            is KBDouble -> DataType.Primitive.DOUBLE
+            is KBChar   -> DataType.Primitive.CHAR
+            is KBString -> DataType.Primitive.STRING
+            else        -> TODO("VALUE DATA TYPE")
         }
 
         override fun <X> accept(visitor: Visitor<X>): X =
@@ -156,11 +166,11 @@ sealed class Expr(val context: Context) {
 
     class Unary(context: Context, val op: Operator, val expr: Expr) : Expr(context) {
         enum class Operator(private val type: Token.Type) {
-            NEGATE(Token.Type.DASH),
-            NOT(Token.Type.NOT),
-            LENGTH(Token.Type.POUND),
-            STRING(Token.Type.DOLLAR),
-            VALUE(Token.Type.AT);
+            NEGATE(Token.Symbol.DASH),
+            NOT(Token.Keyword.NOT),
+            LENGTH(Token.Symbol.POUND),
+            STRING(Token.Symbol.DOLLAR),
+            VALUE(Token.Symbol.AT);
 
             companion object {
                 operator fun get(type: Token.Type) =
@@ -202,24 +212,24 @@ sealed class Expr(val context: Context) {
 
     class Binary(context: Context, val op: Operator, val left: Expr, val right: Expr) : Expr(context) {
         enum class Operator(private val type: Token.Type) {
-            ASSIGN(Token.Type.EQUAL_SIGN),
-            OR(Token.Type.OR),
-            AND(Token.Type.AND),
-            EQUAL(Token.Type.DOUBLE_EQUAL),
-            NOT_EQUAL(Token.Type.LESS_GREATER),
-            LESS(Token.Type.LESS_SIGN),
-            LESS_EQUAL(Token.Type.LESS_EQUAL_SIGN),
-            GREATER(Token.Type.GREATER_SIGN),
-            GREATER_EQUAL(Token.Type.GREATER_EQUAL_SIGN),
-            IS(Token.Type.IS),
-            IS_NOT(Token.Type.NOT),
-            CONCAT(Token.Type.AMPERSAND),
-            ADD(Token.Type.PLUS),
-            SUBTRACT(Token.Type.DASH),
-            MULTIPLY(Token.Type.STAR),
-            DIVIDE(Token.Type.SLASH),
-            MODULUS(Token.Type.PERCENT),
-            AS(Token.Type.AS);
+            ASSIGN(Token.Symbol.EQUAL_SIGN),
+            OR(Token.Keyword.OR),
+            AND(Token.Keyword.AND),
+            EQUAL(Token.Symbol.DOUBLE_EQUAL),
+            NOT_EQUAL(Token.Symbol.LESS_GREATER),
+            LESS(Token.Symbol.LESS_SIGN),
+            LESS_EQUAL(Token.Symbol.LESS_EQUAL_SIGN),
+            GREATER(Token.Symbol.GREATER_SIGN),
+            GREATER_EQUAL(Token.Symbol.GREATER_EQUAL_SIGN),
+            IS(Token.Keyword.IS),
+            IS_NOT(Token.Keyword.NOT),
+            CONCAT(Token.Symbol.AMPERSAND),
+            ADD(Token.Symbol.PLUS),
+            SUBTRACT(Token.Symbol.DASH),
+            MULTIPLY(Token.Symbol.STAR),
+            DIVIDE(Token.Symbol.SLASH),
+            MODULUS(Token.Symbol.PERCENT),
+            AS(Token.Keyword.AS);
 
             companion object {
                 operator fun get(type: Token.Type) =
@@ -379,7 +389,7 @@ sealed class Expr(val context: Context) {
 }
 
 fun Any.toExpr(context: Context = Context.none) =
-    Expr.Value(context, this)
+    Expr.Value(context, KBValue.of(this))
 
 fun DataType.toType() =
     Expr.Type(Context.none, this)

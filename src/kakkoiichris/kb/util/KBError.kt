@@ -1,8 +1,8 @@
 package kakkoiichris.kb.util
 
 import kakkoiichris.kb.lexer.Context
+import kakkoiichris.kb.lexer.Token.Keyword.*
 import kakkoiichris.kb.lexer.Token.Type
-import kakkoiichris.kb.lexer.Token.Type.*
 import kakkoiichris.kb.parser.Expr
 import kakkoiichris.kb.parser.Stmt
 import kakkoiichris.kb.runtime.DataType

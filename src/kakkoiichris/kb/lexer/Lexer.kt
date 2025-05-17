@@ -1,21 +1,20 @@
 package kakkoiichris.kb.lexer
 
-import kakkoiichris.kb.runtime.Empty
+import kakkoiichris.kb.runtime.KBEmpty
 import kakkoiichris.kb.util.KBError
 import kakkoiichris.kb.util.Source
 import java.util.*
 
-class Lexer(private val source: Source) : Iterator<Token> {
+class Lexer(private val source: Source) : Iterator<Token<*>> {
     companion object {
         const val NUL = '\u0000'
 
-        val keywords = Token.Type
-            .values()
-            .filter { it.symbol.all(Char::isLetter) }
-            .associateBy(Token.Type::symbol)
+        val keywords = Token.Keyword.values()
+            .associateBy { it.name.lowercase() }
 
-        val literals = listOf(true, false, Empty)
+        val literals = listOf(true, false, KBEmpty)
             .associateBy(Objects::toString)
+            .mapValues { (_, v) -> Token.Value(v) }
 
         val longRegex = """\d+[Ll]""".toRegex()
         val intRegex = """\d+""".toRegex()
@@ -35,7 +34,7 @@ class Lexer(private val source: Source) : Iterator<Token> {
 
     override fun hasNext() = pos <= source.content.length
 
-    override fun next(): Token {
+    override fun next(): Token<*> {
         while (!atEndOfFile()) {
             if (match { isWhitespace() }) {
                 skipWhitespace()
@@ -80,9 +79,9 @@ class Lexer(private val source: Source) : Iterator<Token> {
 
     private fun here() =
         Location(source.name, row, col)
-    
-    private fun getLine(location: Location=here())=
-        lines[location.row-1]
+
+    private fun getLine(location: Location = here()) =
+        lines[location.row - 1]
 
     private fun step(count: Int = 1) {
         repeat(count) {
@@ -175,7 +174,7 @@ class Lexer(private val source: Source) : Iterator<Token> {
         step()
     }
 
-    private fun number(): Token {
+    private fun number(): Token<Token.Value> {
         val location = here()
 
         val start = col
@@ -274,10 +273,10 @@ class Lexer(private val source: Source) : Iterator<Token> {
 
         val context = Context(location, region, getLine(location))
 
-        return Token(context, Token.Type.VALUE, number)
+        return Token(context, Token.Value(number))
     }
 
-    private fun word(): Token {
+    private fun word(): Token<*> {
         val location = here()
 
         val start = col
@@ -302,10 +301,10 @@ class Lexer(private val source: Source) : Iterator<Token> {
         val literal = literals[result]
 
         if (literal != null) {
-            return Token(context, Token.Type.VALUE, literal)
+            return Token(context, literal)
         }
 
-        return Token(context, Token.Type.WORD, result)
+        return Token(context, Token.Word(result))
     }
 
     private fun unicode(size: Int): Char {
@@ -352,7 +351,7 @@ class Lexer(private val source: Source) : Iterator<Token> {
         }
     }
 
-    private fun char(): Token {
+    private fun char(): Token<Token.Value> {
         val location = here()
 
         val start = col
@@ -376,10 +375,10 @@ class Lexer(private val source: Source) : Iterator<Token> {
 
         val context = Context(location, region, getLine(location))
 
-        return Token(context, Token.Type.VALUE, result)
+        return Token(context, Token.Value(result))
     }
 
-    private fun string(): Token {
+    private fun string(): Token<Token.Value> {
         val location = here()
 
         val start = col
@@ -401,98 +400,98 @@ class Lexer(private val source: Source) : Iterator<Token> {
 
         val context = Context(location, region, getLine(location))
 
-        return Token(context, Token.Type.VALUE, result)
+        return Token(context, Token.Value(result))
     }
 
-    private fun symbol(): Token {
+    private fun symbol(): Token<Token.Symbol> {
         val location = here()
 
         val start = col
 
         val op = when {
             skip('=') -> when {
-                skip('=') -> Token.Type.DOUBLE_EQUAL
+                skip('=') -> Token.Symbol.DOUBLE_EQUAL
 
-                else      -> Token.Type.EQUAL_SIGN
+                else      -> Token.Symbol.EQUAL_SIGN
             }
 
             skip('+') -> when {
-                skip('=') -> Token.Type.PLUS_EQUAL
+                skip('=') -> Token.Symbol.PLUS_EQUAL
 
-                else      -> Token.Type.PLUS
+                else      -> Token.Symbol.PLUS
             }
 
             skip('-') -> when {
-                skip('=') -> Token.Type.DASH_EQUAL
+                skip('=') -> Token.Symbol.DASH_EQUAL
 
-                else      -> Token.Type.DASH
+                else      -> Token.Symbol.DASH
             }
 
             skip('*') -> when {
-                skip('=') -> Token.Type.STAR_EQUAL
+                skip('=') -> Token.Symbol.STAR_EQUAL
 
-                else      -> Token.Type.STAR
+                else      -> Token.Symbol.STAR
             }
 
             skip('/') -> when {
-                skip('=') -> Token.Type.SLASH_EQUAL
+                skip('=') -> Token.Symbol.SLASH_EQUAL
 
-                else      -> Token.Type.SLASH
+                else      -> Token.Symbol.SLASH
             }
 
             skip('%') -> when {
-                skip('=') -> Token.Type.PERCENT_EQUAL
+                skip('=') -> Token.Symbol.PERCENT_EQUAL
 
-                else      -> Token.Type.PERCENT
+                else      -> Token.Symbol.PERCENT
             }
 
             skip('<') -> when {
-                skip('>') -> Token.Type.LESS_GREATER
+                skip('>') -> Token.Symbol.LESS_GREATER
 
-                skip('=') -> Token.Type.LESS_EQUAL_SIGN
+                skip('=') -> Token.Symbol.LESS_EQUAL_SIGN
 
-                else      -> Token.Type.LESS_SIGN
+                else      -> Token.Symbol.LESS_SIGN
             }
 
             skip('>') -> when {
-                skip('=') -> Token.Type.GREATER_EQUAL_SIGN
+                skip('=') -> Token.Symbol.GREATER_EQUAL_SIGN
 
-                else      -> Token.Type.GREATER_SIGN
+                else      -> Token.Symbol.GREATER_SIGN
             }
 
             skip('&') -> when {
-                skip('=') -> Token.Type.AMPERSAND_EQUAL
+                skip('=') -> Token.Symbol.AMPERSAND_EQUAL
 
-                else      -> Token.Type.AMPERSAND
+                else      -> Token.Symbol.AMPERSAND
             }
 
-            skip('$') -> Token.Type.DOLLAR
+            skip('$') -> Token.Symbol.DOLLAR
 
-            skip('#') -> Token.Type.POUND
+            skip('#') -> Token.Symbol.POUND
 
-            skip('@') -> Token.Type.AT
+            skip('@') -> Token.Symbol.AT
 
-            skip('.') -> Token.Type.DOT
+            skip('.') -> Token.Symbol.DOT
 
             skip(':') -> when {
-                skip(':') -> Token.Type.DOUBLE_COLON
+                skip(':') -> Token.Symbol.DOUBLE_COLON
 
-                else      -> Token.Type.COLON
+                else      -> Token.Symbol.COLON
             }
 
-            skip('(') -> Token.Type.LEFT_PAREN
+            skip('(') -> Token.Symbol.LEFT_PAREN
 
-            skip(')') -> Token.Type.RIGHT_PAREN
+            skip(')') -> Token.Symbol.RIGHT_PAREN
 
-            skip('[') -> Token.Type.LEFT_SQUARE
+            skip('[') -> Token.Symbol.LEFT_SQUARE
 
-            skip(']') -> Token.Type.RIGHT_SQUARE
+            skip(']') -> Token.Symbol.RIGHT_SQUARE
 
-            skip('{') -> Token.Type.LEFT_BRACE
+            skip('{') -> Token.Symbol.LEFT_BRACE
 
-            skip('}') -> Token.Type.RIGHT_BRACE
+            skip('}') -> Token.Symbol.RIGHT_BRACE
 
-            skip(',') -> Token.Type.COMMA
+            skip(',') -> Token.Symbol.COMMA
 
             else      -> {
                 val context = Context(here(), col..(col + 1), getLine())
@@ -508,13 +507,13 @@ class Lexer(private val source: Source) : Iterator<Token> {
         return Token(context, op)
     }
 
-    private fun endOfFile(): Token {
+    private fun endOfFile(): Token<Token.EndOfFile> {
         val location = here()
 
         val region = pos..pos
 
         val context = Context(location, region, getLine(location))
 
-        return Token(context, Token.Type.END_OF_FILE)
+        return Token(context, Token.EndOfFile)
     }
 }

@@ -1,12 +1,96 @@
-enum Coin
-    PENNY = 0.01,
-    NICKEL = 0.05,
-    DIME = 0.1,
-    QUARTER = 0.25,
-    HALF_DOLLAR = 0.5,
-    DOLLAR = 1.0
-end enum
+let rows = 51
+let cols = 61
+let size = 10
 
-for c in Coin::*
-    print($c, ", ", #c, ", ", @c, '\n')
+let width  = cols * size
+let height = rows * size
+
+var a as bool[rows, cols]
+var b as bool[rows, cols]
+
+for r = 0 to #a
+	for c = 0 to #a[0]
+        a[r, c] = random() < 0.5
+    end for
 end for
+
+var paused = false
+var speed = 1 / 60.0
+
+createWindow(width, height, "Game of Life")
+
+openWindow()
+
+while windowIsOpen()
+	setColor(0)
+	clear()
+
+	setColor(255)
+
+    for r = 0 to rows
+        for c = 0 to cols
+            if a[r, c]
+                fillRect(c * size, r * size, size, size)
+            end if
+        end for
+    end for
+
+    if not paused
+        for r = 0 to rows
+            for c = 0 to cols
+                var n = 0
+
+                for ro = -1 to 2
+                    for co = -1 to 2
+                        let rr = r + ro
+                        let cc = c + co
+
+                        if rr >= 0 and rr < rows and cc >= 0 and cc < cols and a[rr, cc]
+                            n += 1
+                        end if
+                    end for
+                end for
+
+                if a[r, c]
+                    n -= 1
+                end if
+
+                if a[r, c] and n < 2
+                    b[r, c] = false
+                else if a[r, c] and n > 3
+                    b[r, c] = false
+                else if not a[r, c] and n == 3
+                    b[r, c] = true
+                else
+                    b[r, c] = a[r, c]
+                end if
+            end for
+        end for
+
+        a $ b
+    end if
+
+	flip()
+
+	sleep(speed)
+
+    if keyIsDown(KEY_UP)
+		speed *= 2
+	end if
+
+    if keyIsDown(KEY_DOWN)
+		speed /= 2
+	end if
+
+	if keyIsDown(KEY_SPACE)
+		paused = not paused
+	end if
+
+	if keyIsDown(KEY_ESCAPE)
+		closeWindow()
+	end if
+
+	poll()
+end while
+
+closeWindow()

@@ -7,7 +7,7 @@ import kakkoiichris.kb.parser.toName
 
 class DataInstance(val name: Expr.Name, private val members: Memory.Scope) {
     fun deref() =
-        members.references.values.map { it.fromRef() }
+        members.references.values.map { it.value }
 
     operator fun get(name: Expr.Name) =
         members.getRef(name)
@@ -15,7 +15,7 @@ class DataInstance(val name: Expr.Name, private val members: Memory.Scope) {
     operator fun get(name: String) =
         members.getRef(name)
 
-    fun invokeSub(runtime: Runtime, subName: Expr.Name, vararg otherArgs: Any): Any {
+    fun invokeSub(runtime: Runtime, subName: Expr.Name, vararg otherArgs: Any): KBValue<*> {
         val invoke = Expr.Invoke(
             Context.none,
             subName,
@@ -24,14 +24,14 @@ class DataInstance(val name: Expr.Name, private val members: Memory.Scope) {
         return runtime.visitInvokeExpr(invoke)
     }
 
-    fun invokeUnaryOperator(runtime: Runtime, operator: Expr.Unary.Operator): Any {
+    fun invokeUnaryOperator(runtime: Runtime, operator: Expr.Unary.Operator): KBValue<*> {
         val invoke =
             Expr.Invoke(Context.none, operator.name.lowercase().toName(), listOf(Expr.Invoke.Argument(false, toExpr())))
 
         return runtime.visitInvokeExpr(invoke)
     }
 
-    fun invokeBinaryOperator(runtime: Runtime, operator: Expr.Binary.Operator, otherArg: Any): Any {
+    fun invokeBinaryOperator(runtime: Runtime, operator: Expr.Binary.Operator, otherArg: Any): KBValue<*> {
         val invoke = Expr.Invoke(
             Context.none,
             operator.name.lowercase().toName(),

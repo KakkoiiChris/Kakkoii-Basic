@@ -20,8 +20,8 @@ class EnumInstance(val name: String, val entries: List<Entry>) {
     operator fun get(index: Int) =
         entries[index]
     
-    data class Entry(val type: String, val name: String, val ordinal: Int, val value: Any) {
+    data class Entry(val type: String, val name: String, val ordinal: Int, val value: KBValue<*>) {
         override fun toString()=
-            "$type #$ordinal \$$name @$value"
+            "$type #$ordinal $$name @$value"
     }
 }

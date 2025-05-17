@@ -8,7 +8,7 @@ import kakkoiichris.kb.parser.toName
 import kakkoiichris.kb.util.KBError
 import kakkoiichris.kb.util.Source
 
-class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<Any> {
+class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<KBValue<*>> {
     val memory = Memory()
 
     private val global = Memory.Scope("global")
@@ -62,7 +62,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
             expr = expr.withTarget(type.name)
         }
 
-        var value = visit(expr).fromRef()
+        var value = visit(expr)
 
         if (value === Unit) {
             KBError.assignedNone(stmt.expr.context)
@@ -78,7 +78,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
             }
         }
 
-        if (value === Empty) {
+        if (value === KBEmpty) {
             value = type.default(this) ?: KBError.noDefaultValue(type, stmt.expr.context)
         }
 
@@ -473,21 +473,21 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
     }
 
     override fun visitEmptyExpr(expr: Expr.Empty) =
-        Empty
+        KBEmpty
 
     override fun visitValueExpr(expr: Expr.Value) =
         expr.value
 
     override fun visitNameExpr(expr: Expr.Name) =
-        memory.getRef(expr) ?: KBError.undeclaredVariable(expr, expr.context)
+        memory.getRef(expr)?.value ?: KBError.undeclaredVariable(expr, expr.context)
 
     override fun visitVariableExpr(expr: Expr.Variable) =
-        Unit//memory.getRef(expr) ?: KBError.undeclaredVariable(expr, expr.context)
+        KBEmpty//TODO memory.getRef(expr) ?: KBError.undeclaredVariable(expr, expr.context)
 
     override fun visitTypeExpr(expr: Expr.Type) =
         DataType.resolve(this, expr.value)
 
-    override fun visitArrayExpr(expr: Expr.Array): Any {
+    override fun visitArrayExpr(expr: Expr.Array): KBValue<*> {
         val elements = mutableListOf<Any>()
 
         for (elementNode in expr.elements) {
@@ -509,54 +509,50 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
 
         val type = DataType.infer(this, elements) as DataType.Array
 
-        return ArrayInstance(type.subType, elements)
+        return KBArray(ArrayInstance(type.subType, elements))
     }
 
-    override fun visitUnaryExpr(expr: Expr.Unary): Any {
+    override fun visitUnaryExpr(expr: Expr.Unary): KBValue<*> {
         return when (expr.op) {
-            Expr.Unary.Operator.NEGATE -> when (val e = visit(expr.expr).fromRef().unwrap()) {
-                is Byte          -> (-e).toByte()
+            Expr.Unary.Operator.NEGATE -> when (val e = visit(expr.expr)) {
+                is KBByte   -> KBByte((-e.value).toByte())
 
-                is Short         -> (-e).toShort()
+                is KBShort  -> KBShort((-e.value).toShort())
 
-                is Int           -> -e
+                is KBInt    -> KBInt(-e.value)
 
-                is Long          -> -e
+                is KBLong   -> KBLong(-e.value)
 
-                is Float         -> -e
+                is KBFloat  -> KBFloat(-e.value)
 
-                is Double        -> -e
+                is KBDouble -> KBDouble(-e.value)
 
-                is String        -> e.reversed()
+                is KBString -> KBString(e.value.reversed())
 
-                is ArrayInstance -> ArrayInstance(e.type, e.reversed().toMutableList())
+                is KBArray  -> KBArray(ArrayInstance(e.value.type, e.value.reversed().toMutableList()))
 
-                is DataInstance  -> e.invokeUnaryOperator(this, expr.op)
+                is KBData   -> e.value.invokeUnaryOperator(this, expr.op)
 
-                else             -> KBError.invalidUnaryOperand(e, expr.op, expr.expr.context)
+                else        -> KBError.invalidUnaryOperand(e, expr.op, expr.expr.context)
             }
 
-            Expr.Unary.Operator.NOT    -> visit(expr.expr).fromRef().unwrap().isEmptyValue()
+            Expr.Unary.Operator.NOT    -> KBBool(visit(expr.expr).isEmptyValue())
 
-            Expr.Unary.Operator.LENGTH -> when (val e = visit(expr.expr).fromRef().unwrap()) {
-                is String             -> e.length
-
-                is ArrayInstance      -> e.size
-
-                is DataInstance       -> e.deref().size
-
-                is EnumInstance.Entry -> e.ordinal
-
-                else                  -> 1
+            Expr.Unary.Operator.LENGTH -> when (val e = visit(expr.expr)) {
+                is KBString -> KBInt(e.value.length)
+                is KBArray  -> KBInt(e.value.size)
+                is KBData   -> KBInt(e.value.deref().size)
+                is KBEnum   -> KBInt(e.value.ordinal)
+                else        -> KBInt(1)
             }
 
-            Expr.Unary.Operator.STRING -> when (val e = visit(expr.expr).fromRef().unwrap()) {
-                is EnumInstance.Entry -> e.name
+            Expr.Unary.Operator.STRING -> when (val e = visit(expr.expr)) {
+                is KBEnum -> KBString(e.value.name)
 
-                else                  -> e.toString()
+                else                  -> KBString(e.value.toString())
             }
 
-            Expr.Unary.Operator.VALUE  -> when (val e = visit(expr.expr).fromRef().unwrap()) {
+            Expr.Unary.Operator.VALUE  -> when (val e = visit(expr.expr)) {
                 is EnumInstance.Entry -> e.value
 
                 else                  -> e
@@ -578,7 +574,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
 
                     var r = visit(right).fromRef()
 
-                    if (r === Empty) {
+                    if (r === KBEmpty) {
                         r = type.default(this) ?: KBError.noDefaultValue(type, expr.left.context)
                     }
 
@@ -633,7 +629,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
             Expr.Binary.Operator.EQUAL         -> when (val l = visit(expr.left).fromRef().unwrap()) {
                 is Boolean       -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Boolean -> l == r
-                    Empty      -> l.isEmptyValue()
+                    KBEmpty    -> l.isEmptyValue()
                     else       -> false
                 }
 
@@ -644,7 +640,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                     is Long   -> l == r
                     is Float  -> l == r
                     is Double -> l == r
-                    Empty     -> l.isEmptyValue()
+                    KBEmpty   -> l.isEmptyValue()
                     else      -> false
                 }
 
@@ -655,7 +651,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                     is Long   -> l == r
                     is Float  -> l == r
                     is Double -> l == r
-                    Empty     -> l.isEmptyValue()
+                    KBEmpty   -> l.isEmptyValue()
                     else      -> false
                 }
 
@@ -666,7 +662,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                     is Long   -> l == r
                     is Float  -> l == r
                     is Double -> l == r
-                    Empty     -> l.isEmptyValue()
+                    KBEmpty   -> l.isEmptyValue()
                     else      -> false
                 }
 
@@ -677,7 +673,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                     is Long   -> l == r
                     is Float  -> l == r
                     is Double -> l == r
-                    Empty     -> l.isEmptyValue()
+                    KBEmpty   -> l.isEmptyValue()
                     else      -> false
                 }
 
@@ -688,7 +684,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                     is Long   -> l == r
                     is Float  -> l == r
                     is Double -> l == r
-                    Empty     -> l.isEmptyValue()
+                    KBEmpty   -> l.isEmptyValue()
                     else      -> false
                 }
 
@@ -699,31 +695,31 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                     is Long   -> l == r
                     is Float  -> l == r
                     is Double -> l == r
-                    Empty     -> l.isEmptyValue()
+                    KBEmpty   -> l.isEmptyValue()
                     else      -> false
                 }
 
                 is Char          -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Char -> l == r
-                    Empty   -> l.isEmptyValue()
+                    KBEmpty -> l.isEmptyValue()
                     else    -> false
                 }
 
                 is String        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is String -> l == r
-                    Empty     -> l.isEmptyValue()
+                    KBEmpty   -> l.isEmptyValue()
                     else      -> false
                 }
 
                 is ArrayInstance -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is ArrayInstance -> l == r
-                    Empty            -> l.isEmpty()
+                    KBEmpty          -> l.isEmpty()
                     else             -> false
                 }
 
                 is DataInstance  -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is DataInstance -> l == r
-                    Empty           -> l.isEmpty()
+                    KBEmpty         -> l.isEmpty()
                     else            -> false
                 }
 
@@ -733,7 +729,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
             Expr.Binary.Operator.NOT_EQUAL     -> when (val l = visit(expr.left).fromRef().unwrap()) {
                 is Boolean       -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Boolean -> l != r
-                    Empty      -> !l.isEmptyValue()
+                    KBEmpty    -> !l.isEmptyValue()
                     else       -> true
                 }
 
@@ -744,7 +740,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                     is Long   -> l != r
                     is Float  -> l != r
                     is Double -> l != r
-                    Empty     -> !l.isEmptyValue()
+                    KBEmpty   -> !l.isEmptyValue()
                     else      -> true
                 }
 
@@ -755,7 +751,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                     is Long   -> l != r
                     is Float  -> l != r
                     is Double -> l != r
-                    Empty     -> !l.isEmptyValue()
+                    KBEmpty   -> !l.isEmptyValue()
                     else      -> true
                 }
 
@@ -766,7 +762,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                     is Long   -> l != r
                     is Float  -> l != r
                     is Double -> l != r
-                    Empty     -> !l.isEmptyValue()
+                    KBEmpty   -> !l.isEmptyValue()
                     else      -> true
                 }
 
@@ -777,7 +773,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                     is Long   -> l != r
                     is Float  -> l != r
                     is Double -> l != r
-                    Empty     -> !l.isEmptyValue()
+                    KBEmpty   -> !l.isEmptyValue()
                     else      -> true
                 }
 
@@ -788,7 +784,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                     is Long   -> l != r
                     is Float  -> l != r
                     is Double -> l != r
-                    Empty     -> !l.isEmptyValue()
+                    KBEmpty   -> !l.isEmptyValue()
                     else      -> true
                 }
 
@@ -799,31 +795,31 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                     is Long   -> l != r
                     is Float  -> l != r
                     is Double -> l != r
-                    Empty     -> !l.isEmptyValue()
+                    KBEmpty   -> !l.isEmptyValue()
                     else      -> true
                 }
 
                 is Char          -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is Char -> l != r
-                    Empty   -> !l.isEmptyValue()
+                    KBEmpty -> !l.isEmptyValue()
                     else    -> true
                 }
 
                 is String        -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is String -> l != r
-                    Empty     -> !l.isEmptyValue()
+                    KBEmpty   -> !l.isEmptyValue()
                     else      -> true
                 }
 
                 is ArrayInstance -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is ArrayInstance -> l != r
-                    Empty            -> !l.isEmpty()
+                    KBEmpty          -> !l.isEmpty()
                     else             -> true
                 }
 
                 is DataInstance  -> when (val r = visit(expr.right).fromRef().unwrap()) {
                     is DataInstance -> l != r
-                    Empty           -> !l.isEmpty()
+                    KBEmpty         -> !l.isEmpty()
                     else            -> true
                 }
 
@@ -1675,7 +1671,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
         return enum[expr.member]
     }
 
-    override fun visitInvokeExpr(expr: Expr.Invoke): Any {
+    override fun visitInvokeExpr(expr: Expr.Invoke): KBValue<*> {
         val (mode, _, value) = performInvoke(expr)
 
         return when (mode) {
@@ -1927,7 +1923,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
         return DataInstance(data.name, scope)
     }
 
-    data class InvokeResult(val mode: Mode, val type: DataType = DataType.Inferred, val value: Any = Unit) {
+    data class InvokeResult(val mode: Mode, val type: DataType = DataType.Inferred, val value: KBValue<*> = KBEmpty) {
         enum class Mode {
             SUCCESS,
             FAIL_UNDECLARED,

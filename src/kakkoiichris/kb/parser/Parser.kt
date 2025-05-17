@@ -3,7 +3,8 @@ package kakkoiichris.kb.parser
 import kakkoiichris.kb.lexer.Context
 import kakkoiichris.kb.lexer.Lexer
 import kakkoiichris.kb.lexer.Token
-import kakkoiichris.kb.lexer.Token.Type.*
+import kakkoiichris.kb.lexer.Token.Keyword.*
+import kakkoiichris.kb.lexer.Token.Symbol.*
 import kakkoiichris.kb.runtime.DataType
 import kakkoiichris.kb.util.KBError
 
@@ -34,6 +35,9 @@ class Parser(private val lexer: Lexer) {
     private fun match(type: Token.Type) =
         currentToken.type == type
 
+    private inline fun <reified X : Token.Type> match() =
+        X::class.isInstance(currentToken.type)
+
     private fun matchAny(vararg types: Token.Type): Boolean {
         for (type in types) {
             if (match(type)) {
@@ -54,6 +58,15 @@ class Parser(private val lexer: Lexer) {
         return false
     }
 
+    @Suppress("UNCHECKED_CAST")
+    private inline fun <reified T : Token.Type> get(): Token<T> {
+        val token = currentToken
+
+        mustSkip(token.type)
+
+        return token as Token<T>
+    }
+
     private fun mustSkip(type: Token.Type) {
         if (!skip(type)) {
             KBError.invalidTokenType(currentToken.type, type, context())
@@ -61,7 +74,7 @@ class Parser(private val lexer: Lexer) {
     }
 
     private fun isEndOfFile() =
-        match(END_OF_FILE)
+        match(Token.EndOfFile)
 
     private fun stmt(): Stmt {
         val label = if (skip(LABEL)) name() else Expr.Name.none
@@ -1144,7 +1157,7 @@ class Parser(private val lexer: Lexer) {
 
         val end = currentToken.context
 
-        val member = if (skip(Token.Type.STAR))
+        val member = if (skip(STAR))
             Expr.Name(end, "*")
         else
             name()
@@ -1156,41 +1169,37 @@ class Parser(private val lexer: Lexer) {
 
     private fun terminal(): Expr {
         return when {
-            match(VALUE)       -> value()
+            match<Token.Value>() -> value()
 
-            match(WORD)        -> name()
+            match<Token.Word>()  -> name()
 
-            match(LEFT_SQUARE) -> array()
+            match(LEFT_SQUARE)   -> array()
 
-            match(LEFT_BRACE)  -> data()
+            match(LEFT_BRACE)    -> data()
 
-            match(LEFT_PAREN)  -> nested()
+            match(LEFT_PAREN)    -> nested()
 
-            else               -> KBError.invalidTerminal(currentToken.type, currentToken.context)
+            else                 -> KBError.invalidTerminal(currentToken.type, currentToken.context)
         }
     }
 
     private fun value(): Expr.Value {
-        val token = currentToken
+        val (context, type) = get<Token.Value>()
 
-        mustSkip(VALUE)
-
-        return Expr.Value(token.context, token.value)
+        return Expr.Value(context, type.value)
     }
 
     private fun name(): Expr.Name {
-        val token = currentToken
+        val (context, type) = get<Token.Word>()
 
-        mustSkip(WORD)
-
-        return Expr.Name(token.context, token.value as String)
+        return Expr.Name(context, type.value)
     }
 
     private fun type(): Expr.Type {
         val startContext = context()
         var endContext = context()
 
-        var type = if (match(WORD)) {
+        var type = if (match<Token.Word>()) {
             DataType.Data(name())
         }
         else {
