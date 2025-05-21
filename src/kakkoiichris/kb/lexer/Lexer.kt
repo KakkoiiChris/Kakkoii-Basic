@@ -1,6 +1,9 @@
 package kakkoiichris.kb.lexer
 
+import kakkoiichris.kb.runtime.KBChar
 import kakkoiichris.kb.runtime.KBEmpty
+import kakkoiichris.kb.runtime.KBString
+import kakkoiichris.kb.runtime.KBValue
 import kakkoiichris.kb.util.KBError
 import kakkoiichris.kb.util.Source
 import java.util.*
@@ -14,7 +17,7 @@ class Lexer(private val source: Source) : Iterator<Token<*>> {
 
         val literals = listOf(true, false, KBEmpty)
             .associateBy(Objects::toString)
-            .mapValues { (_, v) -> Token.Value(v) }
+            .mapValues { (_, v) -> Token.Value(KBValue.of(v)!!) }
 
         val longRegex = """\d+[Ll]""".toRegex()
         val intRegex = """\d+""".toRegex()
@@ -273,7 +276,7 @@ class Lexer(private val source: Source) : Iterator<Token<*>> {
 
         val context = Context(location, region, getLine(location))
 
-        return Token(context, Token.Value(number))
+        return Token(context, Token.Value(KBValue.of(number)!!))
     }
 
     private fun word(): Token<*> {
@@ -375,7 +378,7 @@ class Lexer(private val source: Source) : Iterator<Token<*>> {
 
         val context = Context(location, region, getLine(location))
 
-        return Token(context, Token.Value(result))
+        return Token(context, Token.Value(KBChar(result)))
     }
 
     private fun string(): Token<Token.Value> {
@@ -400,7 +403,7 @@ class Lexer(private val source: Source) : Iterator<Token<*>> {
 
         val context = Context(location, region, getLine(location))
 
-        return Token(context, Token.Value(result))
+        return Token(context, Token.Value(KBString(result)))
     }
 
     private fun symbol(): Token<Token.Symbol> {

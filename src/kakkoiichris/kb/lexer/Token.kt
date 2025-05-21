@@ -1,5 +1,8 @@
 package kakkoiichris.kb.lexer
 
+import kakkoiichris.kb.runtime.KBV
+import kakkoiichris.kb.runtime.KBValue
+
 data class Token<X : Token.Type>(val context: Context, val type: X) {
     sealed interface Type {
         val symbol: String
@@ -118,7 +121,7 @@ data class Token<X : Token.Type>(val context: Context, val type: X) {
         COMMA(","),
     }
 
-    class Value(val value: Any) : Type {
+    class Value(val value: KBV) : Type {
         override val symbol = "<Value $value>"
     }
 

@@ -10,5 +10,5 @@ sealed class Redirect(val origin: Context) : Throwable() {
     
     class Return(origin: Context) : Redirect(origin)
     
-    class Yield(origin: Context, val value: Any) : Redirect(origin)
+    class Yield(origin: Context, val value: KBV) : Redirect(origin)
 }

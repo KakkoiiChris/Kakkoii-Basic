@@ -1,25 +1,33 @@
 package kakkoiichris.kb.runtime
 
+typealias KBV = KBValue<*>
+
 sealed interface KBValue<X> {
     val value: X
 
     companion object {
-        fun of(x: Any) = when (x) {
-            is Boolean -> KBBool(x)
-            is Byte    -> KBByte(x)
-            is Short   -> KBShort(x)
-            is Int     -> KBInt(x)
-            is Long    -> KBLong(x)
-            is Float   -> KBFloat(x)
-            is Double  -> KBDouble(x)
-            is Char    -> KBChar(x)
-            is String  -> KBString(x)
-            else       -> null
+        fun of(x: Any): KBV? = when (x) {
+            is KBV -> x
+            Unit          -> KBNone
+            is Boolean    -> KBBool(x)
+            is Byte       -> KBByte(x)
+            is Short      -> KBShort(x)
+            is Int        -> KBInt(x)
+            is Long       -> KBLong(x)
+            is Float      -> KBFloat(x)
+            is Double     -> KBDouble(x)
+            is Char       -> KBChar(x)
+            is String     -> KBString(x)
+            else          -> null
         }
     }
 }
 
 data object KBEmpty : KBValue<KBEmpty> {
+    override val value = this
+}
+
+data object KBNone : KBValue<KBNone> {
     override val value = this
 }
 

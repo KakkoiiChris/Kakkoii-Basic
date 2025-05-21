@@ -750,16 +750,18 @@ class Parser(private val lexer: Lexer) {
             return expr
         }
 
+        expr as? Expr.Name ?: TODO()
+
         val op = currentToken
 
         mustSkip(op.type)
 
-        fun desugar(newOp: Expr.Binary.Operator): Expr.Binary {
+        fun desugar(newOp: Expr.Binary.Operator): Expr.Assign {
             val right = disjunction()
 
             val context = expr.context + right.context
 
-            return Expr.Binary(context, Expr.Binary.Operator.ASSIGN, expr, Expr.Binary(context, newOp, expr, right))
+            return Expr.Assign(context, expr, Expr.Binary(context, newOp, expr, right))
         }
 
         return when (op.type) {
@@ -865,13 +867,13 @@ class Parser(private val lexer: Lexer) {
 
             mustSkip(op.type)
 
-            val opType = if (skip(NOT)) NOT else IS
+            val invert = skip(NOT)
 
             val right = type()
 
             val context = expr.context + right.context
 
-            expr = Expr.Binary(context, Expr.Binary.Operator[opType], expr, right)
+            expr = Expr.TypeCheck(context, expr, right, invert)
         }
 
         return expr
@@ -943,7 +945,7 @@ class Parser(private val lexer: Lexer) {
 
             val context = expr.context + right.context
 
-            expr = Expr.Binary(context, Expr.Binary.Operator[op.type], expr, right)
+            expr = Expr.TypeCast(context, expr, right)
         }
 
         return expr

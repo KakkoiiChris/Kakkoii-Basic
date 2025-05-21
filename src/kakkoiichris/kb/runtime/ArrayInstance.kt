@@ -1,7 +1,7 @@
 package kakkoiichris.kb.runtime
 
 @Suppress("JavaDefaultMethodsNotOverriddenByDelegation")
-class ArrayInstance(val type: DataType, private val elements: MutableList<KBValue<*>>) : MutableList<KBValue<*>> by elements {
+class ArrayInstance(val type: DataType, private val elements: MutableList<KBV>) : MutableList<KBV> by elements {
     fun asBooleanArray() =
         map { it as Boolean }.toBooleanArray()
 
@@ -57,28 +57,28 @@ class ArrayInstance(val type: DataType, private val elements: MutableList<KBValu
 }
 
 fun BooleanArray.toArrayInstance() =
-    ArrayInstance(DataType.Primitive.BOOL, this.toList().toMutableList())
+    ArrayInstance(DataType.Primitive.BOOL, this.map(::KBBool).toMutableList())
 
 fun ByteArray.toArrayInstance() =
-    ArrayInstance(DataType.Primitive.BYTE, this.toList().toMutableList())
+    ArrayInstance(DataType.Primitive.BYTE, this.map(::KBByte).toMutableList())
 
 fun ShortArray.toArrayInstance() =
-    ArrayInstance(DataType.Primitive.SHORT, this.toList().toMutableList())
+    ArrayInstance(DataType.Primitive.SHORT, this.map(::KBShort).toMutableList())
 
 fun IntArray.toArrayInstance() =
-    ArrayInstance(DataType.Primitive.INT, this.toList().toMutableList())
+    ArrayInstance(DataType.Primitive.INT, this.map(::KBInt).toMutableList())
 
 fun LongArray.toArrayInstance() =
-    ArrayInstance(DataType.Primitive.LONG, this.toList().toMutableList())
+    ArrayInstance(DataType.Primitive.LONG, this.map(::KBLong).toMutableList())
 
 fun FloatArray.toArrayInstance() =
-    ArrayInstance(DataType.Primitive.FLOAT, this.toList().toMutableList())
+    ArrayInstance(DataType.Primitive.FLOAT, this.map(::KBFloat).toMutableList())
 
 fun DoubleArray.toArrayInstance() =
-    ArrayInstance(DataType.Primitive.DOUBLE, this.toList().toMutableList())
+    ArrayInstance(DataType.Primitive.DOUBLE, this.map(::KBDouble).toMutableList())
 
 fun CharArray.toArrayInstance() =
-    ArrayInstance(DataType.Primitive.CHAR, this.toList().toMutableList())
+    ArrayInstance(DataType.Primitive.CHAR, this.map(::KBChar).toMutableList())
 
 fun Array<String>.toArrayInstance() =
-    ArrayInstance(DataType.Primitive.STRING, this.toList().toMutableList())
+    ArrayInstance(DataType.Primitive.STRING, this.map(::KBString).toMutableList())
