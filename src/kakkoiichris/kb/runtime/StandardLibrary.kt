@@ -13,217 +13,221 @@ import kotlin.system.exitProcess
 
 class StandardLibrary {
     private val builtins = mutableMapOf<String, Builtin>()
-    
+
     private lateinit var window: Window
-    
+
     init {
         addGeneral()
-        
+
         addChar()
-        
+
         addString()
-        
+
         addMath()
-        
+
         addGraphics()
     }
-    
+
     private fun addGeneral() {
         add("print", NONE, ANY.vararg) { script, args ->
             val (subArgs) = args
-            
-            subArgs as ArrayInstance
-            
-            for (arg in subArgs) {
+
+            subArgs as KBArray
+
+            for (arg in subArgs.value) {
                 print(script.getString(arg))
             }
+
+            KBNone
         }
-        
+
         add("input", STRING, ANY.vararg) { script, args ->
             val (subArgs) = args
-            
-            subArgs as ArrayInstance
-            
-            for (arg in subArgs) {
+
+            subArgs as KBArray
+
+            for (arg in subArgs.value) {
                 print(script.getString(arg))
             }
-            
-            readln()
+
+            KBString(readln())
         }
-        
+
         add("read", STRING, STRING) { _, args ->
             val (path) = args
-            
-            path as String
-            
-            Files.readString(Paths.get(path))
+
+            path as KBString
+
+            KBString(Files.readString(Paths.get(path.value)))
         }
-        
+
         add("write", NONE, STRING, ANY) { _, args ->
             val (path, data) = args
-            
-            path as String
-            
-            Files.writeString(Paths.get(path), data.toString())
-            
-            Unit
+
+            path as KBString
+
+            Files.writeString(Paths.get(path.value), data.value.toString())
+
+            KBNone
         }
-        
+
         add("concat", STRING, ANY.vararg) { script, args ->
             val (subArgs) = args
-            
-            subArgs as ArrayInstance
-            
-            buildString {
-                for (arg in subArgs) {
+
+            subArgs as KBArray
+
+            KBString(buildString {
+                for (arg in subArgs.value) {
                     append(script.getString(arg))
                 }
-            }
+            })
         }
-        
+
         add("sleep", NONE, LONG) { _, args ->
             val (milliseconds) = args
-            
-            milliseconds as Long
-            
-            Thread.sleep(milliseconds)
+
+            milliseconds as KBLong
+
+            Thread.sleep(milliseconds.value)
+
+            KBNone
         }
-        
-        add("milliseconds", LONG) { _, _ -> System.currentTimeMillis() }
-        
-        add("nanoseconds", LONG) { _, _ -> System.nanoTime() }
-        
+
+        add("milliseconds", LONG) { _, _ -> KBLong(System.currentTimeMillis()) }
+
+        add("nanoseconds", LONG) { _, _ -> KBLong(System.nanoTime()) }
+
         add("typeof", STRING, ANY) { script, args ->
             val (x) = args
-            
-            DataType.infer(script, x).toString()
+
+            KBString(DataType.infer(script, x).toString())
         }
-        
+
         add("invoke", ANY, STRING, ANY.vararg) { script, args ->
             val (name, arguments) = args
-            
-            name as String
-            arguments as ArrayInstance
-            
-            script.invoke(name, *arguments.toTypedArray()) ?: KBError.noSub(name)
+
+            name as KBString
+            arguments as KBArray
+
+            script.invoke(name.value, *arguments.value.toTypedArray())?.result ?: KBError.noSub(name.value)
         }
-        
+
         add("exit", NONE, INT) { _, args ->
             val (code) = args
-            
-            code as Int
-            
-            exitProcess(code)
+
+            code as KBInt
+
+            exitProcess(code.value)
         }
     }
-    
+
     private fun addChar() {
         add("isAlpha", BOOL, CHAR) { _, args ->
             val (c) = args
-            
-            c as Char
-            
-            c.isLetter()
+
+            c as KBChar
+
+            KBBool(c.value.isLetter())
         }
-        
+
         add("isAlnum", BOOL, CHAR) { _, args ->
             val (c) = args
-            
-            c as Char
-            
-            c.isLetterOrDigit()
+
+            c as KBChar
+
+            KBBool(c.value.isLetterOrDigit())
         }
-        
+
         add("isDigit", BOOL, CHAR) { _, args ->
             val (c) = args
-            
-            c as Char
-            
-            c.isDigit()
+
+            c as KBChar
+
+            KBBool(c.value.isDigit())
         }
-        
+
         add("isSpace", BOOL, CHAR) { _, args ->
             val (c) = args
-            
-            c as Char
-            
-            c.isWhitespace()
+
+            c as KBChar
+
+            KBBool(c.value.isWhitespace())
         }
-        
+
         add("isVowel", BOOL, CHAR) { _, args ->
             val (c) = args
-            
-            c as Char
-            
-            c in "AEIOUaeiou"
+
+            c as KBChar
+
+            KBBool(c.value in "AEIOUaeiou")
         }
-        
+
         add("isLower", BOOL, CHAR) { _, args ->
             val (c) = args
-            
-            c as Char
-            
-            c.isLowerCase()
+
+            c as KBChar
+
+            KBBool(c.value.isLowerCase())
         }
-        
+
         add("isUpper", BOOL, CHAR) { _, args ->
             val (c) = args
-            
-            c as Char
-            
-            c.isUpperCase()
+
+            c as KBChar
+
+            KBBool(c.value.isUpperCase())
         }
-        
+
         add("toLower", CHAR, CHAR) { _, args ->
             val (c) = args
-            
-            c as Char
-            
-            c.lowercase()
+
+            c as KBChar
+
+            KBChar(c.value.lowercase().first())
         }
-        
+
         add("toUpper", CHAR, CHAR) { _, args ->
             val (c) = args
-            
-            c as Char
-            
-            c.uppercase()
+
+            c as KBChar
+
+            KBChar(c.value.uppercase().first())
         }
     }
-    
+
     private fun addString() {
         add("isBlank", BOOL, STRING) { _, args ->
             val (s) = args
-            
-            s as String
-            
-            s.isBlank()
+
+            s as KBString
+
+            KBBool(s.value.isBlank())
         }
-        
+
         add("isEmpty", BOOL, STRING) { _, args ->
             val (s) = args
-            
-            s as String
-            
-            s.isBlank()
+
+            s as KBString
+
+            KBBool(s.value.isBlank())
         }
-        
+
         add("toLower", STRING, STRING) { _, args ->
             val (s) = args
-            
-            s as String
-            
-            s.lowercase()
+
+            s as KBString
+
+            KBString(s.value.lowercase())
         }
-        
+
         add("toUpper", STRING, STRING) { _, args ->
             val (s) = args
-            
-            s as String
-            
-            s.uppercase()
+
+            s as KBString
+
+            KBString(s.value.uppercase())
         }
-        
+
         add(
             "startsWith",
             BOOL,
@@ -232,14 +236,14 @@ class StandardLibrary {
             BOOL
         ) { _, args ->
             val (s, prefix, ignoreCase) = args
-            
-            s as String
-            prefix as String
-            ignoreCase as Boolean
-            
-            s.startsWith(prefix, ignoreCase)
+
+            s as KBString
+            prefix as KBString
+            ignoreCase as KBBool
+
+            KBBool(s.value.startsWith(prefix.value, ignoreCase.value))
         }
-        
+
         add(
             "endsWith",
             BOOL,
@@ -248,38 +252,38 @@ class StandardLibrary {
             BOOL
         ) { _, args ->
             val (s, suffix, ignoreCase) = args
-            
-            s as String
-            suffix as String
-            ignoreCase as Boolean
-            
-            s.endsWith(suffix, ignoreCase)
+
+            s as KBString
+            suffix as KBString
+            ignoreCase as KBBool
+
+            KBBool(s.value.endsWith(suffix.value, ignoreCase.value))
         }
-        
+
         add("trim", STRING, STRING) { _, args ->
             val (s) = args
-            
-            s as String
-            
-            s.trim()
+
+            s as KBString
+
+            KBString(s.value.trim())
         }
-        
+
         add("trimStart", STRING, STRING) { _, args ->
             val (s) = args
-            
-            s as String
-            
-            s.trimStart()
+
+            s as KBString
+
+            KBString(s.value.trimStart())
         }
-        
+
         add("trimEnd", STRING, STRING) { _, args ->
             val (s) = args
-            
-            s as String
-            
-            s.trimEnd()
+
+            s as KBString
+
+            KBString(s.value.trimEnd())
         }
-        
+
         add(
             "substring",
             STRING,
@@ -288,65 +292,65 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (s, startIndex, endIndex) = args
-            
-            s as String
-            startIndex as Int
-            endIndex as Int
-            
-            s.substring(startIndex, endIndex)
+
+            s as KBString
+            startIndex as KBInt
+            endIndex as KBInt
+
+            KBString(s.value.substring(startIndex.value, endIndex.value))
         }
-        
+
         add(
             "split",
             STRING.array,
             STRING,
             STRING
         ) { _, args ->
-            
+
             val (s, regex) = args
-            
-            s as String
-            regex as String
-            
-            s.split(regex.toRegex()).toTypedArray().toArrayInstance()
+
+            s as KBString
+            regex as KBString
+
+            KBArray(s.value.split(regex.value.toRegex()).toTypedArray().toArrayInstance())
         }
-        
+
         add("indexOf", INT, STRING, CHAR) { _, args ->
             val (s, c) = args
-            
-            s as String
-            c as Char
-            
-            s.indexOf(c)
+
+            s as KBString
+            c as KBChar
+
+            KBInt(s.value.indexOf(c.value))
         }
-        
+
         add("indexOf", INT, STRING, STRING) { _, args ->
             val (s, sequence) = args
-            
-            s as String
-            sequence as String
-            
-            s.indexOf(sequence)
+
+            s as KBString
+            sequence as KBString
+
+            KBInt(s.value.indexOf(sequence.value))
         }
-        
+
         add("lastIndexOf", INT, STRING, CHAR) { _, args ->
             val (s, c) = args
-            
-            s as String
-            c as Char
-            
-            s.lastIndexOf(c)
+
+            s as KBString
+            c as KBChar
+
+            KBInt(s.value.lastIndexOf(c.value))
         }
-        
+
         add("lastIndexOf", INT, STRING, STRING) { _, args ->
             val (s, sequence) = args
-            
-            s as String
-            sequence as String
-            
-            s.lastIndexOf(sequence)
+
+            s as KBString
+            sequence as KBString
+
+            KBInt(s.value.lastIndexOf(sequence.value))
         }
-        
+
         add(
             "padStart",
             STRING,
@@ -355,14 +359,14 @@ class StandardLibrary {
             CHAR
         ) { _, args ->
             val (s, length, c) = args
-            
-            s as String
-            length as Int
-            c as Char
-            
-            s.padStart(length, c)
+
+            s as KBString
+            length as KBInt
+            c as KBChar
+
+            KBString(s.value.padStart(length.value, c.value))
         }
-        
+
         add(
             "padEnd",
             STRING,
@@ -371,14 +375,14 @@ class StandardLibrary {
             CHAR
         ) { _, args ->
             val (s, length, c) = args
-            
-            s as String
-            length as Int
-            c as Char
-            
-            s.padEnd(length, c)
+
+            s as KBString
+            length as KBInt
+            c as KBChar
+
+            KBString(s.value.padEnd(length.value, c.value))
         }
-        
+
         add(
             "replace",
             STRING,
@@ -387,14 +391,14 @@ class StandardLibrary {
             CHAR
         ) { _, args ->
             val (s, old, new) = args
-            
-            s as String
-            old as Char
-            new as Char
-            
-            s.replace(old, new)
+
+            s as KBString
+            old as KBChar
+            new as KBChar
+
+            KBString(s.value.replace(old.value, new.value))
         }
-        
+
         add(
             "replace",
             STRING,
@@ -403,743 +407,743 @@ class StandardLibrary {
             STRING
         ) { _, args ->
             val (s, old, new) = args
-            
-            s as String
-            old as String
-            new as String
-            
-            s.replace(old, new)
+
+            s as KBString
+            old as KBString
+            new as KBString
+
+            KBString(s.value.replace(old.value, new.value))
         }
     }
-    
+
     private fun addMath() {
         add("abs", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            abs(n)
+
+            n as KBDouble
+
+            KBDouble(abs(n.value))
         }
-        
+
         add("abs", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            abs(n)
+
+            n as KBFloat
+
+            KBFloat(abs(n.value))
         }
-        
+
         add("abs", INT, INT) { _, args ->
             val (n) = args
-            
-            n as Int
-            
-            abs(n)
+
+            n as KBInt
+
+            KBInt(abs(n.value))
         }
-        
+
         add("abs", LONG, LONG) { _, args ->
             val (n) = args
-            
-            n as Long
-            
-            abs(n)
+
+            n as KBLong
+
+            KBLong(abs(n.value))
         }
-        
+
         add("acos", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            acos(n)
+
+            n as KBDouble
+
+            KBDouble(acos(n.value))
         }
-        
+
         add("acos", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            acos(n)
+
+            n as KBFloat
+
+            KBFloat(acos(n.value))
         }
-        
+
         add("acosh", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            acosh(n)
+
+            n as KBDouble
+
+            KBDouble(acosh(n.value))
         }
-        
+
         add("acosh", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            acosh(n)
+
+            n as KBFloat
+
+            KBFloat(acosh(n.value))
         }
-        
+
         add("asin", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            asin(n)
+
+            n as KBDouble
+
+            KBDouble(asin(n.value))
         }
-        
+
         add("asin", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            asin(n)
+
+            n as KBFloat
+
+            KBFloat(asin(n.value))
         }
-        
+
         add("asinh", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            asinh(n)
+
+            n as KBDouble
+
+            KBDouble(asinh(n.value))
         }
-        
+
         add("asinh", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            asinh(n)
+
+            n as KBFloat
+
+            KBFloat(asinh(n.value))
         }
-        
+
         add("atan", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            atan(n)
+
+            n as KBDouble
+
+            KBDouble(atan(n.value))
         }
-        
+
         add("atan", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            atan(n)
+
+            n as KBFloat
+
+            KBFloat(atan(n.value))
         }
-        
+
         add(
             "atan2",
             DOUBLE, DOUBLE, DOUBLE
         ) { _, args ->
             val (y, x) = args
-            
-            y as Double
-            x as Double
-            
-            atan2(y, x)
+
+            y as KBDouble
+            x as KBDouble
+
+            KBDouble(atan2(y.value, x.value))
         }
-        
+
         add("atan2", FLOAT, FLOAT, FLOAT) { _, args ->
             val (y, x) = args
-            
-            y as Float
-            x as Float
-            
-            atan2(y, x)
+
+            y as KBFloat
+            x as KBFloat
+
+            KBFloat(atan2(y.value, x.value))
         }
-        
+
         add("atanh", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            atanh(n)
+
+            n as KBDouble
+
+            KBDouble(atanh(n.value))
         }
-        
+
         add("atanh", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            atanh(n)
+
+            n as KBFloat
+
+            KBFloat(atanh(n.value))
         }
-        
+
         add("ceil", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            ceil(n)
+
+            n as KBDouble
+
+            KBDouble(ceil(n.value))
         }
-        
+
         add("ceil", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            ceil(n)
+
+            n as KBFloat
+
+            KBFloat(ceil(n.value))
         }
-        
+
         add("cos", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            cos(n)
+
+            n as KBDouble
+
+            KBDouble(cos(n.value))
         }
-        
+
         add("cos", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            cos(n)
+
+            n as KBFloat
+
+            KBFloat(cos(n.value))
         }
-        
+
         add("cosh", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            cosh(n)
+
+            n as KBDouble
+
+            KBDouble(cosh(n.value))
         }
-        
+
         add("cosh", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            cosh(n)
+
+            n as KBFloat
+
+            KBFloat(cosh(n.value))
         }
-        
+
         add("exp", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            exp(n)
+
+            n as KBDouble
+
+            KBDouble(exp(n.value))
         }
-        
+
         add("exp", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            exp(n)
+
+            n as KBFloat
+
+            KBFloat(exp(n.value))
         }
-        
+
         add("expm1", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            expm1(n)
+
+            n as KBDouble
+
+            KBDouble(expm1(n.value))
         }
-        
+
         add("expm1", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            expm1(n)
+
+            n as KBFloat
+
+            KBFloat(expm1(n.value))
         }
-        
+
         add("floor", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            floor(n)
+
+            n as KBDouble
+
+            KBDouble(floor(n.value))
         }
-        
+
         add("floor", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            floor(n)
+
+            n as KBFloat
+
+            KBFloat(floor(n.value))
         }
-        
+
         add(
             "hypot",
             DOUBLE, DOUBLE, DOUBLE
         ) { _, args ->
             val (x, y) = args
-            
-            x as Double
-            y as Double
-            
-            hypot(x, y)
+
+            x as KBDouble
+            y as KBDouble
+
+            KBDouble(hypot(x.value, y.value))
         }
-        
+
         add("hypot", FLOAT, FLOAT, FLOAT) { _, args ->
             val (x, y) = args
-            
-            x as Float
-            y as Float
-            
-            hypot(x, y)
+
+            x as KBFloat
+            y as KBFloat
+
+            KBFloat(hypot(x.value, y.value))
         }
-        
+
         add("IEEErem", DOUBLE, DOUBLE, DOUBLE) { _, args ->
             val (n, divisor) = args
-            
-            n as Double
-            divisor as Double
-            
-            n.IEEErem(divisor)
+
+            n as KBDouble
+            divisor as KBDouble
+
+            KBDouble(n.value.IEEErem(divisor.value))
         }
-        
+
         add("IEEErem", FLOAT, FLOAT, FLOAT) { _, args ->
             val (n, divisor) = args
-            
-            n as Float
-            divisor as Float
-            
-            n.IEEErem(divisor)
+
+            n as KBFloat
+            divisor as KBFloat
+
+            KBFloat(n.value.IEEErem(divisor.value))
         }
-        
+
         add("ln", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            ln(n)
+
+            n as KBDouble
+
+            KBDouble(ln(n.value))
         }
-        
+
         add("ln", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            ln(n)
+
+            n as KBFloat
+
+            KBFloat(ln(n.value))
         }
-        
+
         add("ln1p", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            ln1p(n)
+
+            n as KBDouble
+
+            KBDouble(ln1p(n.value))
         }
-        
+
         add("ln1p", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            ln1p(n)
+
+            n as KBFloat
+
+            KBFloat(ln1p(n.value))
         }
-        
+
         add(
             "log",
             DOUBLE, DOUBLE, DOUBLE
         ) { _, args ->
             val (n, base) = args
-            
-            n as Double
-            base as Double
-            
-            log(n, base)
+
+            n as KBDouble
+            base as KBDouble
+
+            KBDouble(log(n.value, base.value))
         }
-        
+
         add("log", FLOAT, FLOAT, FLOAT) { _, args ->
             val (n, base) = args
-            
-            n as Float
-            base as Float
-            
-            log(n, base)
+
+            n as KBFloat
+            base as KBFloat
+
+            KBFloat(log(n.value, base.value))
         }
-        
+
         add("log10", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            log10(n)
+
+            n as KBDouble
+
+            KBDouble(log10(n.value))
         }
-        
+
         add("log10", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            log10(n)
+
+            n as KBFloat
+
+            KBFloat(log10(n.value))
         }
-        
+
         add("log2", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            log2(n)
+
+            n as KBDouble
+
+            KBDouble(log2(n.value))
         }
-        
+
         add("log2", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            log2(n)
+
+            n as KBFloat
+
+            KBFloat(log2(n.value))
         }
-        
+
         add("max", DOUBLE, DOUBLE, DOUBLE) { _, args ->
             val (a, b) = args
-            
-            a as Double
-            b as Double
-            
-            max(a, b)
+
+            a as KBDouble
+            b as KBDouble
+
+            KBDouble(max(a.value, b.value))
         }
-        
+
         add("max", FLOAT, FLOAT, FLOAT) { _, args ->
             val (a, b) = args
-            
-            a as Float
-            b as Float
-            
-            max(a, b)
+
+            a as KBFloat
+            b as KBFloat
+
+            KBFloat(max(a.value, b.value))
         }
-        
+
         add("max", INT, INT, INT) { _, args ->
             val (a, b) = args
-            
-            a as Int
-            b as Int
-            
-            max(a, b)
+
+            a as KBInt
+            b as KBInt
+
+            KBInt(max(a.value, b.value))
         }
-        
+
         add("max", LONG, LONG, LONG) { _, args ->
             val (a, b) = args
-            
-            a as Long
-            b as Long
-            
-            max(a, b)
+
+            a as KBLong
+            b as KBLong
+
+            KBLong(max(a.value, b.value))
         }
-        
+
         add("min", DOUBLE, DOUBLE, DOUBLE) { _, args ->
             val (a, b) = args
-            
-            a as Double
-            b as Double
-            
-            min(a, b)
+
+            a as KBDouble
+            b as KBDouble
+
+            KBDouble(min(a.value, b.value))
         }
-        
+
         add("min", FLOAT, FLOAT, FLOAT) { _, args ->
             val (a, b) = args
-            
-            a as Float
-            b as Float
-            
-            min(a, b)
+
+            a as KBFloat
+            b as KBFloat
+
+            KBFloat(min(a.value, b.value))
         }
-        
+
         add("min", INT, INT, INT) { _, args ->
             val (a, b) = args
-            
-            a as Int
-            b as Int
-            
-            min(a, b)
+
+            a as KBInt
+            b as KBInt
+
+            KBInt(min(a.value, b.value))
         }
-        
+
         add("min", LONG, LONG, LONG) { _, args ->
             val (a, b) = args
-            
-            a as Long
-            b as Long
-            
-            min(a, b)
+
+            a as KBLong
+            b as KBLong
+
+            KBLong(min(a.value, b.value))
         }
-        
+
         add("nextdown", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            n.nextDown()
+
+            n as KBDouble
+
+            KBDouble(n.value.nextDown())
         }
-        
+
         add("nextdown", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            n.nextDown()
+
+            n as KBFloat
+
+            KBFloat(n.value.nextDown())
         }
-        
+
         add(
             "nexttowards",
             DOUBLE, DOUBLE, DOUBLE
         ) { _, args ->
             val (a, b) = args
-            
-            a as Double
-            b as Double
-            
-            a.nextTowards(b)
+
+            a as KBDouble
+            b as KBDouble
+
+            KBDouble(a.value.nextTowards(b.value))
         }
-        
+
         add(
             "nexttowards",
             FLOAT, FLOAT, FLOAT
         ) { _, args ->
             val (a, b) = args
-            
-            a as Float
-            b as Float
-            
-            a.nextTowards(b)
+
+            a as KBFloat
+            b as KBFloat
+
+            KBFloat(a.value.nextTowards(b.value))
         }
-        
+
         add("nextup", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            n.nextUp()
+
+            n as KBDouble
+
+            KBDouble(n.value.nextUp())
         }
-        
+
         add("nextup", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            n.nextUp()
+
+            n as KBFloat
+
+            KBFloat(n.value.nextUp())
         }
-        
+
         add("pow", DOUBLE, DOUBLE, DOUBLE) { _, args ->
             val (b, e) = args
-            
-            b as Double
-            e as Double
-            
-            b.pow(e)
+
+            b as KBDouble
+            e as KBDouble
+
+            KBDouble(b.value.pow(e.value))
         }
-        
+
         add("pow", FLOAT, FLOAT, FLOAT) { _, args ->
             val (b, e) = args
-            
-            b as Float
-            e as Float
-            
-            b.pow(e)
+
+            b as KBFloat
+            e as KBFloat
+
+            KBFloat(b.value.pow(e.value))
         }
-        
+
         add("pow", DOUBLE, DOUBLE, INT) { _, args ->
             val (b, e) = args
-            
-            b as Double
-            e as Int
-            
-            b.pow(e)
+
+            b as KBDouble
+            e as KBInt
+
+            KBDouble(b.value.pow(e.value))
         }
-        
+
         add("pow", FLOAT, FLOAT, INT) { _, args ->
             val (b, e) = args
-            
-            b as Float
-            e as Int
-            
-            b.pow(e)
+
+            b as KBFloat
+            e as KBInt
+
+            KBFloat(b.value.pow(e.value))
         }
-        
-        add("random", DOUBLE) { _, _ -> Math.random() }
-        
+
+        add("random", DOUBLE) { _, _ -> KBDouble(Math.random()) }
+
         add("round", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            round(n)
+
+            n as KBDouble
+
+            KBDouble(round(n.value))
         }
-        
+
         add("round", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            round(n)
+
+            n as KBFloat
+
+            KBFloat(round(n.value))
         }
-        
+
         add("roundToInt", INT, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            n.roundToInt()
+
+            n as KBDouble
+
+            KBInt(n.value.roundToInt())
         }
-        
+
         add("roundToInt", INT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            n.roundToInt()
+
+            n as KBFloat
+
+            KBInt(n.value.roundToInt())
         }
-        
+
         add("roundToLong", LONG, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            n.roundToLong()
+
+            n as KBDouble
+
+            KBLong(n.value.roundToLong())
         }
-        
+
         add("roundToLong", LONG, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            n.roundToLong()
+
+            n as KBFloat
+
+            KBLong(n.value.roundToLong())
         }
-        
+
         add("sign", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            n.sign
+
+            n as KBDouble
+
+            KBDouble(n.value.sign)
         }
-        
+
         add("sign", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            n.sign
+
+            n as KBFloat
+
+            KBFloat(n.value.sign)
         }
-        
+
         add("sign", INT, INT) { _, args ->
             val (n) = args
-            
-            n as Int
-            
-            n.sign
+
+            n as KBInt
+
+            KBInt(n.value.sign)
         }
-        
+
         add("sign", INT, LONG) { _, args ->
             val (n) = args
-            
-            n as Long
-            
-            n.sign
+
+            n as KBLong
+
+            KBInt(n.value.sign)
         }
-        
+
         add("sin", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            sin(n)
+
+            n as KBDouble
+
+            KBDouble(sin(n.value))
         }
-        
+
         add("sin", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            sin(n)
+
+            n as KBFloat
+
+            KBFloat(sin(n.value))
         }
-        
+
         add("sinh", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            sinh(n)
+
+            n as KBDouble
+
+            KBDouble(sinh(n.value))
         }
-        
+
         add("sinh", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            sinh(n)
+
+            n as KBFloat
+
+            KBFloat(sinh(n.value))
         }
-        
+
         add("sqrt", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            sqrt(n)
+
+            n as KBDouble
+
+            KBDouble(sqrt(n.value))
         }
-        
+
         add("sqrt", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            sqrt(n)
+
+            n as KBFloat
+
+            KBFloat(sqrt(n.value))
         }
-        
+
         add("tan", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            tan(n)
+
+            n as KBDouble
+
+            KBDouble(tan(n.value))
         }
-        
+
         add("tan", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            tan(n)
+
+            n as KBFloat
+
+            KBFloat(tan(n.value))
         }
-        
+
         add("tanh", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            tanh(n)
+
+            n as KBDouble
+
+            KBDouble(tanh(n.value))
         }
-        
+
         add("tanh", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            tanh(n)
+
+            n as KBFloat
+
+            KBFloat(tanh(n.value))
         }
-        
+
         add("truncate", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            truncate(n)
+
+            n as KBDouble
+
+            KBDouble(truncate(n.value))
         }
-        
+
         add("truncate", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            truncate(n)
+
+            n as KBFloat
+
+            KBFloat(truncate(n.value))
         }
-        
+
         add("ulp", DOUBLE, DOUBLE) { _, args ->
             val (n) = args
-            
-            n as Double
-            
-            n.ulp
+
+            n as KBDouble
+
+            KBDouble(n.value.ulp)
         }
-        
+
         add("ulp", FLOAT, FLOAT) { _, args ->
             val (n) = args
-            
-            n as Float
-            
-            n.ulp
+
+            n as KBFloat
+
+            KBFloat(n.value.ulp)
         }
-        
+
         add(
             "map",
             DOUBLE,
@@ -1150,16 +1154,16 @@ class StandardLibrary {
             DOUBLE
         ) { _, args ->
             val (n, fromMin, fromMax, toMin, toMax) = args
-            
-            n as Double
-            fromMin as Double
-            fromMax as Double
-            toMin as Double
-            toMax as Double
-            
-            (n - fromMin) * (toMax - toMin) / (fromMax - fromMin) + toMin
+
+            n as KBDouble
+            fromMin as KBDouble
+            fromMax as KBDouble
+            toMin as KBDouble
+            toMax as KBDouble
+
+            KBDouble((n.value - fromMin.value) * (toMax.value - toMin.value) / (fromMax.value - fromMin.value) + toMin.value)
         }
-        
+
         add(
             "map",
             FLOAT,
@@ -1170,16 +1174,16 @@ class StandardLibrary {
             FLOAT
         ) { _, args ->
             val (n, fromMin, fromMax, toMin, toMax) = args
-            
-            n as Float
-            fromMin as Float
-            fromMax as Float
-            toMin as Float
-            toMax as Float
-            
-            (n - fromMin) * (toMax - toMin) / (fromMax - fromMin) + toMin
+
+            n as KBFloat
+            fromMin as KBFloat
+            fromMax as KBFloat
+            toMin as KBFloat
+            toMax as KBFloat
+
+            KBFloat((n.value - fromMin.value) * (toMax.value - toMin.value) / (fromMax.value - fromMin.value) + toMin.value)
         }
-        
+
         add(
             "map",
             INT,
@@ -1190,16 +1194,16 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (n, fromMin, fromMax, toMin, toMax) = args
-            
-            n as Int
-            fromMin as Int
-            fromMax as Int
-            toMin as Int
-            toMax as Int
-            
-            ((n - fromMin) * (toMax - toMin) / (fromMax - fromMin).toDouble() + toMin).toInt()
+
+            n as KBInt
+            fromMin as KBInt
+            fromMax as KBInt
+            toMin as KBInt
+            toMax as KBInt
+
+            KBInt(((n.value - fromMin.value) * (toMax.value - toMin.value) / (fromMax.value - fromMin.value).toDouble() + toMin.value).toInt())
         }
-        
+
         add(
             "map",
             LONG,
@@ -1210,17 +1214,17 @@ class StandardLibrary {
             LONG
         ) { _, args ->
             val (n, fromMin, fromMax, toMin, toMax) = args
-            
-            n as Long
-            fromMin as Long
-            fromMax as Long
-            toMin as Long
-            toMax as Long
-            
-            ((n - fromMin) * (toMax - toMin) / (fromMax - fromMin).toDouble() + toMin).toLong()
+
+            n as KBLong
+            fromMin as KBLong
+            fromMax as KBLong
+            toMin as KBLong
+            toMax as KBLong
+
+            KBLong(((n.value - fromMin.value) * (toMax.value - toMin.value) / (fromMax.value - fromMin.value).toDouble() + toMin.value).toLong())
         }
     }
-    
+
     private fun addGraphics() {
         add(
             "createWindow",
@@ -1230,28 +1234,34 @@ class StandardLibrary {
             STRING
         ) { _, args ->
             val (width, height, title) = args
-            
-            width as Int
-            height as Int
-            title as String
-            
-            window = Window(width, height, title)
-            
-            Unit
+
+            width as KBInt
+            height as KBInt
+            title as KBString
+
+            window = Window(width.value, height.value, title.value)
+
+            KBNone
         }
-        
-        add("openWindow", NONE) { _, _ -> window.open() }
-        
-        add("closeWindow", NONE) { _, _ -> window.close() }
-        
-        add("windowIsOpen", BOOL) { _, _ -> window.isOpen }
-        
+
+        add("openWindow", NONE) { _, _ ->
+            window.open()
+            KBNone
+        }
+
+        add("closeWindow", NONE) { _, _ ->
+            window.close()
+            KBNone
+        }
+
+        add("windowIsOpen", BOOL) { _, _ -> KBBool(window.isOpen) }
+
         add("getColor", "Color".data) { script, _ ->
             val color = window.getColor()
-            
+
             script.instantiate("Color", color.red, color.green, color.blue, color.alpha)
         }
-        
+
         add(
             "setColor",
             NONE,
@@ -1261,15 +1271,17 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (red, green, blue, alpha) = args
-            
-            red as Int
-            green as Int
-            blue as Int
-            alpha as Int
-            
-            window.setColor(red, green, blue, alpha)
+
+            red as KBInt
+            green as KBInt
+            blue as KBInt
+            alpha as KBInt
+
+            window.setColor(red.value, green.value, blue.value, alpha.value)
+
+            KBNone
         }
-        
+
         add(
             "hsbToColor",
             "Color".data,
@@ -1278,22 +1290,22 @@ class StandardLibrary {
             DOUBLE
         ) { script, args ->
             val (h, s, b) = args
-            
-            h as Double
-            s as Double
-            b as Double
-            
-            val color = Color(Color.HSBtoRGB(h.toFloat(), s.toFloat(), b.toFloat()))
-            
+
+            h as KBDouble
+            s as KBDouble
+            b as KBDouble
+
+            val color = Color(Color.HSBtoRGB(h.value.toFloat(), s.value.toFloat(), b.value.toFloat()))
+
             script.instantiate("Color", color.red, color.green, color.blue, color.alpha)
         }
-        
+
         add("getFont", "Font".data) { script, _ ->
             val font = window.getFont()
-            
+
             script.instantiate("Font", font.name, font.style, font.size)
         }
-        
+
         add(
             "setFont",
             NONE,
@@ -1302,17 +1314,19 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (name, style, size) = args
-            
-            name as String
-            style as Int
-            size as Int
-            
-            window.setFont(name, style, size)
+
+            name as KBString
+            style as KBInt
+            size as KBInt
+
+            window.setFont(name.value, style.value, size.value)
+
+            KBNone
         }
-        
+
         add("getStroke", "Font".data) { script, _ ->
             val stroke = window.getStroke()
-            
+
             script.instantiate(
                 "Stroke",
                 stroke.lineWidth,
@@ -1323,7 +1337,7 @@ class StandardLibrary {
                 stroke.dashPhase
             )
         }
-        
+
         add(
             "setStroke",
             NONE,
@@ -1335,45 +1349,53 @@ class StandardLibrary {
             FLOAT
         ) { _, args ->
             val (width, cap, join, miterLimit, dash, dashPhase) = args
-            
-            width as Float
-            cap as Int
-            join as Int
-            miterLimit as Float
-            dash as ArrayInstance
-            dashPhase as Float
-            
-            val dashFA = dash.asFloatArray()
-            
-            window.setStroke(width, cap, join, miterLimit, dashFA, dashPhase)
+
+            width as KBFloat
+            cap as KBInt
+            join as KBInt
+            miterLimit as KBFloat
+            dash as KBArray
+            dashPhase as KBFloat
+
+            val dashFA = dash.value.asFloatArray()
+
+            window.setStroke(width.value, cap.value, join.value, miterLimit.value, dashFA, dashPhase.value)
+
+            KBNone
         }
-        
+
         add("translate", NONE, INT, INT) { _, args ->
             val (x, y) = args
-            
-            x as Int
-            y as Int
-            
-            window.translate(x, y)
+
+            x as KBInt
+            y as KBInt
+
+            window.translate(x.value, y.value)
+
+            KBNone
         }
-        
+
         add("translate", NONE, DOUBLE, DOUBLE) { _, args ->
             val (x, y) = args
-            
-            x as Double
-            y as Double
-            
-            window.translate(x, y)
+
+            x as KBDouble
+            y as KBDouble
+
+            window.translate(x.value, y.value)
+
+            KBNone
         }
-        
+
         add("rotate", NONE, DOUBLE) { _, args ->
             val (theta) = args
-            
-            theta as Double
-            
-            window.rotate(theta)
+
+            theta as KBDouble
+
+            window.rotate(theta.value)
+
+            KBNone
         }
-        
+
         add(
             "rotate",
             NONE,
@@ -1382,38 +1404,56 @@ class StandardLibrary {
             DOUBLE
         ) { _, args ->
             val (theta, x, y) = args
-            
-            theta as Double
-            x as Double
-            y as Double
-            
-            window.rotate(theta, x, y)
+
+            theta as KBDouble
+            x as KBDouble
+            y as KBDouble
+
+            window.rotate(theta.value, x.value, y.value)
+
+            KBNone
         }
-        
+
         add("scale", NONE, DOUBLE, DOUBLE) { _, args ->
             val (x, y) = args
-            
-            x as Double
-            y as Double
-            
-            window.scale(x, y)
+
+            x as KBDouble
+            y as KBDouble
+
+            window.scale(x.value, y.value)
+
+            KBNone
         }
-        
+
         add("shear", NONE, DOUBLE, DOUBLE) { _, args ->
             val (x, y) = args
-            
-            x as Double
-            y as Double
-            
-            window.shear(x, y)
+
+            x as KBDouble
+            y as KBDouble
+
+            window.shear(x.value, y.value)
+
+            KBNone
         }
-        
-        add("pushMatrix", NONE) { _, _ -> window.pushMatrix() }
-        
-        add("popMatrix", NONE) { _, _ -> window.popMatrix() }
-        
-        add("clear", NONE) { _, _ -> window.clear() }
-        
+
+        add("pushMatrix", NONE) { _, _ ->
+            window.pushMatrix()
+
+            KBNone
+        }
+
+        add("popMatrix", NONE) { _, _ ->
+            window.popMatrix()
+
+            KBNone
+        }
+
+        add("clear", NONE) { _, _ ->
+            window.clear()
+
+            KBNone
+        }
+
         add(
             "drawLine",
             NONE,
@@ -1423,15 +1463,17 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (xa, ya, xb, yb) = args
-            
-            xa as Int
-            ya as Int
-            xb as Int
-            yb as Int
-            
-            window.drawLine(xa, ya, xb, yb)
+
+            xa as KBInt
+            ya as KBInt
+            xb as KBInt
+            yb as KBInt
+
+            window.drawLine(xa.value, ya.value, xb.value, yb.value)
+
+            KBNone
         }
-        
+
         add(
             "drawRect",
             NONE,
@@ -1441,15 +1483,17 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (x, y, width, height) = args
-            
-            x as Int
-            y as Int
-            width as Int
-            height as Int
-            
-            window.drawRect(x, y, width, height)
+
+            x as KBInt
+            y as KBInt
+            width as KBInt
+            height as KBInt
+
+            window.drawRect(x.value, y.value, width.value, height.value)
+
+            KBNone
         }
-        
+
         add(
             "fillRect",
             NONE,
@@ -1459,15 +1503,17 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (x, y, width, height) = args
-            
-            x as Int
-            y as Int
-            width as Int
-            height as Int
-            
-            window.fillRect(x, y, width, height)
+
+            x as KBInt
+            y as KBInt
+            width as KBInt
+            height as KBInt
+
+            window.fillRect(x.value, y.value, width.value, height.value)
+
+            KBNone
         }
-        
+
         add(
             "drawOval",
             NONE,
@@ -1477,15 +1523,17 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (x, y, width, height) = args
-            
-            x as Int
-            y as Int
-            width as Int
-            height as Int
-            
-            window.drawOval(x, y, width, height)
+
+            x as KBInt
+            y as KBInt
+            width as KBInt
+            height as KBInt
+
+            window.drawOval(x.value, y.value, width.value, height.value)
+
+            KBNone
         }
-        
+
         add(
             "fillOval",
             NONE,
@@ -1495,15 +1543,17 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (x, y, width, height) = args
-            
-            x as Int
-            y as Int
-            width as Int
-            height as Int
-            
-            window.fillOval(x, y, width, height)
+
+            x as KBInt
+            y as KBInt
+            width as KBInt
+            height as KBInt
+
+            window.fillOval(x.value, y.value, width.value, height.value)
+
+            KBNone
         }
-        
+
         add(
             "drawRoundRect",
             NONE,
@@ -1515,17 +1565,19 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (x, y, width, height, arcWidth, arcHeight) = args
-            
-            x as Int
-            y as Int
-            width as Int
-            height as Int
-            arcWidth as Int
-            arcHeight as Int
-            
-            window.drawRoundRect(x, y, width, height, arcWidth, arcHeight)
+
+            x as KBInt
+            y as KBInt
+            width as KBInt
+            height as KBInt
+            arcWidth as KBInt
+            arcHeight as KBInt
+
+            window.drawRoundRect(x.value, y.value, width.value, height.value, arcWidth.value, arcHeight.value)
+
+            KBNone
         }
-        
+
         add(
             "fillRoundRect",
             NONE,
@@ -1537,17 +1589,19 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (x, y, width, height, arcWidth, arcHeight) = args
-            
-            x as Int
-            y as Int
-            width as Int
-            height as Int
-            arcWidth as Int
-            arcHeight as Int
-            
-            window.fillRoundRect(x, y, width, height, arcWidth, arcHeight)
+
+            x as KBInt
+            y as KBInt
+            width as KBInt
+            height as KBInt
+            arcWidth as KBInt
+            arcHeight as KBInt
+
+            window.fillRoundRect(x.value, y.value, width.value, height.value, arcWidth.value, arcHeight.value)
+
+            KBNone
         }
-        
+
         add(
             "draw3DRect",
             NONE,
@@ -1558,16 +1612,18 @@ class StandardLibrary {
             BOOL
         ) { _, args ->
             val (x, y, width, height, raised) = args
-            
-            x as Int
-            y as Int
-            width as Int
-            height as Int
-            raised as Boolean
-            
-            window.draw3DRect(x, y, width, height, raised)
+
+            x as KBInt
+            y as KBInt
+            width as KBInt
+            height as KBInt
+            raised as KBBool
+
+            window.draw3DRect(x.value, y.value, width.value, height.value, raised.value)
+
+            KBNone
         }
-        
+
         add(
             "fill3DRect",
             NONE,
@@ -1578,16 +1634,18 @@ class StandardLibrary {
             BOOL
         ) { _, args ->
             val (x, y, width, height, raised) = args
-            
-            x as Int
-            y as Int
-            width as Int
-            height as Int
-            raised as Boolean
-            
-            window.fill3DRect(x, y, width, height, raised)
+
+            x as KBInt
+            y as KBInt
+            width as KBInt
+            height as KBInt
+            raised as KBBool
+
+            window.fill3DRect(x.value, y.value, width.value, height.value, raised.value)
+
+            KBNone
         }
-        
+
         add(
             "drawArc",
             NONE,
@@ -1599,17 +1657,19 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (x, y, width, height, startAngle, arcAngle) = args
-            
-            x as Int
-            y as Int
-            width as Int
-            height as Int
-            startAngle as Int
-            arcAngle as Int
-            
-            window.drawArc(x, y, width, height, startAngle, arcAngle)
+
+            x as KBInt
+            y as KBInt
+            width as KBInt
+            height as KBInt
+            startAngle as KBInt
+            arcAngle as KBInt
+
+            window.drawArc(x.value, y.value, width.value, height.value, startAngle.value, arcAngle.value)
+
+            KBNone
         }
-        
+
         add(
             "fillArc",
             NONE,
@@ -1621,17 +1681,19 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (x, y, width, height, startAngle, arcAngle) = args
-            
-            x as Int
-            y as Int
-            width as Int
-            height as Int
-            startAngle as Int
-            arcAngle as Int
-            
-            window.fillArc(x, y, width, height, startAngle, arcAngle)
+
+            x as KBInt
+            y as KBInt
+            width as KBInt
+            height as KBInt
+            startAngle as KBInt
+            arcAngle as KBInt
+
+            window.fillArc(x.value, y.value, width.value, height.value, startAngle.value, arcAngle.value)
+
+            KBNone
         }
-        
+
         add(
             "drawPolyline",
             NONE,
@@ -1640,17 +1702,19 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (xPoints, yPoints, nPoints) = args
-            
-            xPoints as ArrayInstance
-            yPoints as ArrayInstance
-            nPoints as Int
-            
-            val xPointsIA = xPoints.asIntArray()
-            val yPointsIA = yPoints.asIntArray()
-            
-            window.drawPolyline(xPointsIA, yPointsIA, nPoints)
+
+            xPoints as KBArray
+            yPoints as KBArray
+            nPoints as KBInt
+
+            val xPointsIA = xPoints.value.asIntArray()
+            val yPointsIA = yPoints.value.asIntArray()
+
+            window.drawPolyline(xPointsIA, yPointsIA, nPoints.value)
+
+            KBNone
         }
-        
+
         add(
             "drawPolygon",
             NONE,
@@ -1659,17 +1723,19 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (xPoints, yPoints, nPoints) = args
-            
-            xPoints as ArrayInstance
-            yPoints as ArrayInstance
-            nPoints as Int
-            
-            val xPointsIA = xPoints.asIntArray()
-            val yPointsIA = yPoints.asIntArray()
-            
-            window.drawPolygon(xPointsIA, yPointsIA, nPoints)
+
+            xPoints as KBArray
+            yPoints as KBArray
+            nPoints as KBInt
+
+            val xPointsIA = xPoints.value.asIntArray()
+            val yPointsIA = yPoints.value.asIntArray()
+
+            window.drawPolygon(xPointsIA, yPointsIA, nPoints.value)
+
+            KBNone
         }
-        
+
         add(
             "fillPolygon",
             NONE,
@@ -1678,17 +1744,19 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (xPoints, yPoints, nPoints) = args
-            
-            xPoints as ArrayInstance
-            yPoints as ArrayInstance
-            nPoints as Int
-            
-            val xPointsIA = xPoints.asIntArray()
-            val yPointsIA = yPoints.asIntArray()
-            
-            window.fillPolygon(xPointsIA, yPointsIA, nPoints)
+
+            xPoints as KBArray
+            yPoints as KBArray
+            nPoints as KBInt
+
+            val xPointsIA = xPoints.value.asIntArray()
+            val yPointsIA = yPoints.value.asIntArray()
+
+            window.fillPolygon(xPointsIA, yPointsIA, nPoints.value)
+
+            KBNone
         }
-        
+
         add(
             "drawString",
             NONE,
@@ -1697,24 +1765,26 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (s, x, y) = args
-            
-            s as String
-            x as Int
-            y as Int
-            
-            window.drawString(s, x, y)
+
+            s as KBString
+            x as KBInt
+            y as KBInt
+
+            window.drawString(s.value, x.value, y.value)
+
+            KBNone
         }
-        
+
         add("loadImage", "Image".data, STRING) { script, args ->
             val (path) = args
-            
-            path as String
-            
-            val (id, width, height) = window.loadImage(path)
-            
+
+            path as KBString
+
+            val (id, width, height) = window.loadImage(path.value)
+
             script.instantiate("Image", id, width, height)
         }
-        
+
         add(
             "drawImage",
             NONE,
@@ -1723,20 +1793,20 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (image, x, y) = args
-            
-            image as DataInstance
-            x as Int
-            y as Int
-            
-            val (id) = image.deref()
-            
-            id as Int
-            
-            window.drawImage(id, x, y)
-            
-            Unit
+
+            image as KBData
+            x as KBInt
+            y as KBInt
+
+            val (id) = image.value.deref()
+
+            id as KBInt
+
+            window.drawImage(id.value, x.value, y.value)
+
+            KBNone
         }
-        
+
         add(
             "drawImage",
             NONE,
@@ -1747,22 +1817,22 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (image, x, y, width, height) = args
-            
-            image as DataInstance
-            x as Int
-            y as Int
-            width as Int
-            height as Int
-            
-            val (id) = image.deref()
-            
-            id as Int
-            
-            window.drawImage(id, x, y, width, height)
-            
-            Unit
+
+            image as KBData
+            x as KBInt
+            y as KBInt
+            width as KBInt
+            height as KBInt
+
+            val (id) = image.value.deref()
+
+            id as KBInt
+
+            window.drawImage(id.value, x.value, y.value, width.value, height.value)
+
+            KBNone
         }
-        
+
         add(
             "drawImage",
             NONE,
@@ -1777,103 +1847,121 @@ class StandardLibrary {
             INT
         ) { _, args ->
             val (image, dxa, dya, dxb, dyb, sxa, sya, sxb, syb) = args
-            
-            image as DataInstance
-            dxa as Int
-            dya as Int
-            dxb as Int
-            dyb as Int
-            sxa as Int
-            sya as Int
-            sxb as Int
-            syb as Int
-            
-            val (id) = image.deref()
-            
-            id as Int
-            
-            window.drawImage(id, dxa, dya, dxb, dyb, sxa, sya, sxb, syb)
-            
-            Unit
+
+            image as KBData
+            dxa as KBInt
+            dya as KBInt
+            dxb as KBInt
+            dyb as KBInt
+            sxa as KBInt
+            sya as KBInt
+            sxb as KBInt
+            syb as KBInt
+
+            val (id) = image.value.deref()
+
+            id as KBInt
+
+            window.drawImage(
+                id.value,
+                dxa.value,
+                dya.value,
+                dxb.value,
+                dyb.value,
+                sxa.value,
+                sya.value,
+                sxb.value,
+                syb.value
+            )
+
+            KBNone
         }
-        
-        add("flip", NONE) { _, _ -> window.flip() }
-        
+
+        add("flip", NONE) { _, _ ->
+            window.flip()
+
+            KBNone
+        }
+
         add("keyIsDown", BOOL, INT) { _, args ->
             val (keyCode) = args
-            
-            keyCode as Int
-            
-            window.keyIsDown(keyCode)
+
+            keyCode as KBInt
+
+            KBBool(window.keyIsDown(keyCode.value))
         }
-        
+
         add("keyIsHeld", BOOL, INT) { _, args ->
             val (keyCode) = args
-            
-            keyCode as Int
-            
-            window.keyIsHeld(keyCode)
+
+            keyCode as KBInt
+
+            KBBool(window.keyIsHeld(keyCode.value))
         }
-        
+
         add("keyIsUp", BOOL, INT) { _, args ->
             val (keyCode) = args
-            
-            keyCode as Int
-            
-            window.keyIsUp(keyCode)
+
+            keyCode as KBInt
+
+            KBBool(window.keyIsUp(keyCode.value))
         }
-        
+
         add("buttonIsDown", BOOL, INT) { _, args ->
             val (buttonCode) = args
-            
-            buttonCode as Int
-            
-            window.buttonIsDown(buttonCode)
+
+            buttonCode as KBInt
+
+            KBBool(window.buttonIsDown(buttonCode.value))
         }
-        
+
         add("buttonIsHeld", BOOL, INT) { _, args ->
             val (buttonCode) = args
-            
-            buttonCode as Int
-            
-            window.buttonIsHeld(buttonCode)
+
+            buttonCode as KBInt
+
+            KBBool(window.buttonIsHeld(buttonCode.value))
         }
-        
+
         add("buttonIsUp", BOOL, INT) { _, args ->
             val (buttonCode) = args
-            
-            buttonCode as Int
-            
-            window.buttonIsUp(buttonCode)
+
+            buttonCode as KBInt
+
+            KBBool(window.buttonIsUp(buttonCode.value))
         }
-        
-        add("mouseX", INT) { _, _ -> window.mousePoint.x }
-        
-        add("mouseY", INT) { _, _ -> window.mousePoint.y }
-        
-        add("mouseWheel", INT) { _, _ -> window.mouseWheel }
-        
-        add("poll", NONE) { _, _ -> window.poll() }
+
+        add("mouseX", INT) { _, _ -> KBInt(window.mousePoint.x) }
+
+        add("mouseY", INT) { _, _ -> KBInt(window.mousePoint.y) }
+
+        add("mouseWheel", INT) { _, _ -> KBInt(window.mouseWheel) }
+
+        add("poll", NONE) { _, _ ->
+            window.poll()
+
+            KBNone
+        }
     }
-    
+
     private fun add(
         name: String,
         returnType: DataType,
         vararg paramTypes: DataType,
-        function: (runtime: Runtime, args: List<Any>) -> Any,
+        function: (runtime: Runtime, args: List<KBV>) -> KBV,
     ) {
         val key = paramTypes.joinToString(prefix = "${name.lowercase()}(", separator = ",", postfix = ")")
-        
+
         builtins[key] = Builtin(returnType, function)
     }
-    
+
     operator fun get(sub: Stmt.Sub) =
         builtins[sub.signature]
-    
-    class Builtin(private val returnType: DataType, val function: (runtime: Runtime, args: List<Any>) -> Any) {
-        operator fun invoke(runtime: Runtime, args: List<Any>): Any? {
+
+    class Builtin(private val returnType: DataType, val function: (runtime: Runtime, args: List<KBV>) -> KBV) {
+        operator fun invoke(runtime: Runtime, args: List<KBV>): KBV? {
             val result = function(runtime, args)
-            
+
             return returnType.filter(runtime, result)
         }
     }

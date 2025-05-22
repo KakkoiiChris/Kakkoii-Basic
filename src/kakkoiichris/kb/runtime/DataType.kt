@@ -9,7 +9,7 @@ import kotlin.reflect.KClass
 
 interface DataType {
     companion object {
-        fun infer(runtime: Runtime, x: KBValue<*>?): DataType =
+        fun infer(runtime: Runtime, x: Any?): DataType =
             when (x) {
                 KBEmpty    -> Primitive.ANY
 
@@ -33,7 +33,9 @@ interface DataType {
                     }
                 }
 
-                else       -> Primitive.infer(runtime, x)
+                is KBV     -> Primitive.infer(runtime, x)
+
+                else       -> TODO("NOT KBV")
             }
 
         private fun List<*>.isHomogenous(runtime: Runtime): Boolean {
@@ -289,7 +291,8 @@ interface DataType {
 
             override fun default(runtime: Runtime) = KBString("")
 
-            override fun iterable(runtime: Runtime, x: KBV?): List<KBV>? = cast(runtime, x)?.value?.toCharArray()?.map { KBChar(it) }
+            override fun iterable(runtime: Runtime, x: KBV?): List<KBV>? =
+                cast(runtime, x)?.value?.toCharArray()?.map { KBChar(it) }
         },
 
         ANY(Any::class) {

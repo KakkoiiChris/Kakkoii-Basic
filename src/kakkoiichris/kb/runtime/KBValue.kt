@@ -54,3 +54,14 @@ data class KBArray(override val value: ArrayInstance) : KBValue<ArrayInstance>
 data class KBData(override val value: DataInstance) : KBValue<DataInstance>
 
 data class KBEnum(override val value: EnumInstance.Entry) : KBValue<EnumInstance.Entry>
+
+data class KBInvoke(val mode: Mode, val type: DataType = DataType.Inferred, val result: KBV = KBEmpty): KBValue<KBInvoke> {
+    override val value get() = this
+
+    enum class Mode {
+        SUCCESS,
+        FAIL_UNDECLARED,
+        FAIL_POSITIONS,
+        FAIL_TYPES
+    }
+}

@@ -6,6 +6,7 @@ import kakkoiichris.kb.lexer.Token.Type
 import kakkoiichris.kb.parser.Expr
 import kakkoiichris.kb.parser.Stmt
 import kakkoiichris.kb.runtime.DataType
+import kotlin.math.abs
 
 class KBError(
     stage: String,
@@ -203,7 +204,7 @@ class KBError(
                 appendLine(context.line)
 
                 append(" ".repeat(context.region.first - 1))
-                appendLine("^".repeat(context.region.last - context.region.first))
+                appendLine("^".repeat(abs(context.region.last - context.region.first)))
             }
         }
 

@@ -69,9 +69,9 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
         }
 
         if (type === DataType.Inferred) {
-            if (value is InvokeResult) {
+            if (value is KBInvoke) {
                 type = value.type
-                value = value.value
+                value = value.result
             }
             else {
                 type = DataType.infer(this, value)
@@ -164,9 +164,9 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
     override fun visitIfStmt(stmt: Stmt.If) {
         val testValue = visit(stmt.test)
 
-        testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.context)
+        testValue as? KBBool ?: KBError.invalidTestExpression(testValue, stmt.test.context)
 
-        if (testValue) {
+        if (testValue.value) {
             visit(stmt.body)
 
             return
@@ -192,7 +192,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                     }
 
                     is Stmt.Switch.Case.Type   -> {
-                        val type = visit(case.type) as DataType
+                        val type = DataType.resolve(this, case.type.value)
 
                         if ((type.filter(this, subject) == null) xor case.inverted) {
                             continue
@@ -216,9 +216,9 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
         while (true) {
             val testValue = visit(stmt.test)
 
-            testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.context)
+            testValue as? KBBool ?: KBError.invalidTestExpression(testValue, stmt.test.context)
 
-            if (!testValue) break
+            if (!testValue.value) break
 
             try {
                 visit(stmt.body)
@@ -254,9 +254,9 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
 
             val testValue = visit(stmt.test)
 
-            testValue as? Boolean ?: KBError.invalidTestExpression(testValue, stmt.test.context)
+            testValue as? KBBool ?: KBError.invalidTestExpression(testValue, stmt.test.context)
 
-            if (testValue) break
+            if (testValue.value) break
         }
     }
 
@@ -298,7 +298,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
 
                 visit(increment)
             }
-            while (visit(test) as Boolean)
+            while ((visit(test) as KBBool).value)
         }
         finally {
             memory.pop()
@@ -431,18 +431,18 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
 
             val ordinalResult = visit(ordinal)
 
-            ordinalResult as? Int ?: TODO("INVALID BASIC ENUM ORDINAL '$ordinalResult' $context")
+            ordinalResult as? KBInt ?: TODO("INVALID BASIC ENUM ORDINAL '$ordinalResult' $context")
 
             val valueResult = visit(value)
 
-            entries.add(EnumInstance.Entry(stmt.name.value, name.value, ordinalResult, valueResult))
+            entries.add(EnumInstance.Entry(stmt.name.value, name.value, ordinalResult.value, valueResult))
         }
 
         memory.newEnum(stmt.name, EnumInstance(stmt.name.value, entries))
     }
 
     override fun visitDataEnumStmt(stmt: Stmt.DataEnum) {
-        val type = visit(stmt.type) as DataType.Data
+        val type = DataType.resolve(this, stmt.type.value) as DataType.Data
 
         val entries = mutableListOf<EnumInstance.Entry>()
 
@@ -451,7 +451,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
 
             val ordinalResult = visit(ordinal)
 
-            ordinalResult as? Int ?: TODO("INVALID DATA ENUM ORDINAL '$ordinalResult'")
+            ordinalResult as? KBInt ?: TODO("INVALID DATA ENUM ORDINAL '$ordinalResult'")
 
             var instantiate = value
 
@@ -461,7 +461,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
 
             val valueResult = visit(instantiate)
 
-            entries.add(EnumInstance.Entry(stmt.name.value, name.value, ordinalResult, valueResult))
+            entries.add(EnumInstance.Entry(stmt.name.value, name.value, ordinalResult.value, valueResult))
         }
 
         memory.newEnum(stmt.name, EnumInstance(stmt.name.value, entries))
@@ -486,16 +486,16 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
     override fun visitArrayExpr(expr: Expr.Array): KBV {
         val elements = mutableListOf<KBV>()
 
-        for (elementNode in expr.elements) {
-            val element = visit(elementNode)
+        for ((elementExpr, each) in expr.elements) {
+            val element = visit(elementExpr)
 
-            if (element is Expr.Each) {
-                when (val value = visit(element.expr)) {
-                    is String        -> elements.addAll(listOf(value.toCharArray()))
+            if (each) {
+                when (element) {
+                    is KBString -> elements.addAll(element.value.toCharArray().map(::KBChar))
 
-                    is ArrayInstance -> elements.addAll(value)
+                    is KBArray  -> elements.addAll(element.value)
 
-                    else             -> TODO("CAN'T EACH")
+                    else        -> TODO("CAN'T EACH")
                 }
             }
             else {
@@ -1106,358 +1106,358 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
             }
 
             Expr.Binary.Operator.ADD           -> when (val l = visit(expr.left)) {
-                is Byte         -> when (val r = visit(expr.right)) {
-                    is Byte   -> (l + r).toByte()
-                    is Short  -> (l + r).toShort()
-                    is Int    -> l + r
-                    is Long   -> l + r
-                    is Float  -> l + r
-                    is Double -> l + r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBByte   -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBByte((l.value + r.value).toByte())
+                    is KBShort  -> KBShort((l.value + r.value).toShort())
+                    is KBInt    -> KBInt(l.value + r.value)
+                    is KBLong   -> KBLong(l.value + r.value)
+                    is KBFloat  -> KBFloat(l.value + r.value)
+                    is KBDouble -> KBDouble(l.value + r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Short        -> when (val r = visit(expr.right)) {
-                    is Byte   -> (l + r).toShort()
-                    is Short  -> (l + r).toShort()
-                    is Int    -> l + r
-                    is Long   -> l + r
-                    is Float  -> l + r
-                    is Double -> l + r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBShort  -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBShort((l.value + r.value).toShort())
+                    is KBShort  -> KBShort((l.value + r.value).toShort())
+                    is KBInt    -> KBInt(l.value + r.value)
+                    is KBLong   -> KBLong(l.value + r.value)
+                    is KBFloat  -> KBFloat(l.value + r.value)
+                    is KBDouble -> KBDouble(l.value + r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Int          -> when (val r = visit(expr.right)) {
-                    is Byte   -> l + r
-                    is Short  -> l + r
-                    is Int    -> l + r
-                    is Long   -> l + r
-                    is Float  -> l + r
-                    is Double -> l + r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBInt    -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBInt(l.value + r.value)
+                    is KBShort  -> KBInt(l.value + r.value)
+                    is KBInt    -> KBInt(l.value + r.value)
+                    is KBLong   -> KBLong(l.value + r.value)
+                    is KBFloat  -> KBFloat(l.value + r.value)
+                    is KBDouble -> KBDouble(l.value + r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Long         -> when (val r = visit(expr.right)) {
-                    is Byte   -> l + r
-                    is Short  -> l + r
-                    is Int    -> l + r
-                    is Long   -> l + r
-                    is Float  -> l + r
-                    is Double -> l + r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBLong   -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBLong(l.value + r.value)
+                    is KBShort  -> KBLong(l.value + r.value)
+                    is KBInt    -> KBLong(l.value + r.value)
+                    is KBLong   -> KBLong(l.value + r.value)
+                    is KBFloat  -> KBFloat(l.value + r.value)
+                    is KBDouble -> KBDouble(l.value + r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Float        -> when (val r = visit(expr.right)) {
-                    is Byte   -> l + r
-                    is Short  -> l + r
-                    is Int    -> l + r
-                    is Long   -> l + r
-                    is Float  -> l + r
-                    is Double -> l + r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBFloat  -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBFloat(l.value + r.value)
+                    is KBShort  -> KBFloat(l.value + r.value)
+                    is KBInt    -> KBFloat(l.value + r.value)
+                    is KBLong   -> KBFloat(l.value + r.value)
+                    is KBFloat  -> KBFloat(l.value + r.value)
+                    is KBDouble -> KBDouble(l.value + r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Double       -> when (val r = visit(expr.right)) {
-                    is Byte   -> l + r
-                    is Short  -> l + r
-                    is Int    -> l + r
-                    is Long   -> l + r
-                    is Float  -> l + r
-                    is Double -> l + r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBDouble -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBDouble(l.value + r.value)
+                    is KBShort  -> KBDouble(l.value + r.value)
+                    is KBInt    -> KBDouble(l.value + r.value)
+                    is KBLong   -> KBDouble(l.value + r.value)
+                    is KBFloat  -> KBDouble(l.value + r.value)
+                    is KBDouble -> KBDouble(l.value + r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Char         -> when (val r = visit(expr.right)) {
-                    is Int -> l + r
-                    else   -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBChar   -> when (val r = visit(expr.right)) {
+                    is KBInt -> KBChar((l.value.code + r.value).toChar())
+                    else     -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is DataInstance -> l.invokeBinaryOperator(this, expr.op, visit(expr.right))
+                is KBData   -> l.value.invokeBinaryOperator(this, expr.op, visit(expr.right))
 
-                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
+                else        -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
             }
 
             Expr.Binary.Operator.SUBTRACT      -> when (val l = visit(expr.left)) {
-                is Byte         -> when (val r = visit(expr.right)) {
-                    is Byte   -> (l - r).toByte()
-                    is Short  -> (l - r).toShort()
-                    is Int    -> l - r
-                    is Long   -> l - r
-                    is Float  -> l - r
-                    is Double -> l - r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBByte   -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBByte((l.value - r.value).toByte())
+                    is KBShort  -> KBShort((l.value - r.value).toShort())
+                    is KBInt    -> KBInt(l.value - r.value)
+                    is KBLong   -> KBLong(l.value - r.value)
+                    is KBFloat  -> KBFloat(l.value - r.value)
+                    is KBDouble -> KBDouble(l.value - r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Short        -> when (val r = visit(expr.right)) {
-                    is Byte   -> (l - r).toShort()
-                    is Short  -> (l - r).toShort()
-                    is Int    -> l - r
-                    is Long   -> l - r
-                    is Float  -> l - r
-                    is Double -> l - r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBShort  -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBShort((l.value - r.value).toShort())
+                    is KBShort  -> KBShort((l.value - r.value).toShort())
+                    is KBInt    -> KBInt(l.value - r.value)
+                    is KBLong   -> KBLong(l.value - r.value)
+                    is KBFloat  -> KBFloat(l.value - r.value)
+                    is KBDouble -> KBDouble(l.value - r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Int          -> when (val r = visit(expr.right)) {
-                    is Byte   -> l - r
-                    is Short  -> l - r
-                    is Int    -> l - r
-                    is Long   -> l - r
-                    is Float  -> l - r
-                    is Double -> l - r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBInt    -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBInt(l.value - r.value)
+                    is KBShort  -> KBInt(l.value - r.value)
+                    is KBInt    -> KBInt(l.value - r.value)
+                    is KBLong   -> KBLong(l.value - r.value)
+                    is KBFloat  -> KBFloat(l.value - r.value)
+                    is KBDouble -> KBDouble(l.value - r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Long         -> when (val r = visit(expr.right)) {
-                    is Byte   -> l - r
-                    is Short  -> l - r
-                    is Int    -> l - r
-                    is Long   -> l - r
-                    is Float  -> l - r
-                    is Double -> l - r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBLong   -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBLong(l.value - r.value)
+                    is KBShort  -> KBLong(l.value - r.value)
+                    is KBInt    -> KBLong(l.value - r.value)
+                    is KBLong   -> KBLong(l.value - r.value)
+                    is KBFloat  -> KBFloat(l.value - r.value)
+                    is KBDouble -> KBDouble(l.value - r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Float        -> when (val r = visit(expr.right)) {
-                    is Byte   -> l - r
-                    is Short  -> l - r
-                    is Int    -> l - r
-                    is Long   -> l - r
-                    is Float  -> l - r
-                    is Double -> l - r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBFloat  -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBFloat(l.value - r.value)
+                    is KBShort  -> KBFloat(l.value - r.value)
+                    is KBInt    -> KBFloat(l.value - r.value)
+                    is KBLong   -> KBFloat(l.value - r.value)
+                    is KBFloat  -> KBFloat(l.value - r.value)
+                    is KBDouble -> KBDouble(l.value - r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Double       -> when (val r = visit(expr.right)) {
-                    is Byte   -> l - r
-                    is Short  -> l - r
-                    is Int    -> l - r
-                    is Long   -> l - r
-                    is Float  -> l - r
-                    is Double -> l - r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBDouble -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBDouble(l.value - r.value)
+                    is KBShort  -> KBDouble(l.value - r.value)
+                    is KBInt    -> KBDouble(l.value - r.value)
+                    is KBLong   -> KBDouble(l.value - r.value)
+                    is KBFloat  -> KBDouble(l.value - r.value)
+                    is KBDouble -> KBDouble(l.value - r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is DataInstance -> l.invokeBinaryOperator(this, expr.op, visit(expr.right))
+                is KBChar   -> when (val r = visit(expr.right)) {
+                    is KBInt -> KBChar((l.value.code - r.value).toChar())
+                    else     -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                }
 
-                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
+                is KBData   -> l.value.invokeBinaryOperator(this, expr.op, visit(expr.right))
+
+                else        -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
             }
 
             Expr.Binary.Operator.MULTIPLY      -> when (val l = visit(expr.left)) {
-                is Byte         -> when (val r = visit(expr.right)) {
-                    is Byte   -> (l * r).toByte()
-                    is Short  -> (l * r).toShort()
-                    is Int    -> l * r
-                    is Long   -> l * r
-                    is Float  -> l * r
-                    is Double -> l * r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBByte   -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBByte((l.value * r.value).toByte())
+                    is KBShort  -> KBShort((l.value * r.value).toShort())
+                    is KBInt    -> KBInt(l.value * r.value)
+                    is KBLong   -> KBLong(l.value * r.value)
+                    is KBFloat  -> KBFloat(l.value * r.value)
+                    is KBDouble -> KBDouble(l.value * r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Short        -> when (val r = visit(expr.right)) {
-                    is Byte   -> (l * r).toShort()
-                    is Short  -> (l * r).toShort()
-                    is Int    -> l * r
-                    is Long   -> l * r
-                    is Float  -> l * r
-                    is Double -> l * r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBShort  -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBShort((l.value * r.value).toShort())
+                    is KBShort  -> KBShort((l.value * r.value).toShort())
+                    is KBInt    -> KBInt(l.value * r.value)
+                    is KBLong   -> KBLong(l.value * r.value)
+                    is KBFloat  -> KBFloat(l.value * r.value)
+                    is KBDouble -> KBDouble(l.value * r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Int          -> when (val r = visit(expr.right)) {
-                    is Byte   -> l * r
-                    is Short  -> l * r
-                    is Int    -> l * r
-                    is Long   -> l * r
-                    is Float  -> l * r
-                    is Double -> l * r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBInt    -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBInt(l.value * r.value)
+                    is KBShort  -> KBInt(l.value * r.value)
+                    is KBInt    -> KBInt(l.value * r.value)
+                    is KBLong   -> KBLong(l.value * r.value)
+                    is KBFloat  -> KBFloat(l.value * r.value)
+                    is KBDouble -> KBDouble(l.value * r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Long         -> when (val r = visit(expr.right)) {
-                    is Byte   -> l * r
-                    is Short  -> l * r
-                    is Int    -> l * r
-                    is Long   -> l * r
-                    is Float  -> l * r
-                    is Double -> l * r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBLong   -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBLong(l.value * r.value)
+                    is KBShort  -> KBLong(l.value * r.value)
+                    is KBInt    -> KBLong(l.value * r.value)
+                    is KBLong   -> KBLong(l.value * r.value)
+                    is KBFloat  -> KBFloat(l.value * r.value)
+                    is KBDouble -> KBDouble(l.value * r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Float        -> when (val r = visit(expr.right)) {
-                    is Byte   -> l * r
-                    is Short  -> l * r
-                    is Int    -> l * r
-                    is Long   -> l * r
-                    is Float  -> l * r
-                    is Double -> l * r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBFloat  -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBFloat(l.value * r.value)
+                    is KBShort  -> KBFloat(l.value * r.value)
+                    is KBInt    -> KBFloat(l.value * r.value)
+                    is KBLong   -> KBFloat(l.value * r.value)
+                    is KBFloat  -> KBFloat(l.value * r.value)
+                    is KBDouble -> KBDouble(l.value * r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Double       -> when (val r = visit(expr.right)) {
-                    is Byte   -> l * r
-                    is Short  -> l * r
-                    is Int    -> l * r
-                    is Long   -> l * r
-                    is Float  -> l * r
-                    is Double -> l * r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBDouble -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBDouble(l.value * r.value)
+                    is KBShort  -> KBDouble(l.value * r.value)
+                    is KBInt    -> KBDouble(l.value * r.value)
+                    is KBLong   -> KBDouble(l.value * r.value)
+                    is KBFloat  -> KBDouble(l.value * r.value)
+                    is KBDouble -> KBDouble(l.value * r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Char         -> when (val r = visit(expr.right)) {
-                    is Byte   -> buildString { repeat(r.toInt()) { append(l) } }
-                    is Short  -> buildString { repeat(r.toInt()) { append(l) } }
-                    is Int    -> buildString { repeat(r) { append(l) } }
-                    is Long   -> buildString { repeat(r.toInt()) { append(l) } }
-                    is Float  -> buildString { repeat(r.toInt()) { append(l) } }
-                    is Double -> buildString { repeat(r.toInt()) { append(l) } }
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBChar   -> when (val r = visit(expr.right)) {
+                    is KBInt -> KBChar((l.value.code * r.value).toChar())
+                    else     -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is String       -> when (val r = visit(expr.right)) {
-                    is Byte   -> l.repeat(r.toInt())
-                    is Short  -> l.repeat(r.toInt())
-                    is Int    -> l.repeat(r)
-                    is Long   -> l.repeat(r.toInt())
-                    is Float  -> l.repeat(r.toInt())
-                    is Double -> l.repeat(r.toInt())
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
-                }
+                is KBData   -> l.value.invokeBinaryOperator(this, expr.op, visit(expr.right))
 
-                is DataInstance -> l.invokeBinaryOperator(this, expr.op, visit(expr.right))
-
-                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
+                else        -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
             }
 
             Expr.Binary.Operator.DIVIDE        -> when (val l = visit(expr.left)) {
-                is Byte         -> when (val r = visit(expr.right)) {
-                    is Byte   -> (l / r).toByte()
-                    is Short  -> (l / r).toShort()
-                    is Int    -> l / r
-                    is Long   -> l / r
-                    is Float  -> l / r
-                    is Double -> l / r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBByte   -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBByte((l.value / r.value).toByte())
+                    is KBShort  -> KBShort((l.value / r.value).toShort())
+                    is KBInt    -> KBInt(l.value / r.value)
+                    is KBLong   -> KBLong(l.value / r.value)
+                    is KBFloat  -> KBFloat(l.value / r.value)
+                    is KBDouble -> KBDouble(l.value / r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Short        -> when (val r = visit(expr.right)) {
-                    is Byte   -> (l / r).toShort()
-                    is Short  -> (l / r).toShort()
-                    is Int    -> l / r
-                    is Long   -> l / r
-                    is Float  -> l / r
-                    is Double -> l / r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBShort  -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBShort((l.value / r.value).toShort())
+                    is KBShort  -> KBShort((l.value / r.value).toShort())
+                    is KBInt    -> KBInt(l.value / r.value)
+                    is KBLong   -> KBLong(l.value / r.value)
+                    is KBFloat  -> KBFloat(l.value / r.value)
+                    is KBDouble -> KBDouble(l.value / r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Int          -> when (val r = visit(expr.right)) {
-                    is Byte   -> l / r
-                    is Short  -> l / r
-                    is Int    -> l / r
-                    is Long   -> l / r
-                    is Float  -> l / r
-                    is Double -> l / r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBInt    -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBInt(l.value / r.value)
+                    is KBShort  -> KBInt(l.value / r.value)
+                    is KBInt    -> KBInt(l.value / r.value)
+                    is KBLong   -> KBLong(l.value / r.value)
+                    is KBFloat  -> KBFloat(l.value / r.value)
+                    is KBDouble -> KBDouble(l.value / r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Long         -> when (val r = visit(expr.right)) {
-                    is Byte   -> l / r
-                    is Short  -> l / r
-                    is Int    -> l / r
-                    is Long   -> l / r
-                    is Float  -> l / r
-                    is Double -> l / r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBLong   -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBLong(l.value / r.value)
+                    is KBShort  -> KBLong(l.value / r.value)
+                    is KBInt    -> KBLong(l.value / r.value)
+                    is KBLong   -> KBLong(l.value / r.value)
+                    is KBFloat  -> KBFloat(l.value / r.value)
+                    is KBDouble -> KBDouble(l.value / r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Float        -> when (val r = visit(expr.right)) {
-                    is Byte   -> l / r
-                    is Short  -> l / r
-                    is Int    -> l / r
-                    is Long   -> l / r
-                    is Float  -> l / r
-                    is Double -> l / r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBFloat  -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBFloat(l.value / r.value)
+                    is KBShort  -> KBFloat(l.value / r.value)
+                    is KBInt    -> KBFloat(l.value / r.value)
+                    is KBLong   -> KBFloat(l.value / r.value)
+                    is KBFloat  -> KBFloat(l.value / r.value)
+                    is KBDouble -> KBDouble(l.value / r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Double       -> when (val r = visit(expr.right)) {
-                    is Byte   -> l / r
-                    is Short  -> l / r
-                    is Int    -> l / r
-                    is Long   -> l / r
-                    is Float  -> l / r
-                    is Double -> l / r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBDouble -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBDouble(l.value / r.value)
+                    is KBShort  -> KBDouble(l.value / r.value)
+                    is KBInt    -> KBDouble(l.value / r.value)
+                    is KBLong   -> KBDouble(l.value / r.value)
+                    is KBFloat  -> KBDouble(l.value / r.value)
+                    is KBDouble -> KBDouble(l.value / r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is DataInstance -> l.invokeBinaryOperator(this, expr.op, visit(expr.right))
+                is KBChar   -> when (val r = visit(expr.right)) {
+                    is KBInt -> KBChar((l.value.code / r.value).toChar())
+                    else     -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                }
 
-                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
+                is KBData   -> l.value.invokeBinaryOperator(this, expr.op, visit(expr.right))
+
+                else        -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
             }
 
             Expr.Binary.Operator.MODULUS       -> when (val l = visit(expr.left)) {
-                is Byte         -> when (val r = visit(expr.right)) {
-                    is Byte   -> (l % r).toByte()
-                    is Short  -> (l % r).toShort()
-                    is Int    -> l % r
-                    is Long   -> l % r
-                    is Float  -> l % r
-                    is Double -> l % r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBByte   -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBByte((l.value % r.value).toByte())
+                    is KBShort  -> KBShort((l.value % r.value).toShort())
+                    is KBInt    -> KBInt(l.value % r.value)
+                    is KBLong   -> KBLong(l.value % r.value)
+                    is KBFloat  -> KBFloat(l.value % r.value)
+                    is KBDouble -> KBDouble(l.value % r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Short        -> when (val r = visit(expr.right)) {
-                    is Byte   -> (l % r).toShort()
-                    is Short  -> (l % r).toShort()
-                    is Int    -> l % r
-                    is Long   -> l % r
-                    is Float  -> l % r
-                    is Double -> l % r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBShort  -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBShort((l.value % r.value).toShort())
+                    is KBShort  -> KBShort((l.value % r.value).toShort())
+                    is KBInt    -> KBInt(l.value % r.value)
+                    is KBLong   -> KBLong(l.value % r.value)
+                    is KBFloat  -> KBFloat(l.value % r.value)
+                    is KBDouble -> KBDouble(l.value % r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Int          -> when (val r = visit(expr.right)) {
-                    is Byte   -> l % r
-                    is Short  -> l % r
-                    is Int    -> l % r
-                    is Long   -> l % r
-                    is Float  -> l % r
-                    is Double -> l % r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBInt    -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBInt(l.value % r.value)
+                    is KBShort  -> KBInt(l.value % r.value)
+                    is KBInt    -> KBInt(l.value % r.value)
+                    is KBLong   -> KBLong(l.value % r.value)
+                    is KBFloat  -> KBFloat(l.value % r.value)
+                    is KBDouble -> KBDouble(l.value % r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Long         -> when (val r = visit(expr.right)) {
-                    is Byte   -> l % r
-                    is Short  -> l % r
-                    is Int    -> l % r
-                    is Long   -> l % r
-                    is Float  -> l % r
-                    is Double -> l % r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBLong   -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBLong(l.value % r.value)
+                    is KBShort  -> KBLong(l.value % r.value)
+                    is KBInt    -> KBLong(l.value % r.value)
+                    is KBLong   -> KBLong(l.value % r.value)
+                    is KBFloat  -> KBFloat(l.value % r.value)
+                    is KBDouble -> KBDouble(l.value % r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Float        -> when (val r = visit(expr.right)) {
-                    is Byte   -> l % r
-                    is Short  -> l % r
-                    is Int    -> l % r
-                    is Long   -> l % r
-                    is Float  -> l % r
-                    is Double -> l % r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBFloat  -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBFloat(l.value % r.value)
+                    is KBShort  -> KBFloat(l.value % r.value)
+                    is KBInt    -> KBFloat(l.value % r.value)
+                    is KBLong   -> KBFloat(l.value % r.value)
+                    is KBFloat  -> KBFloat(l.value % r.value)
+                    is KBDouble -> KBDouble(l.value % r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is Double       -> when (val r = visit(expr.right)) {
-                    is Byte   -> l % r
-                    is Short  -> l % r
-                    is Int    -> l % r
-                    is Long   -> l % r
-                    is Float  -> l % r
-                    is Double -> l % r
-                    else      -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                is KBDouble -> when (val r = visit(expr.right)) {
+                    is KBByte   -> KBDouble(l.value % r.value)
+                    is KBShort  -> KBDouble(l.value % r.value)
+                    is KBInt    -> KBDouble(l.value % r.value)
+                    is KBLong   -> KBDouble(l.value % r.value)
+                    is KBFloat  -> KBDouble(l.value % r.value)
+                    is KBDouble -> KBDouble(l.value % r.value)
+                    else        -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
                 }
 
-                is DataInstance -> l.invokeBinaryOperator(this, expr.op, visit(expr.right))
+                is KBChar   -> when (val r = visit(expr.right)) {
+                    is KBInt -> KBChar((l.value.code % r.value).toChar())
+                    else     -> KBError.invalidRightOperand(r, expr.op, expr.right.context)
+                }
 
-                else            -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
+                is KBData   -> l.value.invokeBinaryOperator(this, expr.op, visit(expr.right))
+
+                else        -> KBError.invalidLeftOperand(l, expr.op, expr.left.context)
             }
         }
     }
@@ -1514,51 +1514,55 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
 
     override fun visitGetIndexExpr(expr: Expr.GetIndex): KBV {
         return when (val target = visit(expr.target)) {
-            is String        -> when (val index = visit(expr.index)) {
-                is Int -> target[index]
+            is KBString -> when (val index = visit(expr.index)) {
+                is KBInt -> KBChar(target.value[index.value])
 
-                else   -> KBError.invalidIndex(
+                else     -> KBError.invalidIndex(
                     DataType.infer(this, target),
                     DataType.infer(this, index),
                     expr.index.context
                 )
             }
 
-            is ArrayInstance -> when (val index = DataType.Primitive.INT.coerce(visit(expr.index))) {
-                is Int -> target[index]
+            is KBArray  -> when (val index = DataType.Primitive.INT.coerce(visit(expr.index))) {
+                is KBInt -> target.value[index.value]
 
-                else   -> KBError.invalidIndex(
+                else     -> KBError.invalidIndex(
                     DataType.infer(this, target),
                     DataType.infer(this, index),
                     expr.index.context
                 )
             }
 
-            is DataInstance  -> when (val index = visit(expr.index)) {
-                is Char   -> target[index.toString()] ?: KBError.noMember(
-                    target.name,
+            is KBData   -> when (val index = visit(expr.index)) {
+                is KBChar   -> target.value[index.value.toString()]?.value ?: KBError.noMember(
+                    target.value.name,
                     index.toString(),
                     expr.index.context
                 )
 
-                is String -> target[index] ?: KBError.noMember(target.name, index, expr.index.context)
+                is KBString -> target.value[index.value]?.value ?: KBError.noMember(
+                    target.value.name,
+                    index.value,
+                    expr.index.context
+                )
 
-                else      -> KBError.invalidIndex(
+                else        -> KBError.invalidIndex(
                     DataType.infer(this, target),
                     DataType.infer(this, index),
                     expr.index.context
                 )
             }
 
-            else             -> KBError.nonIndexedType(DataType.infer(this, target), expr.target.context)
+            else        -> KBError.nonIndexedType(DataType.infer(this, target), expr.target.context)
         }
     }
 
     override fun visitSetIndexExpr(expr: Expr.SetIndex): KBV {
         return when (val target = visit(expr.target)) {
-            is ArrayInstance -> when (val index = DataType.Primitive.INT.coerce(visit(expr.index))) {
-                is Int -> {
-                    val type = target.type
+            is KBArray -> when (val index = DataType.Primitive.INT.coerce(visit(expr.index))) {
+                is KBInt -> {
+                    val type = target.value.type
                     var subExpr = expr.expr
 
                     if (type is DataType.Data && subExpr is Expr.Instantiate && subExpr.isInferred) {
@@ -1568,11 +1572,11 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                     val result = visit(subExpr)
                     val value = type.coerce(result) ?: KBError.mismatchedType(result, type, subExpr.context)
 
-                    if (target.type.filter(this, value) == null) {
-                        KBError.mismatchedType(value, target.type, expr.context)
+                    if (target.value.type.filter(this, value) == null) {
+                        KBError.mismatchedType(value, target.value.type, expr.context)
                     }
 
-                    target[index] = value
+                    target.value[index.value] = value
 
                     value
                 }
@@ -1584,10 +1588,10 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                 )
             }
 
-            is DataInstance  -> when (val index = visit(expr.index)) {
-                is Char   -> {
+            is KBData  -> when (val index = visit(expr.index)) {
+                is KBChar   -> {
                     val ref =
-                        target[index.toString()] ?: KBError.noMember(target.name, index.toString(), expr.index.context)
+                        target.value[index.value.toString()] ?: KBError.noMember(target.value.name, index.toString(), expr.index.context)
 
                     val type = ref.type
                     var subExpr = expr.expr
@@ -1608,8 +1612,8 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                     }
                 }
 
-                is String -> {
-                    val ref = target[index] ?: KBError.noMember(target.name, index, expr.index.context)
+                is KBString -> {
+                    val ref = target.value[index.value] ?: KBError.noMember(target.value.name, index.value, expr.index.context)
 
                     val type = ref.type
                     var subExpr = expr.expr
@@ -1686,18 +1690,18 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
         val (mode, _, value) = performInvoke(expr)
 
         return when (mode) {
-            InvokeResult.Mode.SUCCESS         -> value
+            KBInvoke.Mode.SUCCESS         -> value
 
-            InvokeResult.Mode.FAIL_UNDECLARED -> KBError.undeclaredSub(expr.name, expr.name.context)
+            KBInvoke.Mode.FAIL_UNDECLARED -> KBError.undeclaredSub(expr.name, expr.name.context)
 
-            InvokeResult.Mode.FAIL_POSITIONS  -> KBError.unresolvedPositions(expr.name, expr.context)
+            KBInvoke.Mode.FAIL_POSITIONS  -> KBError.unresolvedPositions(expr.name, expr.context)
 
-            InvokeResult.Mode.FAIL_TYPES      -> KBError.unresolvedTypes(expr.name, expr.context)
+            KBInvoke.Mode.FAIL_TYPES      -> KBError.unresolvedTypes(expr.name, expr.context)
         }
     }
 
-    private fun performInvoke(expr: Expr.Invoke): InvokeResult {
-        val subs = memory.getSubs(expr.name) ?: return InvokeResult(InvokeResult.Mode.FAIL_UNDECLARED)
+    private fun performInvoke(expr: Expr.Invoke): KBInvoke {
+        val subs = memory.getSubs(expr.name) ?: return KBInvoke(KBInvoke.Mode.FAIL_UNDECLARED)
 
         val args = expr.args
 
@@ -1710,7 +1714,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
         }
 
         if (positionValid.isEmpty()) {
-            return InvokeResult(InvokeResult.Mode.FAIL_POSITIONS)
+            return KBInvoke(KBInvoke.Mode.FAIL_POSITIONS)
         }
 
         val typeValid = mutableListOf<Pair<Stmt.Sub, List<Stmt.Decl>>>()
@@ -1722,7 +1726,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
         }
 
         if (typeValid.isEmpty()) {
-            return InvokeResult(InvokeResult.Mode.FAIL_TYPES)
+            return KBInvoke(KBInvoke.Mode.FAIL_TYPES)
         }
 
         val (sub, decls) = if (typeValid.size == 1)
@@ -1730,7 +1734,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
         else
             typeValid.minByOrNull { (_, decls) -> decls.size }!!
 
-        val type = visit(sub.definition.type) as DataType
+        val type = DataType.resolve(this, sub.definition.type.value)
 
         val scope = Memory.Scope(sub.definition.name.value, sub.scope)
 
@@ -1753,10 +1757,10 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
             ref = memory.getRef(sub.definition.name)!!
 
             if (sub.isLinked) {
-                val subArgs = mutableListOf<Any>()
+                val subArgs = mutableListOf<KBV>()
 
                 for (name in decls.map { it.definition.name }) {
-                    subArgs += memory.getRef(name)!!
+                    subArgs += memory.getRef(name)!!.value
                 }
 
                 val builtin = library[sub] ?: KBError.noBuiltin(sub.definition.name, sub.context)
@@ -1767,7 +1771,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                 val value = type.filter(this, builtinValue)
                     ?: KBError.mismatchedReturnType(sub.definition.name, type, Context.none)
 
-                return InvokeResult(InvokeResult.Mode.SUCCESS, type, value)
+                return KBInvoke(KBInvoke.Mode.SUCCESS, type, value)
             }
 
             try {
@@ -1777,10 +1781,10 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
                 val value = type.filter(this, r.value)
                     ?: KBError.mismatchedReturnType(sub.definition.name, type, r.origin)
 
-                return InvokeResult(InvokeResult.Mode.SUCCESS, type, value)
+                return KBInvoke(KBInvoke.Mode.SUCCESS, type, value)
             }
             catch (r: Redirect.Return) {
-                return InvokeResult(InvokeResult.Mode.SUCCESS, type, ref.value)
+                return KBInvoke(KBInvoke.Mode.SUCCESS, type, ref.value)
             }
         }
         finally {
@@ -1789,7 +1793,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
 
         val value = type.filter(this, ref.value) ?: KBError.noYield(sub.definition.name, expr.name.context)
 
-        return InvokeResult(InvokeResult.Mode.SUCCESS, type, value)
+        return KBInvoke(KBInvoke.Mode.SUCCESS, type, value)
     }
 
     private fun resolvePosition(params: List<Stmt.Decl>, args: List<Expr.Invoke.Argument>): List<Stmt.Decl>? {
@@ -1822,20 +1826,15 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
         }
 
         if (p in args.indices) {
-            val varargs = mutableListOf<Expr>()
+            val varargs = mutableListOf<Expr.Array.Element>()
 
             while (p < args.size) {
                 val (each, expr) = args[p++]
 
-                varargs += if (each) {
-                    Expr.Each(expr.context, expr)
-                }
-                else {
-                    expr
-                }
+                varargs += Expr.Array.Element(expr, each)
             }
 
-            exprs[exprs.lastIndex] = Expr.Array(varargs[0].context, varargs)
+            exprs[exprs.lastIndex] = Expr.Array(varargs[0].expr.context, varargs)
         }
 
         if (isVararg && exprs.last() is Expr.Empty) {
@@ -1854,7 +1853,7 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
         for (i in params.indices) {
             val decl = params[i]
 
-            val type = visit(decl.definition.type) as DataType
+            val type = DataType.resolve(this, decl.definition.type.value)
             val value = visit(decl.expr)
 
             val finalValue = type.filter(this, type.coerce(value) ?: value) ?: return null
@@ -1865,16 +1864,16 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
         return params.mapIndexed { i, decl -> decl.withExpr(exprs[i]) }
     }
 
-    fun invoke(name: String, vararg arguments: Any): InvokeResult? {
+    fun invoke(name: String, vararg arguments: Any): KBInvoke? {
         val invoke =
             Expr.Invoke(Context.none, name.toName(), arguments.map { Expr.Invoke.Argument(false, it.toExpr()) })
 
         val result = performInvoke(invoke)
 
         return when (result.mode) {
-            InvokeResult.Mode.SUCCESS -> result
+            KBInvoke.Mode.SUCCESS -> result
 
-            else                      -> null
+            else                  -> null
         }
     }
 
@@ -1885,15 +1884,11 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
             Context.none
         )
 
-    override fun visitEachExpr(expr: Expr.Each): KBV {
-        return expr
-    }
-
-    fun instantiate(name: String, vararg elements: Any): DataInstance {
+    fun instantiate(name: String, vararg elements: Any): KBData {
         val instantiate =
             Expr.Instantiate(Context.none, name.lowercase().toName(), elements.map { it.toExpr() }.toList())
 
-        return visit(instantiate) as DataInstance
+        return visit(instantiate) as KBData
     }
 
     override fun visitInstantiateExpr(expr: Expr.Instantiate): KBData {
@@ -1931,14 +1926,5 @@ class Runtime(private val stmts: List<Stmt>) : Stmt.Visitor<Unit>, Expr.Visitor<
         }
 
         return KBData(DataInstance(data.name, scope))
-    }
-
-    data class InvokeResult(val mode: Mode, val type: DataType = DataType.Inferred, val value: KBV = KBEmpty) {
-        enum class Mode {
-            SUCCESS,
-            FAIL_UNDECLARED,
-            FAIL_POSITIONS,
-            FAIL_TYPES
-        }
     }
 }

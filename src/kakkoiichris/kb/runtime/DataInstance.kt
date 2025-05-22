@@ -15,7 +15,7 @@ class DataInstance(val name: Expr.Name, private val members: Memory.Scope) {
     operator fun get(name: String) =
         members.getRef(name)
 
-    fun invokeSub(runtime: Runtime, subName: Expr.Name, vararg otherArgs: Any): KBValue<*> {
+    fun invokeSub(runtime: Runtime, subName: Expr.Name, vararg otherArgs: Any): KBV {
         val invoke = Expr.Invoke(
             Context.none,
             subName,
@@ -24,14 +24,14 @@ class DataInstance(val name: Expr.Name, private val members: Memory.Scope) {
         return runtime.visitInvokeExpr(invoke)
     }
 
-    fun invokeUnaryOperator(runtime: Runtime, operator: Expr.Unary.Operator): KBValue<*> {
+    fun invokeUnaryOperator(runtime: Runtime, operator: Expr.Unary.Operator): KBV {
         val invoke =
             Expr.Invoke(Context.none, operator.name.lowercase().toName(), listOf(Expr.Invoke.Argument(false, toExpr())))
 
         return runtime.visitInvokeExpr(invoke)
     }
 
-    fun invokeBinaryOperator(runtime: Runtime, operator: Expr.Binary.Operator, otherArg: Any): KBValue<*> {
+    fun invokeBinaryOperator(runtime: Runtime, operator: Expr.Binary.Operator, otherArg: KBV): KBV {
         val invoke = Expr.Invoke(
             Context.none,
             operator.name.lowercase().toName(),
@@ -42,7 +42,7 @@ class DataInstance(val name: Expr.Name, private val members: Memory.Scope) {
 
     fun isEmpty(): Boolean {
         for ((_, member) in members.references) {
-            if (!member.fromRef().isEmptyValue()) {
+            if (!member.isEmptyValue()) {
                 return false
             }
         }
@@ -55,6 +55,6 @@ class DataInstance(val name: Expr.Name, private val members: Memory.Scope) {
             .references
             .entries
             .joinToString(prefix = "$name { ", postfix = " }") { (name, ref) ->
-                "$name : ${ref.fromRef()}"
+                "$name : ${ref.value.value}"
             }
 }

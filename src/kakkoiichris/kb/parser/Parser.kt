@@ -782,7 +782,7 @@ class Parser(private val lexer: Lexer) {
 
                 val context = expr.context + right.context
 
-                Expr.Binary(context, Expr.Binary.Operator[op.type], expr, right)
+                Expr.Assign(context, expr, right)
             }
         }
     }
@@ -1285,28 +1285,17 @@ class Parser(private val lexer: Lexer) {
 
         mustSkip(LEFT_SQUARE)
 
-        val elements = mutableListOf<Expr>()
+        val elements = mutableListOf<Expr.Array.Element>()
 
         endContext = context()
 
         if (!skip(RIGHT_SQUARE)) {
             do {
-                val eachStartContext = context()
-                var eachEndContext: Context
-
                 val each = skip(EACH)
 
-                var element = expr()
+                val expr = expr()
 
-                if (each) {
-                    eachEndContext = element.context
-
-                    val eachContext = eachStartContext + eachEndContext
-
-                    element = Expr.Each(eachContext, element)
-                }
-
-                elements += element
+                elements += Expr.Array.Element(expr, each)
             }
             while (skip(COMMA))
 

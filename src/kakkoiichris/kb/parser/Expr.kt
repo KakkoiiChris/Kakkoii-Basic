@@ -46,8 +46,6 @@ sealed class Expr(val context: Context) {
 
         fun visitInvokeExpr(expr: Invoke): X
 
-        fun visitEachExpr(expr: Each): X
-
         fun visitInstantiateExpr(expr: Instantiate): X
     }
 
@@ -138,19 +136,23 @@ sealed class Expr(val context: Context) {
         }
     }
 
-    class Array(context: Context, val elements: List<Expr>) : Expr(context) {
+    class Array(context: Context, val elements: List<Element>) : Expr(context) {
         override fun getDataType(): DataType {
-            val firstType = elements.firstOrNull()?.getDataType()
+            if (elements.isEmpty()) return DataType.Primitive.NONE
 
-            if (elements.any { it.getDataType() != firstType }) {
+            val firstType = elements.first().expr.getDataType()
+
+            if (elements.any { it.expr.getDataType() != firstType }) {
                 return DataType.Primitive.ANY.array
             }
 
-            return firstType!!.array
+            return firstType.array
         }
 
         override fun <X> accept(visitor: Visitor<X>): X =
             visitor.visitArrayExpr(this)
+
+        data class Element(val expr: Expr, val each: Boolean)
     }
 
     class Unary(context: Context, val op: Operator, val expr: Expr) : Expr(context) {
@@ -296,15 +298,6 @@ sealed class Expr(val context: Context) {
 
                 else                     -> DataType.Primitive.NONE
             }
-
-            Operator.AS            -> when (left.getDataType()) {
-                DataType.Primitive.BOOL -> when (right.getDataType()) {
-                    DataType.Primitive.BOOL -> DataType.Primitive.BOOL
-                    else                    -> DataType.Primitive.NONE
-                }
-
-                else                    -> DataType.Primitive.NONE
-            }
         }
 
         override fun <X> accept(visitor: Visitor<X>): X =
@@ -373,11 +366,6 @@ sealed class Expr(val context: Context) {
             visitor.visitInvokeExpr(this)
 
         data class Argument(val each: Boolean, val expr: Expr)
-    }
-
-    class Each(context: Context, val expr: Expr) : Expr(context) {
-        override fun <X> accept(visitor: Visitor<X>): X =
-            visitor.visitEachExpr(this)
     }
 
     class Instantiate(context: Context, val target: Name, val elements: List<Expr>) : Expr(context) {

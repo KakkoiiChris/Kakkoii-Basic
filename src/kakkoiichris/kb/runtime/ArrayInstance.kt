@@ -3,31 +3,31 @@ package kakkoiichris.kb.runtime
 @Suppress("JavaDefaultMethodsNotOverriddenByDelegation")
 class ArrayInstance(val type: DataType, private val elements: MutableList<KBV>) : MutableList<KBV> by elements {
     fun asBooleanArray() =
-        map { it as Boolean }.toBooleanArray()
+        map { (it as KBBool).value }.toBooleanArray()
 
     fun asByteArray() =
-        map { it as Byte }.toByteArray()
+        map { (it as KBByte).value }.toByteArray()
 
     fun asShortArray() =
-        map { it as Short }.toShortArray()
+        map { (it as KBShort).value }.toShortArray()
 
     fun asIntArray() =
-        map { it as Int }.toIntArray()
+        map { (it as KBInt).value }.toIntArray()
 
     fun asLongArray() =
-        map { it as Long }.toLongArray()
+        map { (it as KBLong).value }.toLongArray()
 
     fun asFloatArray() =
-        map { it as Float }.toFloatArray()
+        map { (it as KBFloat).value }.toFloatArray()
 
     fun asDoubleArray() =
-        map { it as Double }.toDoubleArray()
+        map { (it as KBDouble).value }.toDoubleArray()
 
     fun asCharArray() =
-        map { it as Char }.toCharArray()
+        map { (it as KBChar).value }.toCharArray()
 
     fun asStringArray() =
-        map { it as String }.toTypedArray()
+        map { (it as KBString).value }.toTypedArray()
 
     override fun equals(other: Any?): Boolean {
         if (other == null) return false

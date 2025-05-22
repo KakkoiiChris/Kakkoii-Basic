@@ -61,9 +61,9 @@ private fun exec(name: String, text: String) {
     }
     catch (_: Redirect.Return) {
     }
-    catch (e: KBError) {
-        e.printStackTrace()
-    }
+    //catch (e: KBError) {
+    //    e.printStackTrace()
+    //}
     
     val end = System.nanoTime()
     
