@@ -29,25 +29,25 @@ class StandardLibrary {
     }
 
     private fun addGeneral() {
-        add("print", NONE, ANY.vararg) { script, args ->
+        add("print", NONE, ANY.vararg) { runtime, args ->
             val (subArgs) = args
 
             subArgs as KBArray
 
             for (arg in subArgs.value) {
-                print(script.getString(arg))
+                print(runtime.getString(arg.value!!))
             }
 
             KBNone
         }
 
-        add("input", STRING, ANY.vararg) { script, args ->
+        add("input", STRING, ANY.vararg) { runtime, args ->
             val (subArgs) = args
 
             subArgs as KBArray
 
             for (arg in subArgs.value) {
-                print(script.getString(arg))
+                print(runtime.getString(arg))
             }
 
             KBString(readln())
@@ -71,14 +71,14 @@ class StandardLibrary {
             KBNone
         }
 
-        add("concat", STRING, ANY.vararg) { script, args ->
+        add("concat", STRING, ANY.vararg) { runtime, args ->
             val (subArgs) = args
 
             subArgs as KBArray
 
             KBString(buildString {
                 for (arg in subArgs.value) {
-                    append(script.getString(arg))
+                    append(runtime.getString(arg))
                 }
             })
         }
@@ -97,19 +97,19 @@ class StandardLibrary {
 
         add("nanoseconds", LONG) { _, _ -> KBLong(System.nanoTime()) }
 
-        add("typeof", STRING, ANY) { script, args ->
+        add("typeof", STRING, ANY) { runtime, args ->
             val (x) = args
 
-            KBString(DataType.infer(script, x).toString())
+            KBString(DataType.infer(runtime, x).toString())
         }
 
-        add("invoke", ANY, STRING, ANY.vararg) { script, args ->
+        add("invoke", ANY, STRING, ANY.vararg) { runtime, args ->
             val (name, arguments) = args
 
             name as KBString
             arguments as KBArray
 
-            script.invoke(name.value, *arguments.value.toTypedArray())?.result ?: KBError.noSub(name.value)
+            runtime.invoke(name.value, *arguments.value.toTypedArray())?.result ?: KBError.noSub(name.value)
         }
 
         add("exit", NONE, INT) { _, args ->
@@ -1256,10 +1256,10 @@ class StandardLibrary {
 
         add("windowIsOpen", BOOL) { _, _ -> KBBool(window.isOpen) }
 
-        add("getColor", "Color".data) { script, _ ->
+        add("getColor", "Color".data) { runtime, _ ->
             val color = window.getColor()
 
-            script.instantiate("Color", color.red, color.green, color.blue, color.alpha)
+            runtime.instantiate("Color", color.red, color.green, color.blue, color.alpha)
         }
 
         add(
@@ -1288,7 +1288,7 @@ class StandardLibrary {
             DOUBLE,
             DOUBLE,
             DOUBLE
-        ) { script, args ->
+        ) { runtime, args ->
             val (h, s, b) = args
 
             h as KBDouble
@@ -1297,13 +1297,13 @@ class StandardLibrary {
 
             val color = Color(Color.HSBtoRGB(h.value.toFloat(), s.value.toFloat(), b.value.toFloat()))
 
-            script.instantiate("Color", color.red, color.green, color.blue, color.alpha)
+            runtime.instantiate("Color", color.red, color.green, color.blue, color.alpha)
         }
 
-        add("getFont", "Font".data) { script, _ ->
+        add("getFont", "Font".data) { runtime, _ ->
             val font = window.getFont()
 
-            script.instantiate("Font", font.name, font.style, font.size)
+            runtime.instantiate("Font", font.name, font.style, font.size)
         }
 
         add(
@@ -1324,10 +1324,10 @@ class StandardLibrary {
             KBNone
         }
 
-        add("getStroke", "Font".data) { script, _ ->
+        add("getStroke", "Font".data) { runtime, _ ->
             val stroke = window.getStroke()
 
-            script.instantiate(
+            runtime.instantiate(
                 "Stroke",
                 stroke.lineWidth,
                 stroke.endCap,
@@ -1775,14 +1775,14 @@ class StandardLibrary {
             KBNone
         }
 
-        add("loadImage", "Image".data, STRING) { script, args ->
+        add("loadImage", "Image".data, STRING) { runtime, args ->
             val (path) = args
 
             path as KBString
 
             val (id, width, height) = window.loadImage(path.value)
 
-            script.instantiate("Image", id, width, height)
+            runtime.instantiate("Image", id, width, height)
         }
 
         add(

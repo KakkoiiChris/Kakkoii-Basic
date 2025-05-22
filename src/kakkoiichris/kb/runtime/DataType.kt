@@ -94,11 +94,11 @@ interface DataType {
     }
 
     enum class Primitive(private val clazz: KClass<out Any>) : DataType {
-        NONE(Unit::class) {
-            override fun default(runtime: Runtime) = KBEmpty
+        NONE(KBNone::class) {
+            override fun default(runtime: Runtime) = KBNone
         },
 
-        BOOL(Boolean::class) {
+        BOOL(KBBool::class) {
             override fun cast(runtime: Runtime, x: KBV?) = when (x) {
                 is KBBool   -> x
                 is KBByte   -> KBBool(x.value != 0.toByte())
@@ -115,7 +115,7 @@ interface DataType {
             override fun default(runtime: Runtime) = KBBool(false)
         },
 
-        BYTE(Byte::class) {
+        BYTE(KBByte::class) {
             override fun cast(runtime: Runtime, x: KBV?) = when (x) {
                 is KBBool   -> KBByte((if (x.value) 0 else 1).toByte())
                 is KBByte   -> x
@@ -137,7 +137,7 @@ interface DataType {
             override fun default(runtime: Runtime) = KBByte(0.toByte())
         },
 
-        SHORT(Short::class) {
+        SHORT(KBShort::class) {
             override fun cast(runtime: Runtime, x: KBV?) = when (x) {
                 is KBBool   -> KBShort((if (x.value) 0 else 1).toShort())
                 is KBByte   -> KBShort(x.value.toShort())
@@ -160,7 +160,7 @@ interface DataType {
             override fun default(runtime: Runtime) = KBShort(0.toShort())
         },
 
-        INT(Int::class) {
+        INT(KBInt::class) {
             override fun cast(runtime: Runtime, x: KBV?) = when (x) {
                 is KBBool   -> KBInt(if (x.value) 0 else 1)
                 is KBByte   -> KBInt(x.value.toInt())
@@ -185,7 +185,7 @@ interface DataType {
             override fun default(runtime: Runtime) = KBInt(0)
         },
 
-        LONG(Long::class) {
+        LONG(KBLong::class) {
             override fun cast(runtime: Runtime, x: KBV?) = when (x) {
                 is KBBool   -> KBLong(if (x.value) 0L else 1L)
                 is KBByte   -> KBLong(x.value.toLong())
@@ -211,7 +211,7 @@ interface DataType {
             override fun default(runtime: Runtime) = KBLong(0L)
         },
 
-        FLOAT(Float::class) {
+        FLOAT(KBFloat::class) {
             override fun cast(runtime: Runtime, x: KBV?) = when (x) {
                 is KBBool   -> KBFloat(if (x.value) 0F else 1F)
                 is KBByte   -> KBFloat(x.value.toFloat())
@@ -238,7 +238,7 @@ interface DataType {
             override fun default(runtime: Runtime) = KBFloat(0F)
         },
 
-        DOUBLE(Double::class) {
+        DOUBLE(KBDouble::class) {
             override fun cast(runtime: Runtime, x: KBV?) = when (x) {
                 is KBBool   -> KBDouble(if (x.value) 0.0 else 1.0)
                 is KBByte   -> KBDouble(x.value.toDouble())
@@ -266,7 +266,7 @@ interface DataType {
             override fun default(runtime: Runtime) = KBDouble(0.0)
         },
 
-        CHAR(Char::class) {
+        CHAR(KBChar::class) {
             override fun cast(runtime: Runtime, x: KBV?) = when (x) {
                 is KBByte   -> KBChar(x.value.toInt().toChar())
                 is KBShort  -> KBChar(x.value.toInt().toChar())
@@ -281,7 +281,7 @@ interface DataType {
             override fun default(runtime: Runtime) = KBChar('\u0000')
         },
 
-        STRING(String::class) {
+        STRING(KBString::class) {
             override val iterableType: DataType get() = CHAR
 
             override fun cast(runtime: Runtime, x: KBV?) = when (x) {
@@ -295,7 +295,7 @@ interface DataType {
                 cast(runtime, x)?.value?.toCharArray()?.map { KBChar(it) }
         },
 
-        ANY(Any::class) {
+        ANY(KBValue::class) {
             override fun cast(runtime: Runtime, x: KBV?) = x
 
             override fun default(runtime: Runtime) = KBEmpty
